@@ -1,1 +1,256 @@
-:root{font-family:Inter,"PingFang TC","Microsoft JhengHei",sans-serif;color:#192d42;background:#f5f6f6;font-size:16px}*{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1450px;margin:auto;padding:20px clamp(18px,5vw,84px)}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #cbd2d6;background:white}header strong{font-family:Georgia,serif;font-size:22px}header nav,nav,.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}button,.btn,input,select,textarea{font:inherit;color:inherit;border:1px solid #bdc8cd;border-radius:4px;background:white;padding:10px 14px}button,.btn{cursor:pointer;text-decoration:none}button:hover,.btn:hover{border-color:#19354b;background:#eaf0f3}.primary{background:#19354b;color:white}.primary:hover{background:#32546d}a{color:inherit}h1,h2,h3,p{margin:0 0 12px}h1,h2{font-family:Georgia,"Songti TC",serif}h1{font-size:clamp(40px,5vw,80px);font-weight:500;letter-spacing:.03em}h2{font-size:30px}p{line-height:1.7}.hero{position:relative;min-height:430px;display:flex;align-items:flex-end;padding:clamp(24px,4vw,64px);background:#233746;color:white;isolation:isolate;overflow:hidden}.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0e1b29d9,transparent 95%);z-index:-1}.hero p{max-width:560px}.hero .btn{display:inline-block;margin-top:12px}.section{margin:38px 0 20px;display:flex;align-items:end;justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(235px,100%),1fr));gap:24px}.card{padding:0;text-align:left;background:white;border:0;overflow:hidden}.card img,.card video,.placeholder{width:100%;height:180px;object-fit:cover;background:#dfe6e9}.card div{padding:16px}.muted,small{color:#526777}small{display:block;margin-bottom:5px}dialog{border:0;border-radius:8px;width:min(620px,94vw);max-height:90dvh;padding:24px;color:inherit}dialog::backdrop{background:#13223299}dialog img,dialog video,dialog audio{width:100%;max-height:48vh;object-fit:contain}#stage{position:relative;background:#dbe1e3;height:min(72dvh,820px);min-height:300px}#stage canvas{width:100%;height:100%;display:block;touch-action:none}.pad{position:absolute;bottom:14px;left:14px;display:flex;gap:5px}.pad button{touch-action:none;opacity:.9}label{display:grid;gap:5px;font-size:14px}input,textarea,select{max-width:100%;min-width:0}button:focus-visible,a:focus-visible{outline:3px solid #d18337}footer{border-top:1px solid #cbd2d6;color:#506271}section{margin:20px 0}[hidden]{display:none!important}@media(max-width:600px){header{padding:14px}header strong{font-size:18px}.hero{min-height:360px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card img,.card video,.placeholder{height:120px}main{padding:16px}.pad{gap:3px}.pad button{padding:9px}}
+:root {
+  font-family: Inter, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  color: #192d42;
+  background: #f5f6f6;
+  font-size: 16px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+header,
+main,
+footer {
+  max-width: 1450px;
+  margin: auto;
+  padding: 20px clamp(18px, 5vw, 84px);
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #cbd2d6;
+  background: white;
+}
+header strong {
+  font-family: Georgia, serif;
+  font-size: 22px;
+}
+header nav,
+nav,
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+button,
+.btn,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  border: 1px solid #bdc8cd;
+  border-radius: 4px;
+  background: white;
+  padding: 10px 14px;
+}
+button,
+.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover,
+.btn:hover {
+  border-color: #19354b;
+  background: #eaf0f3;
+}
+.primary {
+  background: #19354b;
+  color: white;
+}
+.primary:hover {
+  background: #32546d;
+}
+a {
+  color: inherit;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0 0 12px;
+}
+h1,
+h2 {
+  font-family: Georgia, "Songti TC", serif;
+}
+h1 {
+  font-size: clamp(40px, 5vw, 80px);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+h2 {
+  font-size: 30px;
+}
+p {
+  line-height: 1.7;
+}
+.hero {
+  position: relative;
+  min-height: 430px;
+  display: flex;
+  align-items: flex-end;
+  padding: clamp(24px, 4vw, 64px);
+  background: #233746;
+  color: white;
+  isolation: isolate;
+  overflow: hidden;
+}
+.hero img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+}
+.hero:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #0e1b29d9, transparent 95%);
+  z-index: -1;
+}
+.hero p {
+  max-width: 560px;
+}
+.hero .btn {
+  display: inline-block;
+  margin-top: 12px;
+}
+.section {
+  margin: 38px 0 20px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(235px, 100%), 1fr));
+  gap: 24px;
+}
+.card {
+  padding: 0;
+  text-align: left;
+  background: white;
+  border: 0;
+  overflow: hidden;
+}
+.card img,
+.card video,
+.placeholder {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  background: #dfe6e9;
+}
+.card div {
+  padding: 16px;
+}
+.muted,
+small {
+  color: #526777;
+}
+small {
+  display: block;
+  margin-bottom: 5px;
+}
+dialog {
+  border: 0;
+  border-radius: 8px;
+  width: min(620px, 94vw);
+  max-height: 90dvh;
+  padding: 24px;
+  color: inherit;
+}
+dialog::backdrop {
+  background: #13223299;
+}
+dialog img,
+dialog video,
+dialog audio {
+  width: 100%;
+  max-height: 48vh;
+  object-fit: contain;
+}
+#stage {
+  position: relative;
+  background: #dbe1e3;
+  height: min(72dvh, 820px);
+  min-height: 300px;
+}
+#stage canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.pad {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  gap: 5px;
+}
+.pad button {
+  touch-action: none;
+  opacity: 0.9;
+}
+label {
+  display: grid;
+  gap: 5px;
+  font-size: 14px;
+}
+input,
+textarea,
+select {
+  max-width: 100%;
+  min-width: 0;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #d18337;
+}
+footer {
+  border-top: 1px solid #cbd2d6;
+  color: #506271;
+}
+section {
+  margin: 20px 0;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 600px) {
+  header {
+    padding: 14px;
+  }
+  header strong {
+    font-size: 18px;
+  }
+  .hero {
+    min-height: 360px;
+  }
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .card img,
+  .card video,
+  .placeholder {
+    height: 120px;
+  }
+  main {
+    padding: 16px;
+  }
+  .pad {
+    gap: 3px;
+  }
+  .pad button {
+    padding: 9px;
+  }
+}
