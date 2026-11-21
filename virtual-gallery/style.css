@@ -254,3 +254,9 @@ section {
     padding: 9px;
   }
 }
+
+#visitTitle {font-size:clamp(1.6rem,3.5vw,2.7rem);margin:0 auto 0 0}
+#stage {height:clamp(350px,66dvh,850px);border-radius:6px;overflow:hidden}
+#visit>p {margin:.6rem 0;color:#465968}
+#exhibits {margin:0} #visit {margin-top:12px}
+@media(max-width:600px){#stage{height:59svh}.row{gap:6px}#visit .row button,#visit .row select{font-size:14px;padding:8px}#visitTitle{width:100%}}

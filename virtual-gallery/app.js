@@ -84,11 +84,12 @@ function leave() {
   viewer?.dispose();
   viewer = null;
   $("visit").hidden = true;
+  document.querySelector(".hero").hidden=false;
   $("music").pause();
 }
 function draw() {
   leave();
-  $("title").textContent = current.title;
+  $("title").textContent = $("visitTitle").textContent = current.title;
   $("desc").textContent = current.description;
   $("dates").textContent =
     current.start || current.end
@@ -147,7 +148,8 @@ async function enter() {
   viewer?.dispose();
   viewer = null;
   $("visit").hidden = false;
-  $("visit").scrollIntoView();
+  document.querySelector(".hero").hidden=true;
+  $("stage").textContent="正在開啟 3D 展廳…";
   try {
     let { gallery } = await import("./gallery.js");
     if (n === seq)
@@ -191,15 +193,19 @@ try {
   $("shows").onchange = () => {
     current = shows[Number($("shows").value)];
     draw();
+    enter();
   };
   if (shows.length) {
     current = shows[0];
     draw();
+    enter();
   } else {
+    leave();
     $("title").textContent = "目前休展";
     $("enter").hidden = true;
   }
 } catch {
+  leave();
   $("title").textContent = "展覽資料讀取失敗，請重新整理";
   $("enter").hidden = true;
 }

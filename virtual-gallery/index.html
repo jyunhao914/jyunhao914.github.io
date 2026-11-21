@@ -15,7 +15,7 @@
         <label>展覽選擇<select id="shows"></select></label>
       </div>
     </section>
-    <article class="hero">
+    <article class="hero" hidden>
       <img src="media/hero.webp" alt="展覽空間" />
       <div>
         <p id="dates"></p>
@@ -24,15 +24,15 @@
         <button id="enter">進入 3D 展廳</button>
       </div>
     </article>
-    <section id="visit" hidden>
+    <section id="visit" aria-label="3D 展廳">
       <div class="row">
-        <h2>展廳漫遊</h2>
+        <h1 id="visitTitle">3D 展廳</h1>
         <select id="room" aria-label="展廳"></select
         ><button id="next">下一件導覽</button
-        ><button id="leave">離開展廳</button>
+        ><button id="leave">展覽介紹</button>
       </div>
       <p>拖曳環顧，方向鍵或下方按鍵移動。點選作品可閱讀展籤。</p>
-      <div id="stage"></div>
+      <div id="stage" aria-label="可行走的 3D 展廳">正在開啟 3D 展廳…</div>
       <label id="musicLabel">展廳音樂<audio id="music" controls></audio></label
       ><label id="volLabel"
         >播放音量<input

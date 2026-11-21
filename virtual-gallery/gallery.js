@@ -24,6 +24,15 @@ export function gallery(host, works, onPick, onMove) {
     box(scene, 0.12, 4.6, 14, 0xf2f1ed, s * 6, 2.25, 0);
     box(scene, 12, 4.6, 0.12, 0xf7f5ef, 0, 2.25, s * 7);
   }
+  // Floor joints, track lights and a central bench give the room a visible scale.
+  for(let x=-4;x<=4;x+=2)box(scene,.012,.004,14,0x988e82,x,0,0);
+  for(let z=-6;z<=6;z+=2)box(scene,12,.004,.012,0x988e82,0,0,z);
+  for(let x of [-3,3]){
+    box(scene,.065,.06,13,0x3b4245,x,4.44,0);
+    for(let z of [-5,-1,3])box(scene,.14,.21,.18,0x353b41,x,4.31,z);
+  }
+  const bench=box(scene,2.6,.13,.6,0x8e6747,0,.46,-1.2);
+  for(let x of [-.9,.9])box(bench,.10,.40,.47,0x434748,x,-.24,0);
   const environment = new T.Scene();
   environment.background = new T.Color(0xa7b0ba);
   for (let x of [-4, 4]) {
@@ -150,7 +159,8 @@ export function gallery(host, works, onPick, onMove) {
     g.add(light);
     light.target = face;
   });
-  cam.position.set(0, 1.65, 3.8);
+  cam.position.set(3.8, 1.65, 3.25);
+  cam.lookAt(-1.7, 1.46, -4.9);
   cam.rotation.order = "YXZ";
   let keys = new Set(),
     ray = new T.Raycaster(),
