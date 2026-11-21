@@ -80,7 +80,9 @@ function detail(a) {
 $("close").onclick = () => $("detail").close();
 $("detail").onclose = () => $("content").replaceChildren();
 function leave() {
-  $("visit").classList.remove("expanded");
+  $("visit").classList.remove("immersive", "expanded");
+  document.body.classList.remove("visiting");
+  menu(false);
   if (document.fullscreenElement === $("visit"))
     document.exitFullscreen().catch(() => {});
   $("expand").textContent = "放大展廳";
@@ -152,6 +154,11 @@ async function enter() {
   viewer?.dispose();
   viewer = null;
   $("visit").hidden = false;
+  document.body.classList.add("visiting");
+  $("visit").classList.add("immersive");
+  menu(false);
+  showFocus(null);
+  syncExpand();
   const roomWorks = current.works.filter((a) => a.room === $("room").value);
   $("tour").replaceChildren(
     new Option("選擇導覽作品", ""),
@@ -165,7 +172,7 @@ async function enter() {
       viewer = gallery(
         $("stage"),
         current.works.filter((a) => a.room === $("room").value),
-        detail,
+        showFocus,
       );
   } catch (e) {
     $("stage").textContent = "此裝置無法啟動 WebGL 2。可於展出作品區開啟展籤。";
@@ -197,11 +204,30 @@ $("homeView").onclick = () => {
   $("tour").value = "";
 };
 const visit = $("visit");
+function showFocus(a) {
+  $("focusTitle").textContent = a?.title || "";
+  $("viewHelp").textContent = a
+    ? "左右滑動切換作品"
+    : "點作品走近觀賞 · 拖曳環顧";
+  $("tour").value = a
+    ? String(
+        current.works
+          .filter((w) => w.room === $("room").value)
+          .findIndex((w) => w.id === a.id),
+      )
+    : "";
+}
+function menu(open) {
+  $("visitMenu").hidden = !open;
+  $("menuButton").setAttribute("aria-expanded", String(open));
+}
+$("menuButton").onclick = () => menu($("visitMenu").hidden);
+$("tour").addEventListener("change", () => menu(false));
 function syncExpand() {
   $("expand").textContent =
     document.fullscreenElement === visit || visit.classList.contains("expanded")
-      ? "縮小展廳"
-      : "放大展廳";
+      ? "退出全螢幕"
+      : "全螢幕";
 }
 document.addEventListener("fullscreenchange", syncExpand);
 $("expand").onclick = async () => {
@@ -210,13 +236,21 @@ $("expand").onclick = async () => {
     visit.classList.remove("expanded");
   else {
     try {
-      await visit.requestFullscreen();
+      await visit.requestFullscreen({ navigationUI: "hide" });
     } catch {
       visit.classList.add("expanded");
     }
   }
+  menu(false);
   syncExpand();
 };
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    menu(false);
+    visit.classList.remove("expanded");
+    syncExpand();
+  }
+});
 try {
   const preview = location.search === "?studio-preview" && parent !== window;
   shows = preview

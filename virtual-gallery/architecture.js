@@ -9,6 +9,7 @@ export function architecture(scene, box, renderer) {
       ["normalMap", "normal"],
       ["roughnessMap", "rough"],
     ]) {
+      if (name === "plaster" && kind === "rough") continue;
       const tex = new T.TextureLoader().load(
         new URL("./materials/" + name + "-" + kind + ".webp", import.meta.url)
           .href,
@@ -22,6 +23,35 @@ export function architecture(scene, box, renderer) {
     }
     return maps;
   }
+  // Approximate diffuse daylight from the two extended apertures in room coordinates.
+  // Modulate the linear diffuse term only; brushed frames and glazing keep their own response.
+  function daylight(material, finish) {
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader =
+        "varying vec3 museumPosition;\n" +
+        shader.vertexShader.replace(
+          "#include <worldpos_vertex>",
+          "#include <worldpos_vertex>\nmuseumPosition=(modelMatrix*vec4(transformed,1.)).xyz;",
+        );
+      shader.fragmentShader =
+        "varying vec3 museumPosition;\n" +
+        shader.fragmentShader.replace(
+          "#include <map_fragment>",
+          `#include <map_fragment>
+        vec3 p=museumPosition;
+        float windowFalloff=exp(-.27*(p.x+6.))*(.68+.32*smoothstep(-7.,-4.,p.z)*smoothstep(-7.,-4.,-p.z));
+        float roofFalloff=exp(-.095*(p.x+1.75)*(p.x+1.75));
+        float edge=min(6.-abs(p.x),7.-abs(p.z));
+        float corner=max(6.-abs(p.x),7.-abs(p.z));
+        float shade=.72+.21*windowFalloff+.13*roofFalloff;
+        shade*=1.-.14*exp(-2.4*max(corner,0.));
+        ${finish === "floor" ? "shade*=1.-.21*exp(-3.*max(edge,0.));" : "shade*=1.-.13*exp(-4.*max(p.y,0.));"}
+        ${finish === "plaster" ? "diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.76,.75,.72),.48);" : ""}
+        diffuseColor.rgb*=shade*mix(vec3(1.02,.98,.93),vec3(.97,1.,1.035),windowFalloff);`,
+        );
+    };
+    material.customProgramCacheKey = () => "museum-daylight-" + finish;
+  }
   const floor = new T.Mesh(
     new T.PlaneGeometry(12, 14),
     new T.MeshStandardMaterial({
@@ -31,6 +61,7 @@ export function architecture(scene, box, renderer) {
       normalScale: new T.Vector2(0.24, 0.24),
     }),
   );
+  daylight(floor.material, "floor");
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
@@ -70,9 +101,17 @@ export function architecture(scene, box, renderer) {
     textures.push(t);
     return t;
   }
-  const wallFinish = { map: plaster(), roughness: 0.93 },
-    stoneColor = 0xe4e1d9;
-
+  const ambient = plaster();
+  ambient.colorSpace = T.NoColorSpace;
+  const lime = surface("plaster", 12, 4.5);
+  const wallFinish = {
+      ...lime,
+      normalScale: new T.Vector2(0.52, 0.52),
+      aoMap: ambient,
+      aoMapIntensity: 0.94,
+      roughness: 0.92,
+    },
+    stoneColor = 0xf6f3ec;
   for (const side of [-1, 1]) {
     box(
       scene,
@@ -99,31 +138,48 @@ export function architecture(scene, box, renderer) {
     box(scene, 0.035, 0.075, 14, 0x918c81, side * 5.92, 0.038, 0);
     box(scene, 12, 0.075, 0.035, 0x918c81, 0, 0.038, side * 6.92);
   }
-  box(scene, 12, 0.1, 14, 0xd3cdbf, 0, 4.58, 0);
-  // Continuous recessed skylight and laminated timber baffles.
-  for (const x of [-3.67, 1.27]) {
-    box(scene, 0.12, 0.17, 13.85, 0xaaa191, x, 4.4, 0).castShadow = true;
+  // Recessed diffuse roof lanterns: broad plaster soffits and splayed reveals.
+  const overhead = surface("plaster", 5, 12);
+  const soffit = {
+    ...overhead,
+    roughness: 0.95,
+    normalScale: new T.Vector2(0.28, 0.28),
+  };
+  box(scene, 12, 0.12, 14, 0xe9e4d7, 0, 4.99, 0, soffit);
+  for (const [x, w] of [
+    [-4.68, 2.64],
+    [2.93, 6.14],
+  ]) {
+    box(scene, w, 0.3, 14, 0xf6f2e7, x, 4.52, 0, soffit);
   }
+  for (const x of [-3.34, -0.15]) {
+    const reveal = box(scene, 0.12, 0.48, 14, 0xe8e1d3, x, 4.69, 0, soffit);
+    reveal.rotation.z = x < -1 ? -0.2 : 0.2;
+  }
+  for (let n = 0; n < 4; n++) {
+    const z = -5.25 + n * 3.5;
+    box(scene, 3.1, 0.05, 3.32, 0xe5e8e5, -1.75, 4.9, z, {
+      emissive: 0xdde6e9,
+      emissiveIntensity: 0.6,
+      roughness: 0.95,
+    });
+    box(scene, 3.28, 0.22, 0.13, 0xd2c9b8, -1.75, 4.73, z + 1.68, soffit);
+    for (let j of [-0.82, 0.82])
+      box(scene, 0.024, 0.045, 3.28, 0xbbbdb6, -1.75 + j, 4.85, z);
+  }
+  // Shallow perimeter recess creates a continuous shadow line at the ceiling junction.
   for (const side of [-1, 1]) {
-    box(scene, 11.92, 0.035, 0.08, 0xafaa9e, 0, 4.37, side * 6.91);
+    box(scene, 11.9, 0.046, 0.07, 0xa19c90, 0, 4.31, side * 6.92);
+    box(scene, 0.07, 0.046, 13.9, 0xa19c90, side * 5.92, 4.31, 0);
   }
-  const glow = { emissive: 0xffedd1, emissiveIntensity: 0.95 };
-  box(scene, 4.7, 0.045, 13.7, 0xfff4db, -1.2, 4.48, 0, glow);
   function repeat(count, geo, material, position) {
     const group = new T.InstancedMesh(geo, material, count),
       matrix = new T.Matrix4();
     for (let i = 0; i < count; i++)
       group.setMatrixAt(i, matrix.makeTranslation(...position(i)));
-    group.castShadow = true;
     group.receiveShadow = true;
     scene.add(group);
   }
-  repeat(
-    41,
-    new T.BoxGeometry(4.9, 0.15, 0.052),
-    new T.MeshStandardMaterial({ ...wood, color: 0xbe946e, roughness: 0.67 }),
-    (i) => [-1.2, 4.34, -6.8 + i * 0.34],
-  );
   // High glazing has a deep sill and a dark reveal, leaving the entire hanging wall available below.
   box(scene, 0.09, 0.86, 12.2, 0x655f57, -5.9, 3.66, 0);
   box(scene, 0.065, 0.72, 12, 0xf4f8f8, -5.83, 3.66, 0, {
@@ -199,7 +255,7 @@ export function architecture(scene, box, renderer) {
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.set(0, 0.005, -1.2);
   scene.add(shadow);
-  const sun = new T.DirectionalLight(0xffeed8, 2.2);
+  const sun = new T.DirectionalLight(0xfff0d9, 1.1);
   sun.position.set(-7, 7, 2);
   sun.target.position.set(2, 0, -3);
   scene.add(sun, sun.target);
@@ -213,7 +269,15 @@ export function architecture(scene, box, renderer) {
     far: 30,
   });
   sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.radius = 3.5;
   sun.shadow.normalBias = 0.018;
   sun.shadow.bias = -0.00025;
+  scene.traverse((object) => {
+    if (
+      object.isMesh &&
+      (object.material.map === lime.map || object.material.map === overhead.map)
+    )
+      daylight(object.material, "plaster");
+  });
   return { floor, textures, wood };
 }

@@ -9,7 +9,7 @@ export function gallery(host, works, onPick, onMove) {
   host.replaceChildren(renderer.domElement);
   const canvas = renderer.domElement;
   scene.background = new T.Color(0xe5e8e8);
-  scene.add(new T.HemisphereLight(0xffffff, 0xb9ae99, 1.15));
+  scene.add(new T.HemisphereLight(0xffffff, 0xc4bcb0, 1.5));
   function box(parent, w, h, d, color, x, y, z, props = {}) {
     let m = new T.Mesh(
       new T.BoxGeometry(w, h, d),
@@ -169,7 +169,7 @@ export function gallery(host, works, onPick, onMove) {
       a.power,
       12,
       (a.angle * Math.PI) / 180,
-      0.45,
+      0.72,
     );
     light.position.set(a.lx, a.ly, a.lz);
     g.add(light);
@@ -196,11 +196,14 @@ export function gallery(host, works, onPick, onMove) {
   canvas.onpointerdown = (e) => {
     if (drag) return;
     canvas.setPointerCapture(e.pointerId);
-    travel = null;
+    if (guide < 0 || onMove) travel = null;
     canvas.focus({ preventScroll: true });
     let obj = hit(e);
     drag = {
       pointer: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      inspecting: guide >= 0 && !onMove,
       x: e.clientX,
       y: e.clientY,
       dist: 0,
@@ -242,7 +245,7 @@ export function gallery(host, works, onPick, onMove) {
         );
         layout(drag.obj.parent, a);
       }
-    } else {
+    } else if (!drag.inspecting) {
       cam.rotation.y -= dx * 0.005;
       cam.rotation.x = Math.max(
         -1.2,
@@ -254,12 +257,26 @@ export function gallery(host, works, onPick, onMove) {
   canvas.setAttribute("aria-label", "展廳視角，可拖曳環視或點地板前往");
   canvas.onpointerup = (e) => {
     if (!drag || drag.pointer !== e.pointerId) return;
-    if (drag.dist < 6 && drag.click) onPick(drag.click.userData.a);
-    else if (drag.obj) onMove(drag.obj.userData.a);
-    else if (drag.dist < 6 && !onMove) {
+    const dx = e.clientX - drag.startX,
+      dy = e.clientY - drag.startY;
+    if (
+      drag.inspecting &&
+      Math.abs(dx) > 42 &&
+      Math.abs(dx) > Math.abs(dy) * 1.3
+    )
+      changeWork(guide + (dx < 0 ? 1 : -1));
+    else if (drag.dist < 9 && drag.click) {
+      const work = drag.click.userData.a;
+      if (onMove) onPick(work);
+      else changeWork(works.indexOf(work));
+    } else if (drag.obj) onMove(drag.obj.userData.a);
+    else if (drag.dist < 9 && !onMove) {
       hit(e);
       const floorHit = ray.intersectObject(building.floor)[0];
-      if (floorHit) navigate(floorHit.point);
+      if (floorHit) {
+        stopInspection();
+        navigate(floorHit.point);
+      }
     }
     drag = null;
   };
@@ -282,6 +299,7 @@ export function gallery(host, works, onPick, onMove) {
   const velocity = new T.Vector2(),
     wish = new T.Vector2();
   function steer(e) {
+    stopInspection();
     const r = stick.getBoundingClientRect();
     let x = (e.clientX - r.left - r.width / 2) / (r.width * 0.34),
       y = (e.clientY - r.top - r.height / 2) / (r.height * 0.34),
@@ -330,7 +348,7 @@ export function gallery(host, works, onPick, onMove) {
   function navigate(point, look = null) {
     const end = new T.Vector3(
       T.MathUtils.clamp(point.x, -5.6, 5.6),
-      1.65,
+      look ? point.y : 1.65,
       T.MathUtils.clamp(point.z, -6.6, 6.6),
     );
     if (blocked(end.x, end.z)) end.z = cam.position.z > -1.2 ? -0.54 : -1.86;
@@ -366,7 +384,19 @@ export function gallery(host, works, onPick, onMove) {
         ),
       );
     }
-    travel = { steps: [...steps, end], look };
+    const path = [start, ...steps, end],
+      curve = new T.CurvePath();
+    for (let i = 1; i < path.length; i++)
+      if (path[i].distanceTo(path[i - 1]) > 0.001)
+        curve.add(new T.LineCurve3(path[i - 1], path[i]));
+    travel = {
+      curve,
+      end,
+      look,
+      started: performance.now(),
+      duration: Math.min(2100, Math.max(550, (curve.getLength() || 0) * 180)),
+      rotation: cam.quaternion.clone(),
+    };
     velocity.set(0, 0);
   }
   function key(e) {
@@ -396,6 +426,7 @@ export function gallery(host, works, onPick, onMove) {
     ) {
       e.preventDefault();
       if (e.type === "keydown") {
+        stopInspection();
         travel = null;
         keys.add(k);
       } else keys.delete(k);
@@ -415,6 +446,7 @@ export function gallery(host, works, onPick, onMove) {
     renderer.setSize(w, h, false);
     cam.aspect = w / h;
     cam.updateProjectionMatrix();
+    if (guide >= 0 && !onMove) focus(guide, false);
   });
   ro.observe(host);
   let last = performance.now();
@@ -430,30 +462,22 @@ export function gallery(host, works, onPick, onMove) {
       .clampLength(0, 1);
     velocity.lerp(wish, 1 - Math.exp(-14 * dt));
     if (travel) {
-      const dest = travel.steps[0],
-        delta = dest.clone().sub(cam.position),
-        distance = delta.length(),
-        step = Math.min(distance, dt * 4.1);
-      if (distance > 0.001)
-        cam.position.addScaledVector(delta, step / distance);
+      const t = T.MathUtils.clamp(
+          (now - travel.started) / travel.duration,
+          0,
+          1,
+        ),
+        ease = t * t * (3 - 2 * t);
+      if (travel.curve.curves.length)
+        cam.position.copy(travel.curve.getPoint(ease));
+      else cam.position.copy(travel.end);
       if (travel.look) {
-        const rotation = new T.Matrix4().lookAt(
-          cam.position,
-          travel.look,
-          cam.up,
+        const final = new T.Quaternion().setFromRotationMatrix(
+          new T.Matrix4().lookAt(cam.position, travel.look, cam.up),
         );
-        cam.quaternion.slerp(
-          new T.Quaternion().setFromRotationMatrix(rotation),
-          1 - Math.exp(-7 * dt),
-        );
+        cam.quaternion.slerpQuaternions(travel.rotation, final, ease);
       }
-      if (distance <= step + 0.001) {
-        travel.steps.shift();
-        if (!travel.steps.length) {
-          if (travel.look) cam.lookAt(travel.look);
-          travel = null;
-        }
-      }
+      if (t === 1) travel = null;
     } else {
       const yaw = cam.rotation.y,
         dx = velocity.x * dt * 3.2,
@@ -477,12 +501,13 @@ export function gallery(host, works, onPick, onMove) {
     if (!g) return;
     const halfFov = T.MathUtils.degToRad(cam.fov / 2);
     const distance = Math.min(
-      6,
+      11,
       Math.max(
-        2.2,
-        (works[i].width * 0.64) /
+        0.85,
+        ((works[i].width + 2 * (works[i].mat + works[i].frameWidth)) * 0.57) /
           (Math.tan(halfFov) * Math.max(0.38, cam.aspect)),
-        (works[i].height * 0.7) / Math.tan(halfFov),
+        ((works[i].height + 2 * (works[i].mat + works[i].frameWidth)) * 0.6) /
+          Math.tan(halfFov),
       ),
     );
     const dest = g.position
@@ -491,7 +516,7 @@ export function gallery(host, works, onPick, onMove) {
         new T.Vector3(0, 0, 1).applyQuaternion(g.quaternion),
         distance,
       );
-    dest.y = 1.65;
+    dest.y = g.position.y;
     if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches)
       navigate(dest, g.position);
     else {
@@ -500,25 +525,31 @@ export function gallery(host, works, onPick, onMove) {
       cam.lookAt(g.position);
     }
   }
+  function stopInspection() {
+    if (guide >= 0 && !onMove) {
+      guide = -1;
+      onPick(null);
+    }
+  }
+  function changeWork(i) {
+    if (!works.length) return;
+    guide = (i + works.length) % works.length;
+    focus(guide, true);
+    if (!onMove) onPick(works[guide]);
+    return works[guide];
+  }
   return {
     next(offset = 1) {
-      if (!works.length) return;
-      guide =
-        guide < 0
-          ? offset > 0
-            ? 0
-            : works.length - 1
-          : (guide + offset + works.length) % works.length;
-      focus(guide, true);
-      return works[guide];
+      return changeWork(
+        guide < 0 ? (offset > 0 ? 0 : works.length - 1) : guide + offset,
+      );
     },
     select(i) {
-      guide = i;
-      focus(i, true);
+      return changeWork(i);
     },
     home() {
+      stopInspection();
       navigate(new T.Vector3(3.8, 1.65, 3.25), new T.Vector3(-1.7, 1.46, -4.9));
-      guide = -1;
     },
     focus,
     dispose() {

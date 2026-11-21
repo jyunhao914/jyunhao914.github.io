@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
   <meta charset="utf-8" /><meta
     name="viewport"
-    content="width=device-width,initial-scale=1"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>虛擬策展工作室｜線上美術館</title
   ><link rel="stylesheet" href="style.css" />
   <header>
@@ -25,32 +25,45 @@
       </div>
     </article>
     <section id="visit" aria-label="3D 展廳">
-      <div class="row">
-        <h1 id="visitTitle">3D 展廳</h1>
-        <select id="room" aria-label="展廳"></select
-        ><button id="expand">放大展廳</button
-        ><button id="leave">展覽介紹</button>
-      </div>
-      <p class="visit-help">
-        點地面前往，拖曳環顧，點作品閱讀展籤。也可用搖桿或 WASD 移動。
-      </p>
       <div id="stage" aria-label="可行走的 3D 展廳">正在開啟 3D 展廳…</div>
-      <div class="tour-tools">
-        <button id="prev">上一件</button
-        ><select id="tour" aria-label="選擇導覽作品"></select
-        ><button id="next">下一件</button
-        ><button id="homeView">回到入口</button>
+      <div class="museum-head">
+        <h1 id="visitTitle">3D 展廳</h1>
+        <button id="expand">全螢幕</button
+        ><button
+          id="menuButton"
+          aria-expanded="false"
+          aria-controls="visitMenu"
+        >
+          選單
+        </button>
       </div>
-      <label id="musicLabel">展廳音樂<audio id="music" controls></audio></label
-      ><label id="volLabel"
-        >播放音量<input
-          id="vol"
-          type="range"
-          min="0"
-          max="1"
-          step=".01"
-          value=".5"
-      /></label>
+      <div class="view-caption">
+        <strong id="focusTitle" aria-live="polite"></strong
+        ><span id="viewHelp">點作品走近觀賞 · 拖曳環顧</span>
+      </div>
+      <div id="visitMenu" hidden>
+        <label>展廳<select id="room"></select></label>
+        <div class="tour-tools">
+          <button id="prev">上一件</button
+          ><select id="tour" aria-label="選擇導覽作品"></select
+          ><button id="next">下一件</button>
+        </div>
+        <div class="tour-tools">
+          <button id="homeView">回到入口</button
+          ><button id="leave">展覽介紹與作品清單</button>
+        </div>
+        <label id="musicLabel"
+          >展廳音樂<audio id="music" controls></audio></label
+        ><label id="volLabel"
+          >播放音量<input
+            id="vol"
+            type="range"
+            min="0"
+            max="1"
+            step=".01"
+            value=".5"
+        /></label>
+      </div>
     </section>
     <div id="works" class="section">
       <h2>展出作品</h2>

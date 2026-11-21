@@ -13,3 +13,9 @@ https://polyhaven.com/license
 https://creativecommons.org/publicdomain/zero/1.0/
 
 These WebP derivatives were made from the original diffuse, OpenGL normal, and roughness maps. Diffuse maps are 1024 × 1024 sRGB. Normal and roughness maps are 512 × 512 data textures.
+
+White painted plaster: White Plaster 02 by Rob Tuytel, Poly Haven.
+https://polyhaven.com/a/white_plaster_02
+Source area: 1 m × 1 m. Creative Commons CC0 1.0 Universal.
+The diffuse scan is desaturated and lifted to a neutral gallery-white base.
+The 512 × 512 normal map retains the source OpenGL convention.

@@ -397,3 +397,102 @@ section {
     height: 68px;
   }
 }
+body.visiting {
+  overflow: hidden;
+}
+#visit.immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: #cbc5b9;
+}
+#visit.immersive #stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+.museum-head {
+  position: absolute;
+  inset: max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right)) auto
+    max(14px, env(safe-area-inset-left));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.museum-head button,
+.museum-head #visitTitle,
+.view-caption,
+#visitMenu {
+  background: #25302ee8;
+  color: #fffcf5;
+  border: 1px solid #ffffff35;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+}
+.museum-head button {
+  pointer-events: auto;
+  min-height: 44px;
+}
+.museum-head #visitTitle {
+  width: auto;
+  padding: 8px 15px;
+  margin: 0 auto 0 0;
+  font-size: clamp(19px, 2.6vw, 32px);
+  font-weight: 500;
+}
+.view-caption {
+  position: absolute;
+  right: max(15px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  padding: 8px 13px;
+  pointer-events: none;
+  display: grid;
+  gap: 2px;
+}
+.view-caption span {
+  font-size: 13px;
+}
+#visitMenu {
+  position: absolute;
+  right: 14px;
+  top: calc(max(14px, env(safe-area-inset-top)) + 60px);
+  width: min(300px, calc(100% - 28px));
+  max-height: 70dvh;
+  overflow: auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+#visitMenu button,
+#visitMenu select {
+  background: #f6f5ef;
+  color: #263531;
+  padding: 8px;
+}
+#visitMenu label {
+  margin: 5px 0;
+}
+#visitMenu audio {
+  max-width: 100%;
+}
+#visit.immersive .walk-pad {
+  bottom: max(18px, env(safe-area-inset-bottom));
+}
+#visit.expanded .museum-head #visitTitle,
+#visit.expanded .view-caption:has(strong:empty),
+#visit:fullscreen .museum-head #visitTitle,
+#visit:fullscreen .view-caption:has(strong:empty) {
+  visibility: hidden;
+}
