@@ -169,9 +169,24 @@ $("next").onclick = () => {
   if (a) $("next").textContent = "下一件導覽 · " + a.title;
 };
 try {
-  shows = (
-    await (await fetch("exhibitions.json", { cache: "no-store" })).json()
-  ).filter(valid);
+  const preview = location.search === "?studio-preview" && parent !== window;
+  shows = preview
+    ? await new Promise((resolve) => {
+        window.addEventListener("message", function receive(e) {
+          if (
+            e.origin === location.origin &&
+            e.source === parent &&
+            Array.isArray(e.data?.galleryPreview)
+          ) {
+            window.removeEventListener("message", receive);
+            resolve(e.data.galleryPreview);
+          }
+        });
+        parent.postMessage("galleryPreviewReady", location.origin);
+      })
+    : (
+        await (await fetch("exhibitions.json", { cache: "no-store" })).json()
+      ).filter(valid);
   $("shows").replaceChildren(...shows.map((s, i) => new Option(s.title, i)));
   $("shows").onchange = () => {
     current = shows[Number($("shows").value)];

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>虛擬策展工作室｜管理後台</title
+  ><meta name="referrer" content="no-referrer" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://api.github.com 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; frame-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'"
+  />
+  <style>
+    #preview {
+      width: 95vw;
+      height: 90dvh;
+      border: 0;
+    }
+    #preview iframe {
+      width: 100%;
+      height: 90%;
+      border: 0;
+    }
+    #login {
+      max-width: 600px;
+      margin: 6vh auto;
+      padding: 24px;
+      background: white;
+    }
+    #login p {
+      line-height: 1.7;
+    }
+    #login input {
+      width: 100%;
+      box-sizing: border-box;
+      margin: 10px 0;
+    }
+    body {
+      font: 16px system-ui;
+      color: #1b3448;
+      margin: 0;
+      background: #f4f6f7;
+    }
+    header,
+    main {
+      max-width: 1300px;
+      margin: auto;
+      padding: 18px 4vw;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+    }
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+      padding: 10px;
+      border: 1px solid #bcc8cd;
+      border-radius: 5px;
+      color: inherit;
+      background: white;
+    }
+    button {
+      cursor: pointer;
+    }
+    button[aria-current="true"],
+    .action {
+      background: #19364e;
+      color: white;
+    }
+    nav,
+    .bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    label {
+      display: grid;
+      gap: 4px;
+      font-size: 14px;
+    }
+    fieldset {
+      border: 1px solid #cdd6da;
+      background: #fff;
+      margin: 16px 0;
+      padding: 14px;
+    }
+    legend {
+      font-weight: bold;
+    }
+    .fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+      gap: 12px;
+    }
+    input,
+    select,
+    textarea {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .panel {
+      display: grid;
+      grid-template-columns: minmax(200px, 1fr) minmax(0, 3fr);
+      gap: 20px;
+    }
+    aside button {
+      width: 100%;
+      text-align: left;
+      margin: 3px 0;
+    }
+    .wall {
+      position: relative;
+      aspect-ratio: 12/4.5;
+      background:
+        repeating-linear-gradient(0deg, #d9e0e1 0 1px, transparent 1px 11.11%),
+        repeating-linear-gradient(90deg, #dae0e3 0 1px, #f7f8f8 1px 8.333%);
+      border: 1px solid #84939a;
+      overflow: hidden;
+    }
+    .piece {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      padding: 0;
+      touch-action: none;
+      overflow: hidden;
+      background: #a2b9be;
+      background-size: 100% 100%;
+      border: 3px solid #76664f;
+    }
+    .piece.sel {
+      outline: 3px solid #20689b;
+    }
+    .piece span {
+      background: #fff9;
+      font-size: 12px;
+    }
+    #stage {
+      position: relative;
+      height: 52dvh;
+      min-height: 250px;
+    }
+    #stage canvas {
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .pad {
+      position: absolute;
+      bottom: 7px;
+      left: 7px;
+    }
+    .pad button {
+      touch-action: none;
+    }
+    a {
+      color: inherit;
+    }
+    #status {
+      max-width: 50%;
+      font-size: 14px;
+    }
+    video,
+    img {
+      max-width: 100%;
+    }
+    @media (max-width: 680px) {
+      .panel {
+        display: block;
+      }
+      aside {
+        max-height: 185px;
+        overflow: auto;
+      }
+      .fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .wall {
+        min-height: 180px;
+      }
+      header {
+        padding: 12px;
+      }
+      h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+  <header>
+    <strong>虛擬策展工作室</strong
+    ><span id="status" role="status">尚未登入</span>
+    <button id="logout" hidden>登出</button>
+  </header>
+  <main>
+    <div id="login">
+      <h1>線上策展工作室</h1>
+      <p>
+        使用 jyunhao914 的 GitHub
+        憑證登入。草稿會儲存在私人作品庫，發布後即可在公開展廳參觀。
+      </p>
+      <details>
+        <summary>首次登入：建立管理憑證</summary>
+        <p>
+          在 GitHub 選擇 Only select repositories，勾選
+          <b>virtual-gallery-private</b> 和 <b>jyunhao914.github.io</b>，確認
+          Contents 為 Read and write，產生憑證後貼回此處。
+        </p>
+        <a
+          target="_blank"
+          rel="noopener noreferrer"
+          href="https://github.com/settings/personal-access-tokens/new?name=Virtual+Gallery+Studio&amp;target_name=jyunhao914&amp;contents=write"
+          >前往 GitHub 建立細粒度憑證</a
+        >
+      </details>
+      <label
+        >GitHub 管理憑證<input
+          id="key"
+          type="password"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false" /></label
+      ><button id="signin" class="action">登入工作室</button>
+      <p>憑證只在此分頁記憶體中使用。重新整理或登出後需再次輸入。</p>
+    </div>
+    <nav id="tabs"></nav>
+    <div id="app"></div>
+  </main>
+  <dialog id="preview">
+    <button id="closePreview">返回布展</button
+    ><iframe title="草稿預覽"></iframe>
+  </dialog>
+  <script type="module" src="./login.js"></script>
+</html>
