@@ -9,7 +9,7 @@ export function gallery(host, works, onPick, onMove) {
   host.replaceChildren(renderer.domElement);
   const canvas = renderer.domElement;
   scene.background = new T.Color(0xe5e8e8);
-  scene.add(new T.HemisphereLight(0xffffff, 0xc4bcb0, 1.5));
+  scene.add(new T.HemisphereLight(0xeef2fa, 0xc4ae91, 0.5));
   function box(parent, w, h, d, color, x, y, z, props = {}) {
     let m = new T.Mesh(
       new T.BoxGeometry(w, h, d),
@@ -26,23 +26,20 @@ export function gallery(host, works, onPick, onMove) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFShadowMap;
   const building = architecture(scene, box, renderer);
-  const environment = new T.Scene();
-  environment.background = new T.Color(0xa7b0ba);
-  for (let x of [-4, 4]) {
-    let panel = new T.Mesh(
-      new T.PlaneGeometry(4, 3),
-      new T.MeshBasicMaterial({ color: 0xffffff, side: T.DoubleSide }),
-    );
-    panel.position.set(x, 2, -3);
-    environment.add(panel);
-  }
-  const pmrem = new T.PMREMGenerator(renderer),
-    reflection = pmrem.fromScene(environment);
-  scene.environment = reflection.texture;
-  pmrem.dispose();
-  environment.traverse((o) => {
-    o.geometry?.dispose();
-    o.material?.dispose();
+  let reflection,
+    disposed = false;
+  building.ready.then(() => {
+    if (disposed) return;
+    const cube = new T.WebGLCubeRenderTarget(128, { type: T.HalfFloatType });
+    const probe = new T.CubeCamera(0.08, 78, cube);
+    probe.position.set(0, 1.7, 0);
+    probe.update(renderer, scene);
+    const pmrem = new T.PMREMGenerator(renderer);
+    reflection = pmrem.fromCubemap(cube.texture);
+    scene.environment = reflection.texture;
+    scene.environmentIntensity = 0.28;
+    cube.dispose();
+    pmrem.dispose();
   });
   let groups = [],
     targets = [],
@@ -134,7 +131,13 @@ export function gallery(host, works, onPick, onMove) {
     textures.push(tex);
     let face = new T.Mesh(
       new T.PlaneGeometry(w, h),
-      new T.MeshStandardMaterial({ map: tex, roughness: 0.92 }),
+      new T.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.92,
+        emissive: 0xffffff,
+        emissiveMap: tex,
+        emissiveIntensity: 0.17,
+      }),
     );
     face.position.z = d / 2 + 0.012;
     face.userData.a = a;
@@ -555,7 +558,8 @@ export function gallery(host, works, onPick, onMove) {
     dispose() {
       building.textures.forEach((t) => t.dispose());
       scene.traverse((o) => o.shadow?.dispose());
-      reflection.dispose();
+      disposed = true;
+      reflection?.dispose();
       renderer.setAnimationLoop(null);
       ro.disconnect();
       window.removeEventListener("keydown", key);

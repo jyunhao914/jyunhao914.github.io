@@ -19,3 +19,9 @@ https://polyhaven.com/a/white_plaster_02
 Source area: 1 m × 1 m. Creative Commons CC0 1.0 Universal.
 The diffuse scan is desaturated and lifted to a neutral gallery-white base.
 The 512 × 512 normal map retains the source OpenGL convention.
+
+Exterior landscape panorama: Shady Patch by Greg Zaal, Poly Haven.
+https://polyhaven.com/a/shady_patch
+Creative Commons CC0 1.0 Universal. The woodland.webp derivative is a
+2048 × 1024 equirectangular sRGB image from the original HDR panorama;
+exposure and foliage saturation have been adjusted for the gallery windows.
