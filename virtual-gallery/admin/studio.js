@@ -1,3 +1,4 @@
+import { artworkList, artworkDetail } from "./art-preview.js";
 import { state, post, versions, exhibition } from "./storage.js";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
@@ -193,7 +194,8 @@ function library() {
     ) +
     '</select></label><aside></aside></div><div id="form"></div></div>';
   let list = () =>
-    listButtons(
+    artworkList(
+      $("aside"),
       db.arts.filter(
         (x) =>
           (!filter || x.category === filter) &&
@@ -204,7 +206,6 @@ function library() {
         aid = i;
         render();
       },
-      $("aside"),
     );
   $("#query").value = search;
   $("#query").oninput = (e) => {
@@ -250,7 +251,7 @@ function library() {
   };
   if (!a) return;
   $("#form").innerHTML =
-    '<fieldset><legend>作品資料</legend><div class="fields">' +
+    '<div id="art-preview"></div><fieldset><legend>作品資料</legend><div class="fields">' +
     field(a, "title", "作品名稱", null, "text", "required") +
     field(a, "artist", "創作者") +
     field(a, "category", "分類") +
@@ -273,12 +274,21 @@ function library() {
       .join("") +
     "</div></fieldset>" +
     btn("delete", "刪除作品");
-  bind($("#form"), a, () => list());
+  const refreshPreview = () => artworkDetail($("#art-preview"), a);
+  refreshPreview();
+  bind($("#form"), a, (k) => {
+    list();
+    if (["title", "description", "type"].includes(k)) refreshPreview();
+  });
   for (let k of ["src", "voice", "captions"])
     $("#" + k).onchange = async (e) => {
       let f = e.target.files[0];
       if (f) {
         a[k] = await fileData(f, k === "captions" ? "text/vtt" : null);
+        if (k === "src") {
+          list();
+          refreshPreview();
+        }
         changed();
       }
     };
@@ -668,8 +678,12 @@ function layout() {
   scene();
 }
 async function refreshRestored() {
-  db=await state();sid=db.shows[0]?.id;aid=db.arts[0]?.id;dirty=false;
-  status.textContent="已還原 · 版本 "+db.rev; render();
+  db = await state();
+  sid = db.shows[0]?.id;
+  aid = db.arts[0]?.id;
+  dirty = false;
+  status.textContent = "已還原 · 版本 " + db.rev;
+  render();
 }
 function backup() {
   app.innerHTML =

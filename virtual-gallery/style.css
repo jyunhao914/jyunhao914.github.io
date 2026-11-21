@@ -255,8 +255,145 @@ section {
   }
 }
 
-#visitTitle {font-size:clamp(1.6rem,3.5vw,2.7rem);margin:0 auto 0 0}
-#stage {height:clamp(350px,66dvh,850px);border-radius:6px;overflow:hidden}
-#visit>p {margin:.6rem 0;color:#465968}
-#exhibits {margin:0} #visit {margin-top:12px}
-@media(max-width:600px){#stage{height:59svh}.row{gap:6px}#visit .row button,#visit .row select{font-size:14px;padding:8px}#visitTitle{width:100%}}
+#visitTitle {
+  font-size: clamp(1.6rem, 3.5vw, 2.7rem);
+  margin: 0 auto 0 0;
+}
+#stage {
+  height: clamp(350px, 66dvh, 850px);
+  border-radius: 6px;
+  overflow: hidden;
+}
+#visit > p {
+  margin: 0.6rem 0;
+  color: #465968;
+}
+#exhibits {
+  margin: 0;
+}
+#visit {
+  margin-top: 12px;
+}
+@media (max-width: 600px) {
+  #stage {
+    height: 59svh;
+  }
+  .row {
+    gap: 6px;
+  }
+  #visit .row button,
+  #visit .row select {
+    font-size: 14px;
+    padding: 8px;
+  }
+  #visitTitle {
+    width: 100%;
+  }
+}
+#visit {
+  background: #fff;
+  padding: clamp(12px, 2vw, 26px);
+  border: 1px solid #dce2e1;
+  border-radius: 10px;
+}
+#visit .row {
+  gap: 8px;
+}
+#visitTitle {
+  font-family: Georgia, "Songti TC", serif;
+}
+#stage {
+  height: clamp(360px, 68dvh, 900px);
+  background: #c9c8c0;
+  border-radius: 4px;
+}
+#stage canvas {
+  cursor: grab;
+}
+#stage canvas:active {
+  cursor: grabbing;
+}
+#stage .walk-pad {
+  bottom: 18px;
+  left: 18px;
+  z-index: 2;
+}
+.walk-stick {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #fff9;
+  background: radial-gradient(circle, #15253026, #172c3c75);
+  box-shadow: 0 3px 16px #18263230;
+  backdrop-filter: blur(3px);
+  touch-action: none;
+}
+.walk-knob {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fffffff0;
+  border: 1px solid white;
+  box-shadow: 0 2px 6px #14253344;
+  pointer-events: none;
+}
+#visit .tour-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.tour-tools select {
+  max-width: min(100%, 280px);
+}
+#visit .visit-help {
+  font-size: 0.9rem;
+  color: #49606a;
+  margin: 0.5rem 0;
+}
+#visit:fullscreen,
+#visit.expanded {
+  box-sizing: border-box;
+  background: white;
+  overflow: auto;
+  width: 100%;
+  height: 100dvh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+#visit.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+#visit:fullscreen #stage,
+#visit.expanded #stage {
+  height: calc(100dvh - 185px);
+}
+@media (max-width: 650px) {
+  #visit {
+    padding: 9px;
+    margin: 8px -8px;
+  }
+  #stage {
+    height: 60svh;
+  }
+  #visit .tour-tools {
+    gap: 4px;
+  }
+  .tour-tools select,
+  .tour-tools button {
+    padding: 8px 9px;
+    font-size: 14px;
+  }
+  .walk-stick {
+    width: 68px;
+    height: 68px;
+  }
+}

@@ -1,4 +1,5 @@
 import * as T from "./vendor/three.module.js";
+import { architecture } from "./architecture.js";
 export function gallery(host, works, onPick, onMove) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(64, 1, 0.06, 80),
@@ -8,31 +9,23 @@ export function gallery(host, works, onPick, onMove) {
   host.replaceChildren(renderer.domElement);
   const canvas = renderer.domElement;
   scene.background = new T.Color(0xe5e8e8);
-  scene.add(new T.HemisphereLight(0xffffff, 0xc7b9a7, 1.6));
+  scene.add(new T.HemisphereLight(0xffffff, 0xb9ae99, 1.15));
   function box(parent, w, h, d, color, x, y, z, props = {}) {
     let m = new T.Mesh(
       new T.BoxGeometry(w, h, d),
       new T.MeshStandardMaterial({ color, ...props }),
     );
     m.position.set(x, y, z);
+    m.receiveShadow = true;
+    m.castShadow = parent !== scene;
     parent.add(m);
     return m;
   }
-  box(scene, 12, 0.12, 14, 0xb9afa0, 0, -0.06, 0);
-  box(scene, 12, 0.12, 14, 0xf8f8f6, 0, 4.55, 0);
-  for (let s of [-1, 1]) {
-    box(scene, 0.12, 4.6, 14, 0xf2f1ed, s * 6, 2.25, 0);
-    box(scene, 12, 4.6, 0.12, 0xf7f5ef, 0, 2.25, s * 7);
-  }
-  // Floor joints, track lights and a central bench give the room a visible scale.
-  for(let x=-4;x<=4;x+=2)box(scene,.012,.004,14,0x988e82,x,0,0);
-  for(let z=-6;z<=6;z+=2)box(scene,12,.004,.012,0x988e82,0,0,z);
-  for(let x of [-3,3]){
-    box(scene,.065,.06,13,0x3b4245,x,4.44,0);
-    for(let z of [-5,-1,3])box(scene,.14,.21,.18,0x353b41,x,4.31,z);
-  }
-  const bench=box(scene,2.6,.13,.6,0x8e6747,0,.46,-1.2);
-  for(let x of [-.9,.9])box(bench,.10,.40,.47,0x434748,x,-.24,0);
+  renderer.toneMapping = T.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.04;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = T.PCFShadowMap;
+  const building = architecture(scene, box, renderer);
   const environment = new T.Scene();
   environment.background = new T.Color(0xa7b0ba);
   for (let x of [-4, 4]) {
@@ -110,6 +103,7 @@ export function gallery(host, works, onPick, onMove) {
           metalness: a.frame === "金屬框" ? 0.7 : 0.08,
           roughness: a.finish === "亮面" ? 0.16 : 0.82,
           envMapIntensity: 1,
+          ...(a.frame === "木框" ? building.wood : {}),
         },
       );
     if (m) box(g, w + 2 * m, h + 2 * m, 0.012, 0xf7f2e5, 0, 0, d / 2);
@@ -146,6 +140,28 @@ export function gallery(host, works, onPick, onMove) {
     face.userData.a = a;
     g.add(face);
     targets.push(face);
+    const tag = document.createElement("canvas");
+    tag.width = 512;
+    tag.height = 190;
+    const tc = tag.getContext("2d");
+    tc.fillStyle = "#edeade";
+    tc.fillRect(0, 0, 512, 190);
+    tc.fillStyle = "#202b31";
+    tc.font = "bold 44px sans-serif";
+    tc.fillText(a.title, 22, 75, 465);
+    tc.font = "26px sans-serif";
+    tc.fillText(a.artist || a.type, 24, 133, 462);
+    const tagTex = new T.CanvasTexture(tag);
+    tagTex.colorSpace = T.SRGBColorSpace;
+    textures.push(tagTex);
+    const plaque = new T.Mesh(
+      new T.PlaneGeometry(0.43, 0.16),
+      new T.MeshStandardMaterial({ map: tagTex }),
+    );
+    plaque.position.set(w / 2 + m + f + 0.28, -h / 2 + 0.08, 0.015);
+    g.add(plaque);
+    plaque.userData.a = a;
+    targets.push(plaque);
     let k = a.kelvin,
       t = (k - 2500) / 4500;
     let light = new T.SpotLight(
@@ -178,9 +194,13 @@ export function gallery(host, works, onPick, onMove) {
     return ray.intersectObjects(targets)[0]?.object;
   }
   canvas.onpointerdown = (e) => {
+    if (drag) return;
     canvas.setPointerCapture(e.pointerId);
+    travel = null;
+    canvas.focus({ preventScroll: true });
     let obj = hit(e);
     drag = {
+      pointer: e.pointerId,
       x: e.clientX,
       y: e.clientY,
       dist: 0,
@@ -196,7 +216,7 @@ export function gallery(host, works, onPick, onMove) {
     }
   };
   canvas.onpointermove = (e) => {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.pointer) return;
     let dx = e.clientX - drag.x,
       dy = e.clientY - drag.y;
     drag.dist += Math.abs(dx) + Math.abs(dy);
@@ -230,34 +250,135 @@ export function gallery(host, works, onPick, onMove) {
       );
     }
   };
-  canvas.onpointerup = () => {
-    if (drag?.dist < 6 && drag.click) onPick(drag.click.userData.a);
-    else if (drag?.obj) onMove(drag.obj.userData.a);
+  canvas.tabIndex = 0;
+  canvas.setAttribute("aria-label", "展廳視角，可拖曳環視或點地板前往");
+  canvas.onpointerup = (e) => {
+    if (!drag || drag.pointer !== e.pointerId) return;
+    if (drag.dist < 6 && drag.click) onPick(drag.click.userData.a);
+    else if (drag.obj) onMove(drag.obj.userData.a);
+    else if (drag.dist < 6 && !onMove) {
+      hit(e);
+      const floorHit = ray.intersectObject(building.floor)[0];
+      if (floorHit) navigate(floorHit.point);
+    }
     drag = null;
   };
   canvas.onpointercancel = () => (drag = null);
-  let pad = document.createElement("div");
-  pad.className = "pad";
-  for (let [k, n] of [
-    ["a", "左移"],
-    ["w", "前進"],
-    ["s", "後退"],
-    ["d", "右移"],
-  ]) {
-    let b = document.createElement("button");
-    b.textContent = n;
-    b.onpointerdown = (e) => {
-      b.setPointerCapture(e.pointerId);
-      keys.add(k);
-    };
-    b.onlostpointercapture = () => keys.delete(k);
-    pad.append(b);
-  }
+  const pad = document.createElement("div"),
+    stick = document.createElement("button"),
+    knob = document.createElement("span");
+  pad.className = "pad walk-pad";
+  stick.className = "walk-stick";
+  stick.type = "button";
+  stick.setAttribute("aria-label", "移動搖桿：拖曳前進、後退或側移");
+  knob.className = "walk-knob";
+  stick.append(knob);
+  pad.append(stick);
   host.append(pad);
+  let joyX = 0,
+    joyY = 0,
+    stickPointer = null,
+    travel = null;
+  const velocity = new T.Vector2(),
+    wish = new T.Vector2();
+  function steer(e) {
+    const r = stick.getBoundingClientRect();
+    let x = (e.clientX - r.left - r.width / 2) / (r.width * 0.34),
+      y = (e.clientY - r.top - r.height / 2) / (r.height * 0.34),
+      length = Math.max(1, Math.hypot(x, y));
+    joyX = x / length;
+    joyY = y / length;
+    knob.style.transform = "translate(" + joyX * 20 + "px," + joyY * 20 + "px)";
+    travel = null;
+  }
+  stick.onpointerdown = (e) => {
+    if (stickPointer !== null) return;
+    stickPointer = e.pointerId;
+    stick.setPointerCapture(e.pointerId);
+    steer(e);
+  };
+  stick.onpointermove = (e) => {
+    if (e.pointerId === stickPointer) steer(e);
+  };
+  function neutral() {
+    stickPointer = null;
+    joyX = joyY = 0;
+    knob.style.transform = "";
+  }
+  stick.onlostpointercapture = neutral;
+  function blocked(x, z) {
+    return Math.abs(x) < 1.67 && z > -1.78 && z < -0.62;
+  }
+  function move(x, z) {
+    x = T.MathUtils.clamp(x, -5.6, 5.6);
+    z = T.MathUtils.clamp(z, -6.6, 6.6);
+    if (!blocked(x, cam.position.z)) cam.position.x = x;
+    if (!blocked(cam.position.x, z)) cam.position.z = z;
+  }
+  const marker = new T.Mesh(
+    new T.RingGeometry(0.12, 0.17, 40),
+    new T.MeshBasicMaterial({
+      color: 0x244e62,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+    }),
+  );
+  marker.rotation.x = -Math.PI / 2;
+  marker.visible = false;
+  scene.add(marker);
+  function navigate(point, look = null) {
+    const end = new T.Vector3(
+      T.MathUtils.clamp(point.x, -5.6, 5.6),
+      1.65,
+      T.MathUtils.clamp(point.z, -6.6, 6.6),
+    );
+    if (blocked(end.x, end.z)) end.z = cam.position.z > -1.2 ? -0.54 : -1.86;
+    marker.position.set(end.x, 0.014, end.z);
+    marker.visible = !look;
+    let start = cam.position.clone(),
+      steps = [],
+      crosses = false;
+    for (let i = 1; i <= 40; i++) {
+      let t = i / 40;
+      if (
+        blocked(
+          T.MathUtils.lerp(start.x, end.x, t),
+          T.MathUtils.lerp(start.z, end.z, t),
+        )
+      ) {
+        crosses = true;
+        break;
+      }
+    }
+    if (crosses) {
+      const side = (start.x + end.x >= 0 ? 1 : -1) * 1.83;
+      steps.push(
+        new T.Vector3(
+          side,
+          1.65,
+          start.z >= -1.2 ? Math.max(start.z, -0.52) : Math.min(start.z, -1.88),
+        ),
+        new T.Vector3(
+          side,
+          1.65,
+          end.z >= -1.2 ? Math.max(end.z, -0.52) : Math.min(end.z, -1.88),
+        ),
+      );
+    }
+    travel = { steps: [...steps, end], look };
+    velocity.set(0, 0);
+  }
   function key(e) {
     if (
       /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) ||
       document.querySelector("dialog[open]")
+    )
+      return;
+    if (
+      e.type === "keydown" &&
+      (host.getBoundingClientRect().bottom < 40 ||
+        host.getBoundingClientRect().top > innerHeight)
     )
       return;
     let k = e.key.toLowerCase();
@@ -274,13 +395,19 @@ export function gallery(host, works, onPick, onMove) {
       ].includes(k)
     ) {
       e.preventDefault();
-      if (e.type === "keydown") keys.add(k);
-      else keys.delete(k);
+      if (e.type === "keydown") {
+        travel = null;
+        keys.add(k);
+      } else keys.delete(k);
     }
   }
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
-  let blur = () => keys.clear();
+  let blur = () => {
+    keys.clear();
+    neutral();
+    velocity.set(0, 0);
+  };
   window.addEventListener("blur", blur);
   let ro = new ResizeObserver(() => {
     let w = host.clientWidth,
@@ -292,39 +419,111 @@ export function gallery(host, works, onPick, onMove) {
   ro.observe(host);
   let last = performance.now();
   renderer.setAnimationLoop((now) => {
-    let dt = Math.min(0.05, (now - last) / 1000) * 3;
+    let dt = Math.min(0.085, Math.max(0, (now - last) / 1000));
     last = now;
     let has = (a, b) => Number(keys.has(a) || keys.has(b));
-    cam.translateX(dt * (has("d", "arrowright") - has("a", "arrowleft")));
-    cam.translateZ(dt * (has("s", "arrowdown") - has("w", "arrowup")));
-    cam.position.y = 1.65;
-    cam.position.x = T.MathUtils.clamp(cam.position.x, -5.6, 5.6);
-    cam.position.z = T.MathUtils.clamp(cam.position.z, -6.6, 6.6);
+    wish
+      .set(
+        has("d", "arrowright") - has("a", "arrowleft") + joyX,
+        has("s", "arrowdown") - has("w", "arrowup") + joyY,
+      )
+      .clampLength(0, 1);
+    velocity.lerp(wish, 1 - Math.exp(-14 * dt));
+    if (travel) {
+      const dest = travel.steps[0],
+        delta = dest.clone().sub(cam.position),
+        distance = delta.length(),
+        step = Math.min(distance, dt * 4.1);
+      if (distance > 0.001)
+        cam.position.addScaledVector(delta, step / distance);
+      if (travel.look) {
+        const rotation = new T.Matrix4().lookAt(
+          cam.position,
+          travel.look,
+          cam.up,
+        );
+        cam.quaternion.slerp(
+          new T.Quaternion().setFromRotationMatrix(rotation),
+          1 - Math.exp(-7 * dt),
+        );
+      }
+      if (distance <= step + 0.001) {
+        travel.steps.shift();
+        if (!travel.steps.length) {
+          if (travel.look) cam.lookAt(travel.look);
+          travel = null;
+        }
+      }
+    } else {
+      const yaw = cam.rotation.y,
+        dx = velocity.x * dt * 3.2,
+        dz = velocity.y * dt * 3.2;
+      move(
+        cam.position.x + dx * Math.cos(yaw) + dz * Math.sin(yaw),
+        cam.position.z - dx * Math.sin(yaw) + dz * Math.cos(yaw),
+      );
+    }
     for (let { img, ctx, tex } of animated) {
       if (img.complete && img.naturalWidth) {
         ctx.drawImage(img, 0, 0, 512, 512);
         tex.needsUpdate = true;
       }
     }
+    if (!travel) marker.visible = false;
     renderer.render(scene, cam);
   });
-  function focus(i) {
-    let g = groups[i];
+  function focus(i, animate = false) {
+    const g = groups[i];
     if (!g) return;
-    let n = new T.Vector3(0, 0, 1).applyQuaternion(g.quaternion);
-    cam.position
-      .copy(g.position)
-      .addScaledVector(n, Math.min(5, Math.max(2.6, works[i].width * 1.4)));
-    cam.lookAt(g.position);
+    const halfFov = T.MathUtils.degToRad(cam.fov / 2);
+    const distance = Math.min(
+      6,
+      Math.max(
+        2.2,
+        (works[i].width * 0.64) /
+          (Math.tan(halfFov) * Math.max(0.38, cam.aspect)),
+        (works[i].height * 0.7) / Math.tan(halfFov),
+      ),
+    );
+    const dest = g.position
+      .clone()
+      .addScaledVector(
+        new T.Vector3(0, 0, 1).applyQuaternion(g.quaternion),
+        distance,
+      );
+    dest.y = 1.65;
+    if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches)
+      navigate(dest, g.position);
+    else {
+      travel = null;
+      cam.position.copy(dest);
+      cam.lookAt(g.position);
+    }
   }
   return {
-    next() {
-      guide = (guide + 1) % groups.length;
-      focus(guide);
+    next(offset = 1) {
+      if (!works.length) return;
+      guide =
+        guide < 0
+          ? offset > 0
+            ? 0
+            : works.length - 1
+          : (guide + offset + works.length) % works.length;
+      focus(guide, true);
       return works[guide];
+    },
+    select(i) {
+      guide = i;
+      focus(i, true);
+    },
+    home() {
+      navigate(new T.Vector3(3.8, 1.65, 3.25), new T.Vector3(-1.7, 1.46, -4.9));
+      guide = -1;
     },
     focus,
     dispose() {
+      building.textures.forEach((t) => t.dispose());
+      scene.traverse((o) => o.shadow?.dispose());
       reflection.dispose();
       renderer.setAnimationLoop(null);
       ro.disconnect();

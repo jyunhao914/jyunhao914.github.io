@@ -80,11 +80,15 @@ function detail(a) {
 $("close").onclick = () => $("detail").close();
 $("detail").onclose = () => $("content").replaceChildren();
 function leave() {
+  $("visit").classList.remove("expanded");
+  if (document.fullscreenElement === $("visit"))
+    document.exitFullscreen().catch(() => {});
+  $("expand").textContent = "放大展廳";
   seq++;
   viewer?.dispose();
   viewer = null;
   $("visit").hidden = true;
-  document.querySelector(".hero").hidden=false;
+  document.querySelector(".hero").hidden = false;
   $("music").pause();
 }
 function draw() {
@@ -148,8 +152,13 @@ async function enter() {
   viewer?.dispose();
   viewer = null;
   $("visit").hidden = false;
-  document.querySelector(".hero").hidden=true;
-  $("stage").textContent="正在開啟 3D 展廳…";
+  const roomWorks = current.works.filter((a) => a.room === $("room").value);
+  $("tour").replaceChildren(
+    new Option("選擇導覽作品", ""),
+    ...roomWorks.map((a, i) => new Option(a.title, i)),
+  );
+  document.querySelector(".hero").hidden = true;
+  $("stage").textContent = "正在開啟 3D 展廳…";
   try {
     let { gallery } = await import("./gallery.js");
     if (n === seq)
@@ -166,9 +175,47 @@ async function enter() {
 $("enter").onclick = enter;
 $("room").onchange = enter;
 $("leave").onclick = leave;
-$("next").onclick = () => {
-  let a = viewer?.next();
-  if (a) $("next").textContent = "下一件導覽 · " + a.title;
+for (const [name, step] of [
+  ["prev", -1],
+  ["next", 1],
+]) {
+  $(name).onclick = () => {
+    const a = viewer?.next(step);
+    if (a)
+      $("tour").value = String(
+        current.works
+          .filter((w) => w.room === $("room").value)
+          .findIndex((w) => w.id === a.id),
+      );
+  };
+}
+$("tour").onchange = () => {
+  if ($("tour").value !== "") viewer?.select(Number($("tour").value));
+};
+$("homeView").onclick = () => {
+  viewer?.home();
+  $("tour").value = "";
+};
+const visit = $("visit");
+function syncExpand() {
+  $("expand").textContent =
+    document.fullscreenElement === visit || visit.classList.contains("expanded")
+      ? "縮小展廳"
+      : "放大展廳";
+}
+document.addEventListener("fullscreenchange", syncExpand);
+$("expand").onclick = async () => {
+  if (document.fullscreenElement === visit) await document.exitFullscreen();
+  else if (visit.classList.contains("expanded"))
+    visit.classList.remove("expanded");
+  else {
+    try {
+      await visit.requestFullscreen();
+    } catch {
+      visit.classList.add("expanded");
+    }
+  }
+  syncExpand();
 };
 try {
   const preview = location.search === "?studio-preview" && parent !== window;

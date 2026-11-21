@@ -1,0 +1,15 @@
+Gallery surface textures
+
+Stone: Marble 01, Poly Haven
+https://polyhaven.com/a/marble_01
+Source area: 1.5 m × 1.5 m.
+
+Wood: Wood Table, Poly Haven
+https://polyhaven.com/a/wood_table
+Source area: 1 m × 1 m.
+
+Both texture sets are distributed by Poly Haven under Creative Commons CC0 1.0 Universal.
+https://polyhaven.com/license
+https://creativecommons.org/publicdomain/zero/1.0/
+
+These WebP derivatives were made from the original diffuse, OpenGL normal, and roughness maps. Diffuse maps are 1024 × 1024 sRGB. Normal and roughness maps are 512 × 512 data textures.
