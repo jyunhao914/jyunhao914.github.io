@@ -32,7 +32,7 @@ async function init() {
     url: home,
     redirect_url: home + "register.html",
     callback_urls: [home],
-    hook_attributes: { active: false },
+    hook_attributes: { url: home, active: false },
     public: false,
     default_permissions: { contents: "write" },
     default_events: [],
