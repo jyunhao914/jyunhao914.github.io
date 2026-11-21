@@ -1,6 +1,7 @@
 import * as T from "./vendor/three.module.js";
 import { architecture } from "./architecture.js?v=vault1";
-export function gallery(host, works, onPick, onMove) {
+import { photographicRoom } from "./photographic-room.js";
+export function gallery(host, works, onPick, onMove, photographic = false) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(64, 1, 0.06, 80),
     renderer = new T.WebGLRenderer({ antialias: true });
@@ -25,22 +26,34 @@ export function gallery(host, works, onPick, onMove) {
   renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFShadowMap;
-  const building = architecture(scene, box, renderer);
+  const station = photographic
+    ? new T.Vector3(0, 1.65, -2.4)
+    : new T.Vector3(3.8, 1.65, 3.25);
+  const entranceLook = photographic
+    ? new T.Vector3(3.18, 1.72, -6.87)
+    : new T.Vector3(-1.7, 1.46, -4.9);
+  const building = photographic
+    ? photographicRoom(scene, renderer, station)
+    : architecture(scene, box, renderer);
   let reflection,
     disposed = false;
-  building.ready.then(() => {
-    if (disposed) return;
-    const cube = new T.WebGLCubeRenderTarget(128, { type: T.HalfFloatType });
-    const probe = new T.CubeCamera(0.08, 78, cube);
-    probe.position.set(0, 1.7, 0);
-    probe.update(renderer, scene);
-    const pmrem = new T.PMREMGenerator(renderer);
-    reflection = pmrem.fromCubemap(cube.texture);
-    scene.environment = reflection.texture;
-    scene.environmentIntensity = 0.28;
-    cube.dispose();
-    pmrem.dispose();
-  });
+  building.ready
+    .then(() => {
+      if (disposed) return;
+      const cube = new T.WebGLCubeRenderTarget(128, { type: T.HalfFloatType });
+      const probe = new T.CubeCamera(0.08, 78, cube);
+      probe.position.copy(photographic ? station : new T.Vector3(0, 1.7, 0));
+      probe.update(renderer, scene);
+      const pmrem = new T.PMREMGenerator(renderer);
+      reflection = pmrem.fromCubemap(cube.texture);
+      scene.environment = reflection.texture;
+      scene.environmentIntensity = 0.28;
+      cube.dispose();
+      pmrem.dispose();
+    })
+    .catch(() => {
+      if (!disposed) host.dispatchEvent(new Event("photofailed"));
+    });
   let groups = [],
     targets = [],
     videos = [],
@@ -86,6 +99,28 @@ export function gallery(host, works, onPick, onMove) {
       f = a.frame === "無框" ? 0 : a.frameWidth,
       m = a.mat,
       d = a.depth;
+    if (photographic) {
+      const contactCanvas = document.createElement("canvas");
+      contactCanvas.width = 256;
+      contactCanvas.height = 192;
+      const ink = contactCanvas.getContext("2d");
+      ink.filter = "blur(4px)";
+      ink.fillStyle = "rgba(26,19,13,.42)";
+      ink.fillRect(9, 8, 238, 175);
+      const shadowMap = new T.CanvasTexture(contactCanvas);
+      textures.push(shadowMap);
+      const shadow = new T.Mesh(
+        new T.PlaneGeometry((w + 2 * (f + m)) * 1.08, (h + 2 * (f + m)) * 1.12),
+        new T.MeshBasicMaterial({
+          map: shadowMap,
+          transparent: true,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+      );
+      shadow.position.set(0.018, -0.027, -0.055);
+      g.add(shadow);
+    }
     if (f)
       box(
         g,
@@ -178,8 +213,8 @@ export function gallery(host, works, onPick, onMove) {
     g.add(light);
     light.target = face;
   });
-  cam.position.set(3.8, 1.65, 3.25);
-  cam.lookAt(-1.7, 1.46, -4.9);
+  cam.position.copy(station);
+  cam.lookAt(entranceLook);
   cam.rotation.order = "YXZ";
   let keys = new Set(),
     ray = new T.Raycaster(),
@@ -328,6 +363,7 @@ export function gallery(host, works, onPick, onMove) {
   }
   stick.onlostpointercapture = neutral;
   function blocked(x, z) {
+    if (photographic) return false;
     return Math.abs(x) < 1.67 && z > -1.78 && z < -0.62;
   }
   function move(x, z) {
@@ -552,10 +588,11 @@ export function gallery(host, works, onPick, onMove) {
     },
     home() {
       stopInspection();
-      navigate(new T.Vector3(3.8, 1.65, 3.25), new T.Vector3(-1.7, 1.46, -4.9));
+      navigate(station, entranceLook);
     },
     focus,
     dispose() {
+      building.dispose?.();
       building.textures.forEach((t) => t.dispose());
       scene.traverse((o) => o.shadow?.dispose());
       disposed = true;

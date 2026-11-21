@@ -157,6 +157,7 @@ async function enter() {
   document.body.classList.add("visiting");
   $("visit").classList.add("immersive");
   menu(false);
+  $("photoCredit").hidden = $("environment").value !== "photo";
   showFocus(null);
   syncExpand();
   const roomWorks = current.works.filter((a) => a.room === $("room").value);
@@ -167,12 +168,14 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=vault1");
+    let { gallery } = await import("./gallery.js?v=photohall1");
     if (n === seq)
       viewer = gallery(
         $("stage"),
         current.works.filter((a) => a.room === $("room").value),
         showFocus,
+        undefined,
+        $("environment").value === "photo",
       );
   } catch (e) {
     $("stage").textContent = "此裝置無法啟動 WebGL 2。可於展出作品區開啟展籤。";
@@ -181,6 +184,13 @@ async function enter() {
 }
 $("enter").onclick = enter;
 $("room").onchange = enter;
+$("environment").onchange = enter;
+$("stage").addEventListener("photofailed", () => {
+  if ($("environment").value === "photo") {
+    $("environment").value = "built";
+    enter();
+  }
+});
 $("leave").onclick = leave;
 for (const [name, step] of [
   ["prev", -1],
