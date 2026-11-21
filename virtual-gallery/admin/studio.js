@@ -667,6 +667,10 @@ function layout() {
     });
   scene();
 }
+async function refreshRestored() {
+  db=await state();sid=db.shows[0]?.id;aid=db.arts[0]?.id;dirty=false;
+  status.textContent="已還原 · 版本 "+db.rev; render();
+}
 function backup() {
   app.innerHTML =
     '<h1>備份與版本</h1><p>備份含作品原檔、草稿、展覽與布展設定。可手動保存到 Google Drive。</p><div class="bar">' +
@@ -699,7 +703,7 @@ function backup() {
       await flush();
       imported.rev = db.rev;
       await post("save", imported);
-      location.reload();
+      await refreshRestored();
     } catch (err) {
       error(err);
     }
@@ -711,7 +715,7 @@ function backup() {
       rev: db.rev,
       version: $("#versions").value,
     });
-    location.reload();
+    await refreshRestored();
   });
 }
 render();
