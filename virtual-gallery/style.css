@@ -497,5 +497,18 @@ body.visiting {
   visibility: hidden;
 }
 
-#visit.immersive #stage {background: #c5bba6 url("./media/photography/doorway.webp") center / cover no-repeat}
-#photoCredit {color:#ede7da;line-height:1.45;margin:10px 0}
+#visit.immersive #stage {
+  background: #c5bba6 url("./media/photography/doorway.webp") center / cover
+    no-repeat;
+}
+#photoCredit {
+  color: #ede7da;
+  line-height: 1.45;
+  margin: 10px 0;
+}
+
+@media (max-width: 599px) {
+  #visit.immersive #stage {
+    background-image: url("./media/photography/doorway-mobile.webp");
+  }
+}

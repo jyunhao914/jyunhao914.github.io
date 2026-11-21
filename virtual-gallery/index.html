@@ -5,8 +5,21 @@
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>虛擬策展工作室｜線上美術館</title
-  ><link rel="stylesheet" href="style.css?v=photohall1" />
-  <link rel="preload" as="image" href="media/photography/doorway.webp" fetchpriority="high">
+  ><link rel="stylesheet" href="style.css?v=photohall2" />
+  <link
+    rel="preload"
+    as="image"
+    media="(min-width:600px)"
+    href="media/photography/doorway.webp"
+    fetchpriority="high"
+  />
+  <link
+    rel="preload"
+    as="image"
+    media="(max-width:599px)"
+    href="media/photography/doorway-mobile.webp"
+    fetchpriority="high"
+  />
   <header>
     <strong>虛擬策展工作室</strong>
     <nav><a href="#exhibits">展覽</a><a href="#works">典藏作品</a></nav>
@@ -99,5 +112,5 @@
     <button id="close">關閉展籤</button>
     <section id="content"></section>
   </dialog>
-  <script type="module" src="app.js?v=photohall1"></script>
+  <script type="module" src="app.js?v=photohall2"></script>
 </html>

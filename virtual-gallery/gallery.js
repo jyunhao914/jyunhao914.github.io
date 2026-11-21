@@ -3,7 +3,12 @@ import { architecture } from "./architecture.js?v=vault1";
 import { photographicRoom } from "./photographic-room.js";
 export function gallery(host, works, onPick, onMove, photographic = false) {
   const scene = new T.Scene(),
-    cam = new T.PerspectiveCamera(64, 1, 0.06, 80),
+    cam = new T.PerspectiveCamera(
+      photographic && host.clientWidth < 600 ? 88 : 64,
+      1,
+      0.06,
+      80,
+    ),
     renderer = new T.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.outputColorSpace = T.SRGBColorSpace;
@@ -30,7 +35,11 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
     ? new T.Vector3(0, 1.65, -2.4)
     : new T.Vector3(3.8, 1.65, 3.25);
   const entranceLook = photographic
-    ? new T.Vector3(3.18, 1.72, -6.87)
+    ? new T.Vector3(
+        host.clientWidth < 600 ? 5.3 : 3.18,
+        host.clientWidth < 600 ? 1.92 : 1.72,
+        -6.87,
+      )
     : new T.Vector3(-1.7, 1.46, -4.9);
   const building = photographic
     ? photographicRoom(scene, renderer, station)
@@ -484,6 +493,7 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
       h = host.clientHeight;
     renderer.setSize(w, h, false);
     cam.aspect = w / h;
+    if (photographic) cam.fov = w < 600 ? 88 : 64;
     cam.updateProjectionMatrix();
     if (guide >= 0 && !onMove) focus(guide, false);
   });
