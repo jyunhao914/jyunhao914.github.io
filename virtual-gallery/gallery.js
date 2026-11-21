@@ -1,5 +1,5 @@
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js";
+import { architecture } from "./architecture.js?v=vault1";
 export function gallery(host, works, onPick, onMove) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(64, 1, 0.06, 80),

@@ -167,7 +167,7 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js");
+    let { gallery } = await import("./gallery.js?v=vault1");
     if (n === seq)
       viewer = gallery(
         $("stage"),

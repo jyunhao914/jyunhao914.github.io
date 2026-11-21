@@ -523,7 +523,7 @@ function layout() {
       surface.innerHTML =
         '<p>拖曳作品調整位置，拖曳空白處環顧展間。</p><div id="stage"></div>';
       let t = token;
-      import("../gallery.js")
+      import("../gallery.js?v=vault1")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
