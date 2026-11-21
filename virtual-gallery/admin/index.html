@@ -7,7 +7,7 @@
   ><meta name="referrer" content="no-referrer" />
   <meta
     http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://api.github.com 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; frame-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'"
+    content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://script.google.com https://script.googleusercontent.com https://api.github.com 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; frame-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'"
   />
   <style>
     #preview {
@@ -198,33 +198,20 @@
   <main>
     <div id="login">
       <h1>線上策展工作室</h1>
-      <p>
-        使用 jyunhao914 的 GitHub
-        憑證登入。草稿會儲存在私人作品庫，發布後即可在公開展廳參觀。
-      </p>
+      <p>使用策展帳號登入，管理私人作品與展覽。</p>
+      <button id="account" class="action">使用 GitHub 帳號登入</button>
+      <p>同一分頁重新整理後可繼續工作，登入最長有效八小時。</p>
       <details>
-        <summary>首次登入：建立管理憑證</summary>
-        <p>
-          在 GitHub 選擇 Only select repositories，勾選
-          <b>virtual-gallery-private</b> 和 <b>jyunhao914.github.io</b>，確認
-          Contents 為 Read and write，產生憑證後貼回此處。
-        </p>
-        <a
-          target="_blank"
-          rel="noopener noreferrer"
-          href="https://github.com/settings/personal-access-tokens/new?name=Virtual+Gallery+Studio&amp;target_name=jyunhao914&amp;contents=write"
-          >前往 GitHub 建立細粒度憑證</a
-        >
+        <summary>擁有者設定與備援登入</summary>
+        <p><a href="./register.html">設定 GitHub 登入應用程式</a></p>
+        <label
+          >既有 GitHub 管理憑證<input
+            id="key"
+            type="password"
+            autocomplete="off"
+            spellcheck="false" /></label
+        ><button id="signin">使用既有憑證登入</button>
       </details>
-      <label
-        >GitHub 管理憑證<input
-          id="key"
-          type="password"
-          autocomplete="off"
-          autocapitalize="none"
-          spellcheck="false" /></label
-      ><button id="signin" class="action">登入工作室</button>
-      <p>憑證只在此分頁記憶體中使用。重新整理或登出後需再次輸入。</p>
     </div>
     <nav id="tabs"></nav>
     <div id="app"></div>

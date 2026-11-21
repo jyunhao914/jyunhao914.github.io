@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><meta name="referrer" content="no-referrer" /><meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; form-action https://github.com; base-uri 'none'"
+  /><link rel="stylesheet" href="../style.css" /><title>
+    啟用 GitHub 帳號登入
+  </title>
+  <main>
+    <h1>啟用 GitHub 登入</h1>
+    <p>
+      請使用 jyunhao914 建立專用 GitHub App，再於安裝頁選擇
+      <strong>Only select repositories</strong>，只勾選 virtual-gallery-private
+      與 jyunhao914.github.io。完成後，手機即可使用 GitHub 帳號登入。
+    </p>
+    <p id="message" role="status"></p>
+    <form
+      id="manifest"
+      method="post"
+      action="https://github.com/settings/apps/new"
+    >
+      <input type="hidden" name="manifest" /><button id="create" disabled>
+        在 GitHub 建立登入應用程式
+      </button>
+    </form>
+    <p><a id="install" hidden>前往 GitHub 選擇兩個儲存庫</a></p>
+    <a href="./">返回管理後台</a>
+  </main>
+  <script type="module" src="./register.js"></script>
+</html>
