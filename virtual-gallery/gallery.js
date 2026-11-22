@@ -1,3 +1,4 @@
+import {mobileControls} from "./mobile-controls.js";
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
 import { architecture } from "./architecture.js?v=space12";
@@ -309,7 +310,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     let gesture = "look";
     if (!onMove && obj?.userData.picture) {
       if (reading && index === guide) gesture = "pan";
-      else if (works[index].width < 4*works[index].height) gesture = "switch";
+      else if (guide>=0 && works[index].width < 4*works[index].height) gesture = "switch";
     }
     drag = {
       pointer: e.pointerId,
@@ -432,6 +433,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     }
   }
   let spaceHeld=false;
+  function turn(yaw,pitch) {
+    cam.rotation.y+=yaw;
+    cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+pitch,-1.2,1.2);
+  }
+  const mobile = !onMove && (navigator.maxTouchPoints>0 || matchMedia("(pointer:coarse)").matches)
+    ? mobileControls(host,turn,()=>Boolean(travel || guide>=0 || drag)) : null;
   const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
     ArrowUp:"前進",ArrowDown:"後退",ArrowLeft:"左移",ArrowRight:"右移"};
   const turning={ArrowUp:"抬頭",ArrowDown:"低頭",ArrowLeft:"左轉",ArrowRight:"右轉"};
@@ -563,6 +570,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   let blur = () => {
     keys.clear();
     tapTravel=[];
+    mobile?.release();
     spaceHeld=false;
   };
   window.addEventListener("blur", blur);
@@ -576,10 +584,34 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     else if (guide >= 0 && !onMove) focus(guide, false);
   });
   ro.observe(host);
+  const frameMeter=document.getElementById("frameMeter");
+  let elapsed=0, frames=0, fastFrames=0, highRefresh=false;
   let last = performance.now();
   renderer.setAnimationLoop((now) => {
     let dt = Math.min(0.040, Math.max(0, (now - last) / 1000));
+    const ms=now-last;
     last = now;
+    if (ms>0 && ms<300 && !document.hidden) {
+      elapsed+=ms; frames++;
+      if(ms<11)fastFrames++;
+      if(elapsed>=1500) {
+        if(fastFrames>frames*.35) highRefresh=true;
+        const fps=1000*frames/elapsed;
+        if(frameMeter)frameMeter.textContent=Math.round(fps)+" FPS";
+        const goal=highRefresh?120:60;
+        if(fps<goal*.84 && renderer.getPixelRatio()>.9)
+          renderer.setPixelRatio(Math.max(.9,renderer.getPixelRatio()-.15));
+        elapsed=frames=fastFrames=0;
+      }
+    } else {elapsed=frames=fastFrames=0;}
+    if(mobile && mobile.vector.lengthSq()>0) {
+      const {x,y}=mobile.vector;
+      if (reading) { if(x) operate(x>0?"右移":"左移",dt*Math.abs(x)); }
+      else {
+        if(x) operate(x>0?"右移":"左移",dt*Math.abs(x));
+        if(y) operate(y>0?"後退":"前進",dt*Math.abs(y));
+      }
+    }
     for(const [code,motion] of keys) {
       const ramp=Math.max(0,Math.min(1,(now-motion.start)/180));
       operate(actionFor(code), dt*(.3+.7*ramp*ramp*(3-2*ramp)));
@@ -710,8 +742,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     else focus(guide,true);
     return a;
   }
+  const entryLook=e=>turn(-e.detail.dx*.003,-e.detail.dy*.003);
+  host.addEventListener("entrylook",entryLook);
   host.dispatchEvent(new CustomEvent("viewerready",{detail: input =>
-    key({ ...input, target:canvas, preventDefault() {} })
+    input.type==="entrylook" ? turn(-input.dx*.003,-input.dy*.003) : key({ ...input, target:canvas, preventDefault() {} })
   }));
   return {
     seek(fraction) { if (reading) panTo((fraction*2-1)*reading.limit); },
@@ -733,6 +767,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       building.dispose?.();
       building.textures.forEach((t) => t.dispose());
       scene.traverse((o) => o.shadow?.dispose());
+      host.removeEventListener("entrylook",entryLook);
+      mobile?.dispose();
       disposed = true;
       reflection?.dispose();
       renderer.setAnimationLoop(null);

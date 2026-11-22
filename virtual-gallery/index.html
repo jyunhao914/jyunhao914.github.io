@@ -5,8 +5,8 @@
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>水墨畫展廳｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=smooth14" />
-  <link rel="modulepreload" href="gallery.js?v=smooth14">
+  ><link rel="stylesheet" href="style.css?v=motion15" />
+  <link rel="modulepreload" href="gallery.js?v=motion15">
   <header>
     <strong>虛擬策展工作室</strong>
     <nav><a href="#exhibits">展覽</a><a href="#works">典藏作品</a></nav>
@@ -50,10 +50,12 @@
         <button id="overview">看全卷</button>
       </div>
       <div id="visitMenu" hidden>
+        <div class="touch-motion"><button type="button" id="gyroTurn" aria-pressed="false">陀螺儀轉向</button> <span id="gyroStatus" role="status"></span></div>
+        <small>即時畫面更新率　<output id="frameMeter">量測中</output></small>
         <details class="gesture-guide">
           <summary>操作指引</summary>
           <p>方向鍵 ↑／↓ 前進、後退，←／→ 左右側移。按住空白鍵搭配 ←／→ 轉身，搭配 ↑／↓ 抬頭、低頭。W、A、S、D 也可移動。長卷近看時按 ←／→ 沿牆慢移。按 R 回到本廳預設視角。</p>
-          <p>點作品走到畫前。拖空白牆面可轉身，點地板可走到該處。</p>
+          <p>手機左下圓形搖桿可行走，長卷近看時左右推可慢移。開啟陀螺儀後，轉動手機可環顧；看畫時固定朝向作品。點作品走到畫前。拖空白牆面可轉身，點地板可走到該處。</p>
           <p>在一般作品上左右滑可換件。在長卷上拖曳可沿牆慢移，放手即停；拖動位置滑桿可快速跳到別處。</p>
         </details>
         <label>切換展覽<select id="visitShows"></select></label>
@@ -101,6 +103,21 @@
     (() => {
       const stage=document.getElementById("stage"), visit=document.getElementById("visit");
       let pending=[];
+      let touch=null;
+      stage.addEventListener("pointerdown",e=>{
+        if(e.target!==stage || stage.querySelector("canvas"))return;
+        touch={id:e.pointerId,x:e.clientX,y:e.clientY};
+        stage.setPointerCapture(e.pointerId);
+      });
+      stage.addEventListener("pointermove",e=>{
+        if(touch?.id!==e.pointerId)return;
+        const motion={type:"entrylook",dx:e.clientX-touch.x,dy:e.clientY-touch.y};
+        touch.x=e.clientX;touch.y=e.clientY;
+        if(stage.querySelector("canvas"))stage.dispatchEvent(new CustomEvent("entrylook",{detail:motion}));
+        else if(pending.at(-1)?.type==="entrylook"){pending.at(-1).dx+=motion.dx;pending.at(-1).dy+=motion.dy;}
+        else pending.push(motion);
+      });
+      stage.addEventListener("lostpointercapture",()=>{touch=null});
       function capture(e) {
         if(visit.hidden || stage.querySelector("canvas") || e.altKey || e.ctrlKey || e.metaKey ||
            e.target.closest?.("input,textarea,select,button,a,[contenteditable=true]") ||
@@ -118,5 +135,5 @@
       stage.focus({preventScroll:true});
     })();
   </script>
-  <script type="module" src="app.js?v=smooth14"></script>
+  <script type="module" src="app.js?v=motion15"></script>
 </html>
