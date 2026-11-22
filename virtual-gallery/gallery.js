@@ -407,12 +407,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     drag = null;
   };
   canvas.onpointercancel = () => (drag = null);
-  const pad = document.createElement("div");
-  pad.className = "pad walk-pad camera-keys";
-  pad.setAttribute("role","group");
-  pad.setAttribute("aria-label","三維空間操作鍵");
-  host.append(pad);
-  let held = null, travel = null;
+  let travel = null;
   function operate(action,dt) {
     if (reading && (action==="左移" || action==="右移")) {
       if (travel) { travel=null; placeOnTrack(); }
@@ -433,51 +428,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+(Number(action==="抬頭")-Number(action==="低頭"))*dt*.65,-1.2,1.2);
     }
   }
-  const keyButtons=new Map();
-  function neutral() {
-    if (held) held.button.classList.remove("pressed");
-    held=null;
-  }
   let spaceHeld=false;
   const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
     ArrowUp:"前進",ArrowDown:"後退",ArrowLeft:"左移",ArrowRight:"右移"};
   const turning={ArrowUp:"抬頭",ArrowDown:"低頭",ArrowLeft:"左轉",ArrowRight:"右轉"};
-  const arrows={ArrowUp:"↑",ArrowDown:"↓",ArrowLeft:"←",ArrowRight:"→"};
   const actionFor=code=>(spaceHeld && turning[code]) || shortcuts[code];
-  function showKeys(){
-    const active=new Set(Array.from(keys.keys(),actionFor));
-    keyButtons.forEach((button,action)=>button.classList.toggle("key-down",active.has(action)));
-  }
-  for (const action of ["前進","後退","左移","右移","抬頭","低頭","左轉","右轉"]) {
-    const button=document.createElement("button");
-    button.type="button";
-    const turnKey=Object.keys(turning).find(code=>turning[code]===action);
-    const moveKeys=Object.keys(shortcuts).filter(code=>shortcuts[code]===action);
-    const label=turnKey ? "空白+"+arrows[turnKey] : moveKeys.map(code=>arrows[code] || code.slice(-1)).join(" / ");
-    button.textContent=action;
-    button.setAttribute("aria-label",action);
-    const hint=document.createElement("kbd");
-    hint.textContent=label;
-    hint.setAttribute("aria-hidden","true");
-    button.append(hint);
-    keyButtons.set(action,button);
-    if (!turnKey) button.setAttribute("aria-keyshortcuts",moveKeys.map(code=>code.replace("Key","")).join(" "));
-    button.title=action+"（"+label+"）";
-    button.onpointerdown=e=>{
-      if(held || e.button!==0) return;
-      canvas.focus({preventScroll:true});
-      e.preventDefault();
-      button.setPointerCapture(e.pointerId);
-      held={action,button,id:e.pointerId,repeatAt:performance.now()+240};
-      button.classList.add("pressed");
-      operate(action,.14);
-    };
-    button.onpointerup=button.onpointercancel=button.onlostpointercapture=e=>{
-      if(held?.id===e.pointerId) neutral();
-    };
-    button.onclick=e=>{ if(e.detail===0) operate(action,.14); };
-    pad.append(button);
-  }
   function blocked(x, z) {
     return hasBench && Math.abs(x) < 1.67 && z > -1.78 && z < -0.62;
   }
@@ -580,7 +535,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if(e.type==="keyup") {
       if(code==="Space") spaceHeld=false;
       keys.delete(code);
-      showKeys();
       return;
     }
     if(e.altKey || e.metaKey || e.ctrlKey || document.querySelector("dialog[open]")) return;
@@ -590,11 +544,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if(host.getBoundingClientRect().bottom<40 || host.getBoundingClientRect().top>innerHeight) return;
     if(code==="Space" && e.target.closest?.("button,a,summary")) return;
     e.preventDefault();
-    if(code==="Space") { spaceHeld=true; showKeys(); return; }
+    if(code==="Space") { spaceHeld=true; return; }
     if(keys.has(code) || e.repeat) return;
     if(code==="KeyR"){resetView();return;}
     keys.set(code,performance.now()+200);
-    showKeys();
     operate(actionFor(code),.14);
   }
   window.addEventListener("keydown", key);
@@ -602,8 +555,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   let blur = () => {
     keys.clear();
     spaceHeld=false;
-    keyButtons.forEach(button=>button.classList.remove("key-down"));
-    neutral();
   };
   window.addEventListener("blur", blur);
   let ro = new ResizeObserver(() => {
@@ -620,7 +571,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   renderer.setAnimationLoop((now) => {
     let dt = Math.min(0.085, Math.max(0, (now - last) / 1000));
     last = now;
-    if (held && now >= held.repeatAt) operate(held.action,dt);
     for(const [code,repeatAt] of keys)
       if(now>=repeatAt) operate(actionFor(code),dt);
     if (travel) {

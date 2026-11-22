@@ -513,8 +513,8 @@ body.visiting {
 #stage .camera-keys button.pressed{background:#51695d;border-color:white}
 
 @media(max-width:630px){
- .view-caption{max-width:calc(100% - 212px);right:8px;padding:5px;overflow-wrap:anywhere}
- #inspectControls{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 98px)}
+ .view-caption{max-width:calc(100% - 28px);right:8px;padding:5px;overflow-wrap:anywhere}
+ #inspectControls{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 58px)}
 }
 
 .camera-keys kbd{display:none}#stage .camera-keys button.key-down{background:#51695d;border-color:white}
