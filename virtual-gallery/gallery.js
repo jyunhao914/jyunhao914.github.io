@@ -170,21 +170,32 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       img.src = a.src;
       tex = new T.CanvasTexture(c);
       animated.push({ img, ctx: c.getContext("2d"), tex });
-    } else if (a.type === "圖片") tex = new T.TextureLoader().load(a.src,(loaded)=>{
-      if(a===works[0])releaseArtwork();
-      const image=loaded.image;
-      if(disposed || a.tiles?.length || (!spec.isHandscroll && w < 4*h) || image.width<=4096) return;
-      const count=Math.ceil(image.width/2048);
-      for(let i=0;i<count;i++){
-        const left=Math.round(image.width*i/count), right=Math.round(image.width*(i+1)/count);
-        const scale=Math.min(1,2048/image.height);
-        const crop=document.createElement("canvas");
-        crop.width=Math.max(1,Math.round((right-left)*scale));
-        crop.height=Math.max(1,Math.round(image.height*scale));
-        crop.getContext("2d").drawImage(image,left,0,right-left,image.height,0,0,crop.width,crop.height);
-        addSection(new T.CanvasTexture(crop),i,count);
+    } else if (a.type === "圖片") {
+      function loadedImage(image) {
+        if(a===works[0])releaseArtwork();
+        if(disposed || a.tiles?.length || (!spec.isHandscroll && w < 4*h) || image.width<=4096) return;
+        const count=Math.ceil(image.width/2048);
+        for(let i=0;i<count;i++){
+          const left=Math.round(image.width*i/count), right=Math.round(image.width*(i+1)/count);
+          const scale=Math.min(1,2048/image.height);
+          const crop=document.createElement("canvas");
+          crop.width=Math.max(1,Math.round((right-left)*scale));
+          crop.height=Math.max(1,Math.round(image.height*scale));
+          crop.getContext("2d").drawImage(image,left,0,right-left,image.height,0,0,crop.width,crop.height);
+          addSection(new T.CanvasTexture(crop),i,count);
+        }
       }
-    },undefined,()=>{if(a===works[0])releaseArtwork();});
+      const image=portalEntry?.image;
+      if(image?.naturalWidth && (image.currentSrc || image.src)===new URL(a.src,document.baseURI).href) {
+        tex=new T.Texture(image);
+        tex.needsUpdate=true;
+        // As with TextureLoader, build any high-resolution tiles after the face exists.
+        queueMicrotask(()=>loadedImage(image));
+      } else {
+        tex=new T.TextureLoader().load(a.src,loaded=>loadedImage(loaded.image),
+          undefined,()=>{if(a===works[0])releaseArtwork();});
+      }
+    }
     else tex = labelTexture(a);
     tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     tex.colorSpace = T.SRGBColorSpace;

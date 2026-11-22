@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=grounds37";
+import {lobbyPage} from "./lobby-page.js?v=grounds38";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
@@ -196,7 +196,7 @@ function offerCatalogue(message) {
   browse.focus({preventScroll:true});
   return notice;
 }
-async function enter(workId,throughDoor=false) {
+async function enter(workId,throughDoor=false,entranceImage=null) {
   const target=current.works.find(work=>work.id===workId);
   if(target)$("room").value=target.room;
   if(!privatePreview)lastDoor=Array.from($("hallList").children).find(card=>
@@ -237,7 +237,7 @@ async function enter(workId,throughDoor=false) {
           $("scrollPosition").value = Math.round(fraction*1000);
           $("scrollPosition").setAttribute("aria-valuetext", "自卷首向左 " + Math.round((1-fraction)*100) + "%");
           $("readPosition").textContent = Math.round((1-fraction)*100) + "%";
-        }, undefined, throughDoor,
+        }, undefined, throughDoor && {image:entranceImage},
       );
     if (n === seq && viewer) {
       if(target)viewer.select(roomWorks.indexOf(target));
@@ -481,19 +481,19 @@ function showCatalogue(visible) {
 let lastRoute, lastDoor;
 const doors=[];
 let incomingDoor;
-function loadRoomRenderer() {return import("./gallery.js?v=grounds37");}
-function prepareRoom(door) {
+function loadRoomRenderer() {return import("./gallery.js?v=grounds38");}
+function prepareRoom() {
   loadRoomRenderer().catch(()=>{});
   const urls=["materials/plaster-color.webp","materials/wood-color.webp","materials/wood-normal.webp",
-    "materials/stone-color.webp",door?.cover?.src];
+    "materials/stone-color.webp"];
   for(const url of urls.filter(Boolean)) {
     const image=new Image();
     image.decoding="async";
     image.src=url;
   }
 }
-const lobby=lobbyPage(door=>{
-  incomingDoor=door;
+const lobby=lobbyPage((door,image)=>{
+  incomingDoor={door,image};
   openRoom(door.show,door.room);
 },prepareRoom);
 function showEntrance() {
@@ -513,8 +513,9 @@ function restorePageFocus(target,exit) {
   else focus();
 }
 function displayShow(show,room,work,catalogue) {
-  const throughDoor=Boolean(incomingDoor && incomingDoor.show===show &&
-    (!room || incomingDoor.room===room) && !work && !catalogue);
+  const throughDoor=Boolean(incomingDoor && incomingDoor.door.show===show &&
+    (!room || incomingDoor.door.room===room) && !work && !catalogue);
+  const entranceImage=incomingDoor?.image;
   incomingDoor=null;
   const expanded=throughDoor ? lobby.hold() : lobby.close();
   $("hallEntrance").hidden=!throughDoor;
@@ -535,7 +536,7 @@ function displayShow(show,room,work,catalogue) {
   } else {
     showCatalogue(false);
     if(expanded)visit.classList.add("expanded");
-    enter(work,throughDoor);
+    enter(work,throughDoor,entranceImage);
   }
 }
 function applyRoute() {

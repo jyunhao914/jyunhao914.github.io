@@ -247,7 +247,11 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const index = complete.door.index;
     entering = true;
     try {
-      Promise.resolve(onEnter(index)).finally(() => { entering = false; });
+      // Reuse the full-resolution image already decoded for this door. The new
+      // renderer owns its own GPU texture and the lobby can still be disposed.
+      const painting=scene.getObjectByName("lobby-room-art-"+index);
+      const image=painting?.material.map?.image;
+      Promise.resolve(onEnter(index,image?.naturalWidth ? image : null)).finally(() => { entering = false; });
     } catch (error) {
       entering = false;
       throw error;

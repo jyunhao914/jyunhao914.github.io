@@ -134,10 +134,10 @@ export function lobbyPage(enterRoom,prepareRoom) {
     message.textContent=returnIndex>=0 ? "正在開啟展場大廳…" : "正在開啟美術館園區…";message.hidden=false;
     el("lobbyHint").hidden=true;
     try {
-      const {createLobby}=await import("./lobby.js?v=grounds37");
+      const {createLobby}=await import("./lobby.js?v=grounds38");
       if(!active || version!==generation)return;
-      scene=createLobby(stage,rooms,index=>{
-        if(active && !panel.open && rooms[index])enterRoom(rooms[index]);
+      scene=createLobby(stage,rooms,(index,image)=>{
+        if(active && !panel.open && rooms[index])enterRoom(rooms[index],image);
       },{
         returnDoorIndex:returnIndex,onNearest:near,onZone:setZone,
         onTravel:walking=>entrance.classList.toggle("portal-walking",walking),
