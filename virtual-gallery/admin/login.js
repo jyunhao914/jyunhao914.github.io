@@ -1,10 +1,10 @@
-import { login } from "./storage.js";
-import { authorize, restore, broker, keys } from "./oauth.js";
+import { login } from "./storage.js?v=layout23";
+import { authorize, restore, broker, keys } from "./oauth.js?v=layout23";
 const $ = (id) => document.getElementById(id);
 async function show(value) {
   await login(value);
   $("key").value = "";
-  await import("./studio.js");
+  await import("./studio.js?v=layout23");
   $("login").hidden = true;
   $("logout").hidden = false;
   $("status").textContent = "已連線至私人作品庫";

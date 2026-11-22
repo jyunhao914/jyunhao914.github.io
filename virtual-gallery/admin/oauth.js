@@ -59,7 +59,7 @@ export async function authorize() {
     .replace(/=+$/, "");
   sessionStorage.setItem(
     keys.flow,
-    JSON.stringify({ state, verifier, time: Date.now() }),
+    JSON.stringify({ state, verifier, layout:new URLSearchParams(location.search).get("layout"), time: Date.now() }),
   );
   const params = new URLSearchParams({
     client_id: app.id,
@@ -84,6 +84,7 @@ export async function restore() {
     )
       throw Error("登入請求無法核對，請從此分頁重新登入。");
     if (query.has("error")) throw Error("GitHub 授權已取消。");
+    if(flow.layout)history.replaceState(null,"",location.pathname+"?layout="+encodeURIComponent(flow.layout));
     const result = await broker("exchange", {
       code: query.get("code"),
       verifier: flow.verifier,

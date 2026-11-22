@@ -100,6 +100,8 @@ function leave() {
 }
 function draw() {
   $("music").pause();
+  $("editLayout").hidden=location.search==="?studio-preview" || location.pathname.startsWith("/public/");
+  $("editLayout").href="admin/?layout="+encodeURIComponent(current.id);
   $("title").textContent = $("visitTitle").textContent = current.title;
   const cover = current.works.find((work) => work.type === "圖片");
   const heroImage = document.querySelector(".hero img");
@@ -177,7 +179,7 @@ async function enter() {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=gesturehud22");
+    let { gallery } = await import("./gallery.js?v=layout23");
     if (n === seq)
       viewer = gallery(
         $("stage"),

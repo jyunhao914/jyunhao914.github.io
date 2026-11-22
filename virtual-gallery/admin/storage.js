@@ -148,7 +148,7 @@ async function save(s) {
   return next;
 }
 const workFields =
-  "id title artist category type description src voice captions subtitle room wall x y z width height rotate frame frameWidth mat depth finish kelvin power angle lx ly lz".split(
+  "id title artist category type description src mount tiles source voice captions subtitle room wall x y z width height rotate frame frameWidth mat depth finish kelvin power angle lx ly lz".split(
     " ",
   );
 function pick(obj, keys) {

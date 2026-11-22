@@ -1,6 +1,7 @@
+import { readDimensions } from "./dimensions.js";
 import {roomSize} from "../room-size.js";
 import { artworkList, artworkDetail } from "./art-preview.js";
-import { state, post, versions, exhibition } from "./storage.js";
+import { state, post, versions, exhibition } from "./storage.js?v=layout23";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
   status = $("#status");
@@ -135,8 +136,6 @@ const defaults = {
   x: 0,
   y: 1.7,
   z: 0,
-  width: 1.8,
-  height: 1.25,
   wall: 0,
   rotate: 0,
   frame: "木框",
@@ -218,15 +217,23 @@ function library() {
     list();
   };
   list();
-  action("new", () => {
+  action("new", async () => {
+    const dimensions=await readDimensions(["新作品"]);
+    if(!dimensions)return;
     aid = id();
-    db.arts.push({ ...defaults, id: aid, title: "新作品" });
+    db.arts.push({ ...defaults, ...dimensions[0], id: aid, title: "新作品" });
     changed();
     render();
   });
   $("#batch").onchange = async (e) => {
     try {
-      for (let f of e.target.files) {
+      const files=Array.from(e.target.files);
+      e.target.value="";
+      if(!files.length)return;
+      const dimensions=await readDimensions(files.map(file=>file.name));
+      if(!dimensions)return;
+      const imported=[];
+      for (const [index,f] of files.entries()) {
         let type = f.type.startsWith("video")
           ? "影片"
           : f.type.startsWith("audio")
@@ -235,17 +242,18 @@ function library() {
               ? "動態"
               : "圖片";
         let src = await fileData(f);
-        aid = id();
-        db.arts.push({
+        imported.push({
           ...defaults,
-          id: aid,
-          ...await landscapeDimensions(src,type),
+          id: id(),
+          ...dimensions[index],
           title: f.name.replace(/\.[^.]+$/, ""),
           src,
           type,
         });
-        changed();
       }
+      db.arts.push(...imported);
+      aid=imported[imported.length-1].id;
+      changed();
       render();
     } catch (err) {
       error(err);
@@ -288,8 +296,6 @@ function library() {
       if (f) {
         a[k] = await fileData(f, k === "captions" ? "text/vtt" : null);
         if (k === "src") {
-          Object.assign(a,await landscapeDimensions(a.src,a.type));
-          render();
           list();
           refreshPreview();
         }
@@ -307,16 +313,6 @@ function library() {
     changed();
     render();
   });
-}
-async function landscapeDimensions(src, type) {
-  if(type !== "圖片") return {};
-  const image=new Image();
-  image.src=src;
-  await image.decode();
-  const ratio=image.naturalWidth/image.naturalHeight;
-  if (ratio<4) return {};
-  const width=Math.min(100,defaults.height*ratio);
-  return {width, height:width/ratio};
 }
 function num(o, k, l, min, max) {
   return field(
@@ -531,19 +527,33 @@ function layout() {
     Object.assign((s.layout[i] ??= {}), obj);
     changed();
   }
+  const span = 2*roomSize(nearby)[wall%2 ? "depth" : "width"];
+  const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+  function extent(work) {
+    const edge=(work.mat||0)+(work.frame==="無框"?0:work.frameWidth||0);
+    const w=work.width+2*edge, h=work.height+2*edge+(work.mount==="掛軸"?.48:0);
+    const theta=(work.rotate||0)*Math.PI/180;
+    return {w:Math.abs(w*Math.cos(theta))+Math.abs(h*Math.sin(theta)),
+      h:Math.abs(h*Math.cos(theta))+Math.abs(w*Math.sin(theta))};
+  }
+  const ordered=[...same].sort((left,right)=>left.x-right.x);
+  const total=ordered.reduce((sum,work)=>sum+extent(work).w,0);
+  const gaps=ordered.slice(1).map((work,i)=>work.x-ordered[i].x-(extent(work).w+extent(ordered[i]).w)/2);
+  const currentGap=gaps.length?Math.max(0,Math.round(100*gaps.reduce((sum,x)=>sum+x,0)/gaps.length)):0;
   function scene() {
     let surface = $("#surface");
     if (mode === "3D") {
       surface.innerHTML =
         '<p>拖曳作品調整位置，拖曳空白處環顧展間。</p><div id="stage"></div>';
       let t = token;
-      import("../gallery.js?v=gesturehud22")
+      import("../gallery.js?v=layout23")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
             $("#stage"),
             nearby.map((work) => ({
               ...work,
+              tiles: work.tiles?.map(path => path.replace(/^media\//,"../media/")),
               src: work.src.replace(/^media\//, "../media/"),
             })),
             (o) => {
@@ -630,7 +640,10 @@ function layout() {
   }
   const n = (k, l, lo, hi) => num(a, k, l, lo, hi);
   $("#form").innerHTML =
-    '<fieldset><legend>展牆與掛點</legend><div class="fields">' +
+    '<fieldset><legend>位置微調</legend><div class="bar">' +
+    btn("left","左移 5 公分")+btn("right","右移 5 公分")+btn("up","升高 5 公分")+btn("down","降低 5 公分")+
+    '</div>'+(same.length>1 ? '<label>同牆作品間距（公分）<input id="gap" type="number" min="0" step="any" value="'+currentGap+'"></label>'+btn("spacing","套用同牆間距") : '')+
+    '</fieldset><fieldset><legend>展牆與掛點</legend><div class="fields">' +
     field(a, "room", "展廳名稱", null, "text", "required") +
     field(a, "wall", "展牆（0 北、1 西、2 南、3 東）", [0, 1, 2, 3]) +
     n("x", "水平 X（公尺）", -100, 100) +
@@ -640,6 +653,7 @@ function layout() {
     n("width", "展出寬度（公尺）", 0.05, 100) +
     n("height", "展出高度（公尺）", 0.05, 4.4) +
     '</div><div class="bar">' +
+    btn("actualSize","按原作尺寸展示（1:1）") +
     btn("align", "同牆作品對齊高度") +
     btn("distribute", "同牆作品等距排列") +
     '</div></fieldset><fieldset><legend>裝裱</legend><div class="fields">' +
@@ -663,10 +677,39 @@ function layout() {
     if (k === "wall") a.wall = Number(a.wall);
     patch(a.id, { [k]: a[k] });
   });
-  $("#form").addEventListener("change", () => {
+  $("#form").addEventListener("change", (e) => {
+    if(e.target.id==="gap")return;
     setTimeout(() => {
       if (tab === "布展編輯") render();
     }, 0);
+  });
+  for(const [name,axis,step] of [["left","x",-.05],["right","x",.05],["up","y",.05],["down","y",-.05]]) {
+    action(name,()=>{
+      const size=extent(a), lower=axis==="x"?(-span+size.w)/2:size.h/2;
+      const upper=axis==="x"?(span-size.w)/2:4.5-size.h/2;
+      if(lower>upper) throw Error("作品含裝裱已超出展牆尺寸。");
+      patch(a.id,{[axis]:Number(clamp(a[axis]+step,lower,upper).toFixed(5))}); render();
+    });
+  }
+  action("spacing",()=>{
+    const input=$("#gap");
+    if(!input.value.trim() || !input.reportValidity())return;
+    const gap=Number(input.value)/100, length=total+gap*(ordered.length-1);
+    if(length>span+.000001)throw Error("展牆寬度不足，請縮小間距或將部分作品移至另一面牆。");
+    const first=ordered[0], last=ordered[ordered.length-1];
+    const center=(first.x-extent(first).w/2+last.x+extent(last).w/2)/2;
+    let left=clamp(center-length/2,-span/2,span/2-length);
+    for(const work of ordered) {
+      const width=extent(work).w;
+      patch(work.id,{x:Number((left+width/2).toFixed(5))});
+      left+=width+gap;
+    }
+    render();
+  });
+  action("actualSize",()=>{
+    const placement=s.layout[a.id];
+    if(placement){delete placement.width;delete placement.height;changed();}
+    render();
   });
   action("align", () => {
     same.forEach((o) => patch(o.id, { y: a.y }));
@@ -746,6 +789,27 @@ function backup() {
     await refreshRestored();
   });
 }
+// An authenticated curator can open the exact exhibition from its public hall.
+const requested=new URLSearchParams(location.search).get("layout");
+if(requested) {
+  let draft=db.shows.find(item=>item.id===requested);
+  if(!draft) {
+    const live=await (await fetch("../exhibitions.json",{cache:"no-store"})).json();
+    const publicShow=live.find(item=>item.id===requested);
+    if(publicShow) {
+      const {works,...metadata}=publicShow;
+      draft={...metadata,status:"草稿",ids:[],layout:{}};
+      for(const work of works) {
+        const key=db.arts.some(item=>item.id===work.id)?id():work.id;
+        db.arts.push({...work,id:key});
+        draft.ids.push(key);
+      }
+      db.shows.push(draft);
+    }
+  }
+  if(draft){sid=draft.id;aid=draft.ids[0];tab="布展編輯";}
+}
+
 render();
 
 document.querySelector("#closePreview").onclick = () =>
