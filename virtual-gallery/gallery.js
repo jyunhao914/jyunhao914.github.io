@@ -1,6 +1,6 @@
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=walltrack8";
+import { architecture } from "./architecture.js?v=slowpan9";
 export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -364,7 +364,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
         reading.x=T.MathUtils.clamp(relative.dot(reading.axis),-reading.limit,reading.limit);
         travel=null;
       }
-      panTo(reading.x - dx * reading.fieldWidth / canvas.clientWidth);
+      // Move 35% of the drag distance on screen. During an interrupted
+      // approach, use the close-reading scale to avoid a large sideways jump.
+      const panWidth = Math.min(reading.fieldWidth, reading.closeFieldWidth);
+      panTo(reading.x - 0.35 * dx * panWidth / canvas.clientWidth);
     } else if (drag.gesture === "look") {
       if (drag.dist > 5) { travel=null; stopInspection(); }
       cam.rotation.y -= dx * 0.005;
@@ -402,49 +405,55 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     drag = null;
   };
   canvas.onpointercancel = () => (drag = null);
-  const pad = document.createElement("div"),
-    stick = document.createElement("button"),
-    knob = document.createElement("span");
-  pad.className = "pad walk-pad";
-  stick.className = "walk-stick";
-  stick.type = "button";
-  stick.setAttribute("aria-label", "移動搖桿：拖曳前進、後退或側移");
-  knob.className = "walk-knob";
-  stick.append(knob);
-  pad.append(stick);
+  const pad = document.createElement("div");
+  pad.className = "pad walk-pad camera-keys";
+  pad.setAttribute("role","group");
+  pad.setAttribute("aria-label","三維空間操作鍵");
   host.append(pad);
-  let joyX = 0,
-    joyY = 0,
-    stickPointer = null,
-    travel = null;
-  const velocity = new T.Vector2(),
-    wish = new T.Vector2();
-  function steer(e) {
+  let held = null, travel = null;
+  const velocity = new T.Vector2(), wish = new T.Vector2();
+  function operate(action,dt) {
+    if (reading && (action==="左移" || action==="右移")) {
+      if (travel) { travel=null; placeOnTrack(); }
+      panTo(reading.x+(action==="左移"?-1:1)*reading.fieldWidth*.35*dt);
+      return;
+    }
     stopInspection();
-    const r = stick.getBoundingClientRect();
-    let x = (e.clientX - r.left - r.width / 2) / (r.width * 0.34),
-      y = (e.clientY - r.top - r.height / 2) / (r.height * 0.34),
-      length = Math.max(1, Math.hypot(x, y));
-    joyX = x / length;
-    joyY = y / length;
-    knob.style.transform = "translate(" + joyX * 20 + "px," + joyY * 20 + "px)";
-    travel = null;
+    travel=null;
+    velocity.set(0,0);
+    const yaw=cam.rotation.y;
+    const forward=Number(action==="前進")-Number(action==="後退");
+    const side=Number(action==="右移")-Number(action==="左移");
+    if (forward || side) {
+      const step=dt*1.65;
+      move(cam.position.x+step*(side*Math.cos(yaw)-forward*Math.sin(yaw)),
+           cam.position.z-step*(side*Math.sin(yaw)+forward*Math.cos(yaw)));
+    } else {
+      cam.rotation.y+=(Number(action==="左轉")-Number(action==="右轉"))*dt*.85;
+      cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+(Number(action==="抬頭")-Number(action==="低頭"))*dt*.65,-1.2,1.2);
+    }
   }
-  stick.onpointerdown = (e) => {
-    if (stickPointer !== null) return;
-    stickPointer = e.pointerId;
-    stick.setPointerCapture(e.pointerId);
-    steer(e);
-  };
-  stick.onpointermove = (e) => {
-    if (e.pointerId === stickPointer) steer(e);
-  };
   function neutral() {
-    stickPointer = null;
-    joyX = joyY = 0;
-    knob.style.transform = "";
+    if (held) held.button.classList.remove("pressed");
+    held=null;
   }
-  stick.onlostpointercapture = neutral;
+  for (const action of ["前進","後退","左移","右移","抬頭","低頭","左轉","右轉"]) {
+    const button=document.createElement("button");
+    button.type="button";
+    button.textContent=action;
+    button.onpointerdown=e=>{
+      if(held || e.button!==0) return;
+      button.setPointerCapture(e.pointerId);
+      held={action,button,id:e.pointerId,repeatAt:performance.now()+240};
+      button.classList.add("pressed");
+      operate(action,.14);
+    };
+    button.onpointerup=button.onpointercancel=button.onlostpointercapture=e=>{
+      if(held?.id===e.pointerId) neutral();
+    };
+    button.onclick=e=>{ if(e.detail===0) operate(action,.14); };
+    pad.append(button);
+  }
   function blocked(x, z) {
     return hasBench && Math.abs(x) < 1.67 && z > -1.78 && z < -0.62;
   }
@@ -575,11 +584,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   renderer.setAnimationLoop((now) => {
     let dt = Math.min(0.085, Math.max(0, (now - last) / 1000));
     last = now;
+    if (held && now >= held.repeatAt) operate(held.action,dt);
     let has = (a, b) => Number(keys.has(a) || keys.has(b));
     wish
       .set(
-        has("d", "arrowright") - has("a", "arrowleft") + joyX,
-        has("s", "arrowdown") - has("w", "arrowup") + joyY,
+        has("d", "arrowright") - has("a", "arrowleft"),
+        has("s", "arrowdown") - has("w", "arrowup"),
       )
       .clampLength(0, 1);
     velocity.lerp(wish, 1 - Math.exp(-14 * dt));
@@ -677,7 +687,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     const at=faceCenter.clone().addScaledVector(axis,x);
     const dest=origin.clone().addScaledVector(axis,x);
     const orientation=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().lookAt(dest,at,cam.up));
-    reading={x,axis,normal,faceCenter,origin,orientation,fieldWidth,limit};
+    reading={x,axis,normal,faceCenter,origin,orientation,fieldWidth,closeFieldWidth:fieldWidth,limit};
     if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       navigate(dest,at);
       travel.readStart=x;

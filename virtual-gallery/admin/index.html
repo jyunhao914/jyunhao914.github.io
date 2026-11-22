@@ -270,7 +270,11 @@
       border-radius: 50%;
       background: white;
     }
-  </style>
+  
+#stage .camera-keys {display:grid;grid-template-columns:repeat(4,44px);gap:2px;position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:2}
+#stage .camera-keys button{padding:0;min-height:44px;border:1px solid #ffffff50;border-radius:5px;background:#20302ee6;color:white;font:14px system-ui;touch-action:none;user-select:none;-webkit-user-select:none}
+#stage .camera-keys button.pressed{background:#51695d;border-color:white}
+</style>
   <header>
     <strong>虛擬策展工作室</strong
     ><span id="status" role="status">尚未登入</span>

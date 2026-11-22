@@ -491,9 +491,7 @@ body.visiting {
   bottom: max(18px, env(safe-area-inset-bottom));
 }
 #visit.expanded .museum-head #visitTitle,
-#visit.expanded .view-caption:has(strong:empty),
-#visit:fullscreen .museum-head #visitTitle,
-#visit:fullscreen .view-caption:has(strong:empty) {
+#visit:fullscreen .museum-head #visitTitle {
   visibility: hidden;
 }
 
@@ -505,3 +503,16 @@ body.visiting {
 
 #inspectControls {align-items:center;background:#20302ee8;border-radius:7px;padding:0 5px}
 #scrollPosition {width:clamp(70px,19vw,150px);margin:0 6px;accent-color:#e1d8bd;min-height:40px}
+
+.gesture-guide summary {cursor:pointer;min-height:44px;line-height:44px}
+.gesture-guide p {margin:0 0 .8em;line-height:1.55}
+#readPosition {min-width:3ch;font:14px system-ui;color:#fff;text-align:right;font-variant-numeric:tabular-nums}
+
+#stage .camera-keys {display:grid;grid-template-columns:repeat(4,44px);gap:2px;position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:2}
+#stage .camera-keys button{padding:0;min-height:44px;border:1px solid #ffffff50;border-radius:5px;background:#20302ee6;color:white;font:14px system-ui;touch-action:none;user-select:none;-webkit-user-select:none}
+#stage .camera-keys button.pressed{background:#51695d;border-color:white}
+
+@media(max-width:630px){
+ .view-caption{max-width:calc(100% - 212px);right:8px;padding:5px;overflow-wrap:anywhere}
+ #inspectControls{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 98px)}
+}

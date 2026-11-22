@@ -176,14 +176,18 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=walltrack8");
+    let { gallery } = await import("./gallery.js?v=slowpan9");
     if (n === seq)
       viewer = gallery(
         $("stage"),
         current.works.filter((a) => a.room === $("room").value),
         showFocus,
         undefined,
-        fraction => { $("scrollPosition").value = Math.round(fraction*1000); },
+        fraction => {
+          $("scrollPosition").value = Math.round(fraction*1000);
+          $("scrollPosition").setAttribute("aria-valuetext", "自卷首向左 " + Math.round((1-fraction)*100) + "%");
+          $("readPosition").textContent = Math.round((1-fraction)*100) + "%";
+        },
       );
   } catch (e) {
     $("stage").textContent = "此裝置無法啟動 WebGL 2。可於展出作品區開啟展籤。";
@@ -222,8 +226,8 @@ function showFocus(a) {
   $("inspectControls").hidden = !wide;
   $("focusTitle").textContent = a?.title || "";
   $("viewHelp").textContent = a
-    ? (wide ? "拖曳沿牆移動 · 拖牆轉身" : "滑作品換件 · 拖牆轉身")
-    : "點作品走近觀賞 · 拖曳環顧";
+    ? (wide ? "拖長卷慢移，放手即停" : "左右滑作品換件 · 拖空牆轉身")
+    : "點作品靠近 · 拖空牆轉身";
   $("tour").value = a
     ? String(
         current.works

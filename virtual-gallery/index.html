@@ -5,7 +5,7 @@
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>水墨畫展廳｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=walltrack8" />
+  ><link rel="stylesheet" href="style.css?v=slowpan9" />
   <header>
     <strong>虛擬策展工作室</strong>
     <nav><a href="#exhibits">展覽</a><a href="#works">典藏作品</a></nav>
@@ -43,10 +43,16 @@
         ><span id="viewHelp">點作品走近觀賞 · 拖曳環顧</span>
       </div>
       <div id="inspectControls" hidden>
+        <output id="readPosition" aria-label="距卷首" aria-live="off">0%</output>
         <input type="range" id="scrollPosition" min="0" max="1000" value="500" aria-label="長卷閱讀位置">
         <button id="overview">看全卷</button>
       </div>
       <div id="visitMenu" hidden>
+        <details class="gesture-guide">
+          <summary>操作指引</summary>
+          <p>左下角八個操作鍵可行走、側移、轉身及抬頭低頭。點一下微調，按住持續移動。點作品走到畫前。拖空白牆面可轉身，點地板可走到該處。</p>
+          <p>在一般作品上左右滑可換件。在長卷上拖曳可沿牆慢移，放手即停；拖動位置滑桿可快速跳到別處。</p>
+        </details>
         <label>切換展覽<select id="visitShows"></select></label>
         <label>展廳<select id="room"></select></label>
         <div class="tour-tools">
@@ -88,5 +94,5 @@
     <button id="close">關閉展籤</button>
     <section id="content"></section>
   </dialog>
-  <script type="module" src="app.js?v=walltrack8"></script>
+  <script type="module" src="app.js?v=slowpan9"></script>
 </html>
