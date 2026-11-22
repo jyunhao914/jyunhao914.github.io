@@ -176,7 +176,7 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=scrollpan7");
+    let { gallery } = await import("./gallery.js?v=walltrack8");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -222,7 +222,7 @@ function showFocus(a) {
   $("inspectControls").hidden = !wide;
   $("focusTitle").textContent = a?.title || "";
   $("viewHelp").textContent = a
-    ? (wide ? "拖畫讀卷 · 拖牆轉身" : "滑作品換件 · 拖牆轉身")
+    ? (wide ? "拖曳沿牆移動 · 拖牆轉身" : "滑作品換件 · 拖牆轉身")
     : "點作品走近觀賞 · 拖曳環顧";
   $("tour").value = a
     ? String(

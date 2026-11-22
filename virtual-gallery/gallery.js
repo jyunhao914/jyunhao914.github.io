@@ -1,6 +1,6 @@
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=scrollpan7";
+import { architecture } from "./architecture.js?v=walltrack8";
 export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -354,6 +354,16 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
         layout(drag.obj.parent, a);
       }
     } else if (drag.gesture === "pan" && reading) {
+      if (travel && drag.dist > 3) {
+        // A drag takes over from the approach at the current wall distance.
+        const relative=cam.position.clone().sub(reading.faceCenter);
+        const distance=Math.max(cam.near*2,relative.dot(reading.normal));
+        reading.origin.copy(reading.faceCenter).addScaledVector(reading.normal,distance);
+        reading.fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
+        reading.limit=Math.max(0,(works[guide].width-reading.fieldWidth)/2);
+        reading.x=T.MathUtils.clamp(relative.dot(reading.axis),-reading.limit,reading.limit);
+        travel=null;
+      }
       panTo(reading.x - dx * reading.fieldWidth / canvas.clientWidth);
     } else if (drag.gesture === "look") {
       if (drag.dist > 5) { travel=null; stopInspection(); }
@@ -594,8 +604,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       }
       if (reading && travel.readStart !== undefined)
         cam.position.addScaledVector(reading.axis,(reading.x-travel.readStart)*ease);
-      if (t === 1) travel = null;
-    } else {
+      if (t === 1) {
+        travel = null;
+        if (reading) placeOnTrack();
+      }
+    } else if (!reading) {
       const yaw = cam.rotation.y,
         dx = velocity.x * dt * 3.2,
         dz = velocity.y * dt * 3.2;
@@ -651,15 +664,20 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   }
   function startReading(x, animate) {
     const g=groups[guide], a=works[guide];
-    // Keep the scroll at about 44% of the viewport height, with a stable wall above and below.
-    const distance=a.height/(.88*Math.tan(T.MathUtils.degToRad(cam.fov/2)));
-    const fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
-    const limit=Math.max(0,(a.width-fieldWidth*.88)/2);
+    const angle=walls[a.wall || 0];
+    const normal=new T.Vector3(Math.sin(angle),0,Math.cos(angle));
+    const axis=new T.Vector3(Math.cos(angle),0,-Math.sin(angle));
+    const faceCenter=g.position.clone().addScaledVector(normal,a.depth/2+.012);
+    const halfAngle=T.MathUtils.degToRad(cam.fov/2);
+    const distance=a.height/(2*Math.tan(halfAngle));
+    const fieldWidth=a.height*cam.aspect;
+    const limit=Math.max(0,(a.width-fieldWidth)/2);
     x=T.MathUtils.clamp(x,-limit,limit);
-    const axis=new T.Vector3(1,0,0).applyQuaternion(g.quaternion);
-    const at=g.position.clone().addScaledVector(axis,x);
-    const dest=at.clone().addScaledVector(new T.Vector3(0,0,1).applyQuaternion(g.quaternion),distance);
-    reading={x,axis,fieldWidth,limit};
+    const origin=faceCenter.clone().addScaledVector(normal,distance);
+    const at=faceCenter.clone().addScaledVector(axis,x);
+    const dest=origin.clone().addScaledVector(axis,x);
+    const orientation=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().lookAt(dest,at,cam.up));
+    reading={x,axis,normal,faceCenter,origin,orientation,fieldWidth,limit};
     if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       navigate(dest,at);
       travel.readStart=x;
@@ -671,11 +689,15 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     }
     onRead(limit ? (x+limit)/(2*limit) : .5);
   }
+  function placeOnTrack() {
+    cam.position.copy(reading.origin).addScaledVector(reading.axis,reading.x);
+    cam.quaternion.copy(reading.orientation);
+  }
   function panTo(value) {
     if (!reading) return;
-    const {x,axis,limit}=reading;
+    const {limit}=reading;
     reading.x=T.MathUtils.clamp(value,-limit,limit);
-    if (!travel) cam.position.addScaledVector(axis,reading.x-x);
+    if (!travel) placeOnTrack();
     onRead(limit ? (reading.x+limit)/(2*limit) : .5);
   }
   function changeWork(i,u) {
