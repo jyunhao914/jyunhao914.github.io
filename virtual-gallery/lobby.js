@@ -2,10 +2,9 @@ import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=atrium40";
 import {createFloorReflection} from "./lobby-floor-reflection.js?v=reception41b";
-import { buildLobby } from "./lobby-interior.js?v=reception41";
+import { buildLobby } from "./lobby-interior.js?v=directory42";
 
 const eyeHeight = 1.60;
-const wallInset = 1.65;
 const walkInRadius = .90;
 const arrivalDistance = 1.05;
 const arrivalPitch = .085;
@@ -31,26 +30,7 @@ function atDoor(door, depth, offset=0) {
 
 
 function placeDoors(doors) {
-  const halfWidth = 5.7;
-  const sideRows = Math.ceil(Math.max(0, doors.length - 3) / 2);
-  const rowSpacing = 4.5;
-  const halfDepth = Math.max(5.9, (Math.max(0, sideRows - 1) * rowSpacing + 7.6) / 2);
-  const placed = doors.map((door, index) => {
-    let x, z, yaw;
-    if (index < 3) {
-      x = [0, -3.3, 3.3][index];
-      z = -halfDepth + wallInset;
-      yaw = 0;
-    } else {
-      const west = (index - 3) % 2 === 0;
-      x = west ? -halfWidth + wallInset : halfWidth - wallInset;
-      z = -halfDepth + 4.52 + Math.floor((index - 3) / 2) * rowSpacing;
-      yaw = west ? Math.PI / 2 : -Math.PI / 2;
-    }
-    return { ...door, index, x, z, yaw,
-      nx: Math.sin(yaw), nz: Math.cos(yaw) };
-  });
-  return { doors: placed, halfWidth, halfDepth };
+  return {doors:doors.map((door,index)=>({...door,index})),halfWidth:5.7,halfDepth:5.9};
 }
 
 export function createLobby(host, doors, onEnter, options = {}) {
@@ -259,14 +239,10 @@ export function createLobby(host, doors, onEnter, options = {}) {
   }
   function enter(index) {
     if(!plan.doors[index] || disposed || paused || entering)return false;
-    const front=interior.menuPoint?.(menuIndex());
-    const visible=interior.menuPoint?.(index);
-    if(!visible || zone==="grounds")selectMenu(index);
-    const destination=visible || interior.menuPoint?.(index) || front;
-    // For a direct directory selection from the grounds the deck can still be
-    // culled. The central card slot remains the indoor navigation destination.
-    const point=destination || {x:window.innerWidth<window.innerHeight ? -1.68 : -1.56,z:.49};
-    return startApproach("room",{...plan.doors[index],x:point.x,z:point.z});
+    selectMenu(index);
+    // Enter through the central aisle of the built north gallery passage.
+    return startApproach("room",{...plan.doors[index],x:2.72,z:-5.7,nx:0,nz:1});
+
   }
   function enterMuseum() {
     if(zone!=="grounds")return false;
@@ -466,7 +442,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
         if(hoverPosition)updateHover(pick(hoverPosition));
       }
       const highlighted=mouseHighlight ? hovered : (cardsExpanded ? nearest : null);
-      const easing=interior.updateWaypoints?.(camera,highlighted,Math.min(.12,elapsed),cardsExpanded);
+      const easing=interior.updateWaypoints?.(camera,highlighted,Math.min(.12,elapsed),cardsExpanded,drag && !drag.moved ? drag.card : null);
       cardsAnimating=Boolean(easing) && !reducedMotion.matches && zone==="lobby";
       if (!disposed) {
         floorReflection?.render(camera,zone==="lobby",now);
@@ -538,7 +514,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     if(zone==="grounds")return "entrance";
     let object = hit.object;
     while (object) {
-      if(object.userData.receptionGuide || object.userData.receptionDesk)return "reception";
+      if(object.userData.receptionDesk)return "reception";
       if (Number.isInteger(object.userData.doorIndex)) return object.userData.doorIndex;
       object = object.parent;
     }
@@ -570,6 +546,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     canvas.setPointerCapture(e.pointerId);
     drag = {id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,
       moved:false,cycled:false,card:zone==="lobby" ? pick(e) : null};
+    invalidate();
   }
   function pointermove(e) {
     if(paused || disposed)return;
@@ -581,6 +558,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     if(e.pointerId!==drag.id)return;
     if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 5) return;
     drag.moved = true;
+    invalidate();
     cancelApproach();
     if(Number.isInteger(drag.card)) {
       const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
@@ -599,6 +577,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     if (e.pointerId !== drag?.id) return;
     const tap = e.type === "pointerup" && !drag.moved && !paused;
     const card=drag.card;
+    invalidate();
     drag = null;
     canvas.style.cursor = "grab";
     if (!tap) return;
@@ -637,7 +616,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     interior = buildLobby(T, scene, plan.doors, {...plan, invalidate});
     floorReflection=createFloorReflection(T,renderer,scene,interior.reflectionFloor,invalidate);
     grounds = buildMuseumGrounds(T,scene,{halfWidth:plan.halfWidth,halfDepth:plan.halfDepth,panorama:interior.panorama,invalidate});
-    receptionTargets=[...interior.hits.filter(hit=>hit.userData.receptionGuide),...(interior.deskHits || [])];
+    receptionTargets=interior.deskHits || [];
     scene.updateMatrixWorld(true);
     scene.traverseVisible(mesh=>{
       if(!mesh.isMesh || !mesh.geometry || !camera.layers.test(mesh.layers))return;

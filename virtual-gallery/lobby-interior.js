@@ -1,5 +1,5 @@
 import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=reception41";
-import {buildWaypoints} from "./lobby-waypoints.js?v=reception41";
+import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
 
 // One sampled centreline is shared by the masonry, the contact shadow, and walking.
 function partitionPlan(w,d,obstacles){

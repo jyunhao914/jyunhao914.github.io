@@ -29,7 +29,6 @@
       </div>
       <p id="lobbyMessage" role="status">正在載入空間…</p>
       <div id="portalWait" hidden><span role="status">正在準備展廳</span><button type="button" id="portalBack">返回大廳</button></div>
-      <button id="lobbyOpenCards" type="button" class="lobby-guide-access" aria-controls="lobbyMenuNav" aria-expanded="false" hidden>選擇展廳</button>
       <div id="lobbyMenuNav" class="lobby-wayfinding" role="group" aria-label="展廳卡片">
         <button type="button" id="lobbyPrevHall" class="lobby-carousel-step" aria-label="上一個展廳" aria-keyshortcuts="ArrowLeft" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
         <button type="button" id="lobbyEnterDoor" hidden></button>
@@ -46,7 +45,7 @@
         <nav id="hallList" aria-label="開放展廳"></nav>
         <details id="lobbyGuide" class="gesture-guide">
           <summary>大廳操作指引</summary>
-          <p>從園區沿步道入館，也可以輕點前方開放廊道或右下角箭頭。入館後點接待台或「選擇展廳」展開選單。左右滑動卡片切換展廳，點選卡片即可進場。拖曳空白處轉身，輕推搖桿慢走，推遠加快，放手即停。</p>
+          <p>從園區沿步道入館，也可以輕點前方開放廊道或右下角箭頭。入館後點接待台展開選單。左右滑動卡片切換展廳，點選卡片即可進場。拖曳空白處轉身，輕推搖桿慢走，推遠加快，放手即停。</p>
           <p>方向鍵或 WASD 移動。按住空白鍵配合方向鍵轉頭，按 Enter 展開選單，再按 Enter 進入目前展廳。按 Tab 移至卡片選擇器後，可用左右鍵換廳，按 Esc 收合選單或停下自動行走，按 R 回到所在區域的起點。</p>
           <div class="touch-motion"><button type="button" id="lobbyGyro" aria-pressed="false">陀螺儀轉向</button> <span id="lobbyGyroStatus" role="status"></span></div>
         </details>
@@ -157,7 +156,7 @@
       }
       if(!preview && (!location.hash || location.hash==="#entrance")) {
         const preload=document.createElement("link");
-        preload.rel="modulepreload";preload.href="./lobby.js?v=reception41b";
+        preload.rel="modulepreload";preload.href="./lobby.js?v=directory42";
         document.head.append(preload);
       }
       function captureEarlyNavigation(stage,surface) {
@@ -199,5 +198,5 @@
       captureEarlyNavigation(document.getElementById("lobbyStage"),document.getElementById("hallEntrance"));
     })();
   </script>
-  <script type="module" src="app.js?v=reception41b"></script>
+  <script type="module" src="app.js?v=directory42"></script>
 </html>

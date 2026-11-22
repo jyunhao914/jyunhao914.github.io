@@ -292,7 +292,17 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   }
   function followsWall(a) { return a.mount==="手卷" || (a.mount!=="冊頁" && a.width>=4*a.height); }
   function setEntrance() {
-    if (!groups.length) return;
+    if (!onMove || !groups.length) {
+      // Stand near the end of the longer aisle at eye level and look down its length.
+      if(halfWidth>halfDepth){
+        station.set(halfWidth-1.2,1.60,halfDepth*.40);
+        entranceLook.set(-halfWidth*.77,1.60,-halfDepth*.20);
+      }else{
+        station.set(-halfWidth*.40,1.60,halfDepth-1.2);
+        entranceLook.set(halfWidth*.20,1.60,-halfDepth*.77);
+      }
+      return;
+    }
     const a=works[0], g=groups[0], aspect=host.clientWidth/Math.max(1,host.clientHeight);
     const spec=mounted.get(a.id).mount.userData.spec;
     entranceLook.copy(framingCenter(g,spec));

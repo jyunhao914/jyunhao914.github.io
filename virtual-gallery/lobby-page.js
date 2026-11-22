@@ -13,7 +13,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
   function reveal() {
     clearTimeout(quietTimer);
     entrance.classList.remove("lobby-quiet");
-    if(active && fullscreen() && !panel.open && !entrance.querySelector(".lobby-head :focus-visible, .lobby-wayfinding :focus-visible, .lobby-guide-access:focus-visible")) {
+    if(active && fullscreen() && !panel.open && !entrance.querySelector(".lobby-head :focus-visible, .lobby-wayfinding :focus-visible")) {
       quietTimer=setTimeout(()=>entrance.classList.add("lobby-quiet"),2800);
     }
   }
@@ -51,9 +51,6 @@ export function lobbyPage(enterRoom,prepareRoom) {
     reveal();
   });
   home.onclick=()=>{panel.close();scene?.setPaused(false);scene?.home();};
-  el("lobbyOpenCards").onclick=()=>{
-    if(scene?.setMenuOpen(true))el("lobbyEnterDoor").focus({preventScroll:true});
-  };
   el("lobbyCloseCards").onclick=()=>{
     if(scene?.setMenuOpen(false))stage.querySelector("canvas")?.focus({preventScroll:true});
   };
@@ -108,8 +105,6 @@ export function lobbyPage(enterRoom,prepareRoom) {
     if(Number.isInteger(index))selectedIndex=index;
     const outdoors=zone==="grounds";
     entrance.dataset.cardMenu=cardsOpen ? "open" : "closed";
-    el("lobbyOpenCards").hidden=outdoors || unavailable || cardsOpen || !rooms.length;
-    el("lobbyOpenCards").setAttribute("aria-expanded",String(cardsOpen));
     el("lobbyCloseCards").hidden=outdoors || unavailable || !cardsOpen;
     for(const direction of ["lobbyPrevHall","lobbyNextHall"])
       el(direction).hidden=outdoors || unavailable || !cardsOpen || rooms.length<2;
@@ -129,7 +124,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
     el("entranceTitle").textContent=outside ? "美術館園區" : "展場大廳";
     stage.setAttribute("aria-label",outside ? "可步行的美術館園區" : "可步行的 3D 展場大廳");
     stage.querySelector("canvas")?.setAttribute("aria-label",outside ? "美術館園區" : "展場大廳");
-    el("lobbyHint").textContent=outside ? "拖曳環顧 · 沿石徑入館" : "點接待台或選擇展廳展開卡片，拖曳空白處環顧";
+    el("lobbyHint").textContent=outside ? "拖曳環顧 · 沿石徑入館" : "點接待台展開展廳名錄，拖曳空白處環顧";
     el("lobbyReturnGrounds").hidden=outside || unavailable;
     home.textContent=outside ? "回到園區起點" : "回到大廳起點";
     el("lobbyDirectoryClose").textContent=outside ? "返回園區" : "返回大廳";
@@ -147,7 +142,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
   function failed() {
     destroyScene();
     unavailable=true;
-    el("lobbyOpenCards").hidden=el("lobbyCloseCards").hidden=enter.hidden=true;
+    el("lobbyCloseCards").hidden=enter.hidden=true;
     el("lobbyReturnGrounds").hidden=el("lobbyPrevHall").hidden=el("lobbyNextHall").hidden=true;
     message.textContent="此裝置暫時無法顯示 3D 大廳。";
     message.hidden=false;
@@ -172,7 +167,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
     message.textContent=startZone==="lobby" ? "正在開啟展場大廳…" : "正在載入空間…";message.hidden=false;
     el("lobbyHint").hidden=true;
     try {
-      const {createLobby}=await import("./lobby.js?v=reception41b");
+      const {createLobby}=await import("./lobby.js?v=directory42");
       if(!active || version!==generation)return;
       const signs=rooms.map(({title,subtitle,room,show})=>({title,subtitle,room,show:{id:show.id,title:show.title}}));
       scene=createLobby(stage,signs,index=>{
