@@ -1,8 +1,10 @@
+import { mountEditor, paintWallMount } from "./mount-editor.js?v=mount30";
+import { mountTemplates } from "./mount-templates.js?v=mount30";
 import { readDimensions } from "./dimensions.js";
-import * as wallTools from "./wall-tools.js?v=wall24";
-import {roomSize} from "../room-size.js";
+import * as wallTools from "./wall-tools.js?v=mount30";
+import {roomSize} from "../room-size.js?v=mount30";
 import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
-import { state, post, versions, exhibition } from "./storage.js?v=session25";
+import { state, post, versions, exhibition } from "./storage.js?v=mount30";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
   status = $("#status");
@@ -200,7 +202,11 @@ function render() {
     if(panel) {
       panel.dataset.show=sid;
       panel.scrollTop=previousScroll;
-      if(!inspector)requestAnimationFrame(()=>{if(panel.isConnected)$("#wall-preview").scrollIntoView({block:"start"});});
+      const jump=pendingMountPanel === sid && $("#mount-controls") && $("#jump-mount");
+      if(jump) {
+        pendingMountPanel=null;
+        requestAnimationFrame(()=>{if(jump.isConnected)jump.click();});
+      } else if(!inspector)requestAnimationFrame(()=>{if(panel.isConnected)$("#wall-preview").scrollIntoView({block:"start"});});
     }
   }
   else backup();
@@ -547,7 +553,7 @@ function layout(keepScene=false) {
     '</div><div class="hanging-desk"><section id="wall-preview" aria-label="即時展牆預覽"><div class="surface-tools"><strong>展牆預覽'+
     (mode==="3D" && a ? '<small class="pinch-tip"> · 雙指縮放</small><small class="wheel-tip"> · 對準細節滾輪縮放</small>' : '')+'</strong>'+
     (mode==="3D" && a ? '<button id="ruler-toggle" aria-pressed="true">隱藏尺標</button>' : '')+
-    btn("preview","參觀預覽")+'</div><div id="surface"></div>' +
+    '<button id="jump-mount" type="button" aria-controls="mount-controls">裝裱</button>'+btn("preview","參觀預覽")+'</div><div id="surface"></div>' +
     '<div id="position-pad" role="group" aria-label="作品位置微調"><div class="pad-caption"><strong id="adjusting-title"></strong><span>每次 5 公分</span></div><div class="nudge-keys">'+
     btn("left","← 左移")+btn("right","右移 →")+btn("up","↑ 升高")+btn("down","↓ 降低")+
     '</div></div><div class="wall-save"><span role="status" id="wall-save-status"></span><button id="wall-save-retry" data-save-retry hidden>重試儲存</button></div></section><div id="layout-inspector" role="region" aria-label="作品清單與布展設定" tabindex="0"><section class="inventory"><h2>布展清單</h2><p id="wall-progress"></p><div id="wall-list"></div></section><div id="form"></div></div></div>';
@@ -588,6 +594,7 @@ function layout(keepScene=false) {
       mode = m;
       render();
     });
+  $("#jump-mount").hidden=!a;
   $("#position-pad").hidden=!a;
   $("#adjusting-title").textContent=a?.title || "";
   if (!a) {
@@ -602,14 +609,18 @@ function layout(keepScene=false) {
     Object.assign((s.layout[i] ??= {}), {reviewed:false},obj);
     changed();
   }
-  const dimensions=roomSize(nearby);
-  const span=2*dimensions[wall%2 ? "depth" : "width"], height=wallTools.wallHeight(dimensions.theme);
+  let dimensions=roomSize(nearby);
+  let span=2*dimensions[wall%2 ? "depth" : "width"], height=wallTools.wallHeight(dimensions.theme);
   const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
   const group=wallTools.members(same,a), ordered=wallTools.units(same);
-  const boxes=ordered.map(wallTools.envelope);
-  const total=boxes.reduce((sum,b)=>sum+b.right-b.left,0);
-  const gaps=boxes.slice(1).map((b,i)=>b.left-boxes[i].right);
-  const currentGap=gaps.length?Math.max(0,Math.round(100*gaps.reduce((sum,x)=>sum+x,0)/gaps.length)):0;
+  function rowSize() {
+    const boxes=ordered.map(wallTools.envelope);
+    const total=boxes.reduce((sum,b)=>sum+b.right-b.left,0);
+    const gaps=boxes.slice(1).map((b,i)=>b.left-boxes[i].right);
+    const currentGap=gaps.length?Math.max(0,Math.round(100*gaps.reduce((sum,x)=>sum+x,0)/gaps.length)):0;
+    return {boxes,total,currentGap};
+  }
+  const currentGap=rowSize().currentGap;
   function savePositions(list) {
     for (const o of list)patch(o.id,{x:+o.x.toFixed(5),y:+o.y.toFixed(5)});
   }
@@ -636,7 +647,7 @@ function layout(keepScene=false) {
         toggle.setAttribute("aria-pressed",String(!readout.hidden));
       };
       let t = token;
-      import("../gallery.js?v=wheel29")
+      import("../gallery.js?v=mount30")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
@@ -678,6 +689,7 @@ function layout(keepScene=false) {
     for (let o of same) {
       let b = document.createElement("button");
       pieces.set(o.id,b);
+      b.dataset.workId=o.id;
       b.className = "piece" + (o.id === aid ? " sel" : "");
       b.style.cssText =
         "left:" +
@@ -691,11 +703,19 @@ function layout(keepScene=false) {
         "%;rotate:" +
         -o.rotate +
         "deg";
+      const face=document.createElement("div");
+      face.className="plan-face";
+      b.append(face);
+      paintWallMount(b,o);
       if (o.type === "圖片")
-        b.style.backgroundImage =
+        face.style.backgroundImage =
           'url("' + o.src.replace(/^media\//, "../media/") + '")';
       let label = document.createElement("span");
       label.textContent = o.title;
+      label.className = "plan-label";
+      label.setAttribute("aria-hidden","true");
+      b.setAttribute("aria-label",o.title);
+      b.onclick = e => {if(e.detail===0)selectWork(o.id);};
       b.append(label);
       w.append(b);
       let d;
@@ -730,6 +750,7 @@ function layout(keepScene=false) {
     '<fieldset><legend>'+esc(a.title)+'</legend><div class="bar">'+
     btn("review",a.reviewed?"重新標記待確認":"確認此作掛位")+
     (works.some(w=>!group.includes(w))?'<label>交換掛位<select id="swap-target">'+works.filter(w=>!group.includes(w)).map(w=>'<option value="'+esc(w.id)+'">'+esc(w.title)+'　·　'+esc(w.room)+'</option>').join("")+'</select></label>'+btn("swap","互換位置"):"")+'</div></fieldset>'+
+    '<fieldset id="mount-controls"><legend>作品裝裱</legend></fieldset>'+
     '<fieldset><legend>連屏組合</legend><div class="panel-members">'+
     same.filter(o=>!o.groupId || o.groupId===a.groupId || o.id===aid).map(o=>
       '<label><input type="checkbox" data-panel="'+esc(o.id)+'" '+(group.includes(o)?'checked ':'')+(o.id===aid?'disabled':'')+'>'+esc(o.title)+'</label>').join("")+
@@ -748,12 +769,6 @@ function layout(keepScene=false) {
     btn("actualSize","按原作尺寸展示（1:1）") +
     btn("align", "同牆作品對齊高度") +
     btn("distribute", "同牆作品等距排列") +
-    '</div></fieldset><fieldset><legend>裝裱</legend><div class="fields">' +
-    field(a, "frame", "畫框", ["木框", "金屬框", "無框"]) +
-    field(a, "finish", "表面", ["霧面", "亮面"]) +
-    n("mat", "卡紙寬（公尺）", 0, 0.5) +
-    n("frameWidth", "框寬（公尺）", 0, 0.5) +
-    n("depth", "厚度（公尺）", 0.01, 0.5) +
     '</div></fieldset><fieldset><legend>作品燈具</legend><div class="fields">' +
     n("lx", "燈具水平位置", -4, 4) +
     n("ly", "相對掛點高度", -2, 4) +
@@ -765,6 +780,57 @@ function layout(keepScene=false) {
     btn("warm", "暖光聚焦") +
     btn("day", "日光漫射") +
     "</div></fieldset>";
+  const mountHost=$("#mount-controls");
+  $("#jump-mount").onclick=()=>{
+    $("#wall-preview").scrollIntoView({block:"start",behavior:"instant"});
+    const inspector=$("#layout-inspector"), first=mountHost.querySelector('[data-mount-field="mount"]');
+    inspector.scrollTop+=mountHost.getBoundingClientRect().top-inspector.getBoundingClientRect().top-8;
+    first.focus({preventScroll:true});
+    viewer?.focus(nearby.indexOf(a));
+  };
+  let mountFrame=0;
+  mountEditor(mountHost,a,delta=>{
+    patch(a.id,delta);
+    if(a.reviewed) {
+      a.reviewed=false;
+      $("#wall-progress").textContent=s.status+"　·　掛位已確認 "+works.filter(w=>w.reviewed).length+" / "+works.length;
+      const meta=$('#wall-list button[aria-current="true"] small');
+      if(meta)meta.textContent=meta.textContent.replace("掛位已確認","待確認");
+      $('[data-act="review"]').textContent="確認此作掛位";
+    }
+    // Input can fire repeatedly while moving the system colour picker or sheen slider.
+    // Save every accepted value above and update the existing scene once per frame.
+    if(mountFrame)return;
+    const sceneToken=token;
+    mountFrame=requestAnimationFrame(()=>{
+      mountFrame=0;
+      if(sceneToken!==token)return;
+      const required=roomSize(nearby), envelope=wallTools.bounds(a);
+      const exceedsWall=Math.max(Math.abs(envelope.left),Math.abs(envelope.right))>span/2;
+      const axis=wall%2 ? "depth" : "width";
+      if(required.theme!==dimensions.theme || (exceedsWall && required[axis]>dimensions[axis])) {
+        dimensions=required;
+        span=2*dimensions[axis];
+        height=wallTools.wallHeight(dimensions.theme);
+        token++;
+        viewer?.dispose();
+        viewer=null;
+        scene(); // Keep the active input and the inspector when the wall needs more room.
+      } else if(viewer)viewer.updateMount(a.id,a);
+      else if(mode==="2D") {
+        const piece=Array.from(document.querySelectorAll(".piece")).find(el=>el.dataset.workId===a.id);
+        if(piece)paintWallMount(piece,a);
+      }
+      const gap=$("#gap");
+      if(gap && aid===a.id)gap.value=rowSize().currentGap;
+      const panelGap=$("#panel-gap");
+      if(panelGap && aid===a.id) {
+        const env=wallTools.envelope(group);
+        const width=group.reduce((sum,w)=>{const b=wallTools.bounds(w);return sum+b.right-b.left;},0);
+        panelGap.value=Math.max(0,Math.round(1000*(env.right-env.left-width)/(group.length-1))/10);
+      }
+    });
+  },(host,apply)=>mountTemplates(host,()=>a,apply,db,changed));
   action("review",()=>{patch(a.id,{reviewed:!a.reviewed});layout(mode==="3D");});
   action("swap",()=>{
     const target=works.find(w=>w.id===$("#swap-target").value);
@@ -785,13 +851,16 @@ function layout(keepScene=false) {
     render();
   });
   if(group.length>1) {
-    const panels=group.map(w=>({w,b:wallTools.bounds(w)})).sort((a,b)=>a.b.left-b.b.left);
-    const width=panels.reduce((sum,p)=>sum+p.b.right-p.b.left,0);
-    const original=wallTools.envelope(group);
+    const panelSize=()=>{
+      const panels=group.map(w=>({w,b:wallTools.bounds(w)})).sort((a,b)=>a.b.left-b.b.left);
+      return {panels,width:panels.reduce((sum,p)=>sum+p.b.right-p.b.left,0),original:wallTools.envelope(group)};
+    };
+    const {width,original}=panelSize();
     $("#panel-gap").value=Math.max(0,Math.round(1000*(original.right-original.left-width)/(group.length-1))/10);
     action("spacePanels",()=>{
       const input=$("#panel-gap");
       if(!input.value.trim() || !input.reportValidity())return;
+      const {panels,width,original}=panelSize();
       const gap=Number(input.value)/100, length=width+(group.length-1)*gap;
       if(length>span)throw Error("屏間距超出展牆寬度。");
       let left=clamp((original.left+original.right-length)/2,-span/2,span/2-length);
@@ -832,6 +901,7 @@ function layout(keepScene=false) {
     action(name,()=>{shift(group,dx,dy);refreshPlacement();});
   }
   function spaceRow(gap) {
+    const {boxes,total}=rowSize();
     const length=total+gap*(ordered.length-1);
     if(length>span+.000001)throw Error("展牆寬度不足，請縮小間距或改掛其他展牆。");
     const center=(boxes[0].left+boxes.at(-1).right)/2;
@@ -859,7 +929,7 @@ function layout(keepScene=false) {
     });
     refreshPlacement();
   });
-  action("distribute",()=>spaceRow(Math.max(0,(span-total)/(ordered.length+1))));
+  action("distribute",()=>spaceRow(Math.max(0,(span-rowSize().total)/(ordered.length+1))));
   for (let [k, v] of [
     ["warm", [3000, 28, 25]],
     ["day", [6200, 18, 55]],
@@ -928,6 +998,7 @@ function backup() {
 // A published work can have a different ID in an imported private draft.
 let unmatchedEntry=null;
 const entry=new URLSearchParams(location.search), requested=entry.get("layout");
+let pendingMountPanel=entry.get("panel")==="mount" ? requested : null;
 if(requested) {
   let draft=db.shows.find(item=>item.id===requested);
   const workId=entry.get("work");

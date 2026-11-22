@@ -1,3 +1,5 @@
+import { mountSpec } from "../mount-spec.js?v=mount30";
+
 // Wall coordinates and physical artwork dimensions are expressed in metres.
 export function wallHeight(theme) {
   return {calligraphy:3.65, projection:3.35, main:5.8, panorama:5.8}[theme] ?? 5.26;
@@ -10,18 +12,9 @@ function rotated(a,x,y) {
 
 export function bounds(a) {
   const corners=[];
-  function rectangle(w,h,y=0) {
+  for (const {w,h,x=0,y=0} of mountSpec(a).rects) {
     for (const dx of [-w/2,w/2])
-      for (const dy of [-h/2,h/2]) corners.push(rotated(a,dx,y+dy));
-  }
-  const mat=a.mat || 0, frame=a.frame==="無框" ? 0 : a.frameWidth || 0;
-  rectangle(a.width,a.height);
-  if (frame || a.mount!=="掛軸") rectangle(a.width+2*(mat+frame),a.height+2*(mat+frame));
-  if (a.mount==="掛軸") {
-    const silk=a.width+2*mat, length=a.height+.48;
-    rectangle(silk,length,.05);
-    rectangle(silk,.014,.05+length/2);
-    rectangle(silk+.10,.054,.05-length/2);
+      for (const dy of [-h/2,h/2]) corners.push(rotated(a,x+dx,y+dy));
   }
   return {left:Math.min(...corners.map(p=>p[0])),right:Math.max(...corners.map(p=>p[0])),
     bottom:Math.min(...corners.map(p=>p[1])),top:Math.max(...corners.map(p=>p[1]))};
@@ -88,7 +81,7 @@ export function makeRulers(T,host,works,groups,cam) {
   svg.setAttribute('aria-hidden','true');
   host.append(svg);
   const cameraMatrix=new T.Matrix4(),projection=new T.Matrix4(),point=new T.Vector3();
-  let index=0, dirty=true, metrics=[],width=0,height=0;
+  let index=0, dirty=true, metrics=[],width=0,height=0,front=0;
   function element(tag,attrs,txt) {
     const el=document.createElementNS(ns,tag);
     for(const [key,value] of Object.entries(attrs))el.setAttribute(key,value);
@@ -102,11 +95,12 @@ export function makeRulers(T,host,works,groups,cam) {
     if(!dirty && w===width && h===height && cameraMatrix.equals(cam.matrixWorld) && projection.equals(cam.projectionMatrix))return;
     if(dirty) {
       metrics=measures(works.filter(o=>o.wall===a.wall && o.room===a.room),a);
+      front=mountSpec(a).faceZ+.001;
       report.textContent=metrics.map(m=>m.text).join('　·　');
     }
     dirty=false; width=w; height=h; cameraMatrix.copy(cam.matrixWorld); projection.copy(cam.projectionMatrix);
     const normal=(a.wall===3?-1:a.wall)*Math.PI/2, co=Math.cos(normal),si=Math.sin(normal);
-    const g=groups[index],front=(a.depth||0)/2+.017;
+    const g=groups[index];
     function project([x,y]) {
       point.set(g.position.x+(x-a.x)*co+si*front,y,g.position.z-(x-a.x)*si+co*front).project(cam);
       return {x:(point.x+1)*w/2,y:(1-point.y)*h/2,z:point.z};

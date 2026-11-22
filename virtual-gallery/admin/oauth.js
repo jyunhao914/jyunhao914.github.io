@@ -60,7 +60,7 @@ export async function authorize(keep=false) {
   const entry=new URLSearchParams(location.search);
   sessionStorage.setItem(
     keys.flow,
-    JSON.stringify({ state, verifier, keep, layout:entry.get("layout"),work:entry.get("work"), time: Date.now() }),
+    JSON.stringify({ state, verifier, keep, layout:entry.get("layout"),work:entry.get("work"), panel:entry.get("panel"), time: Date.now() }),
   );
   const params = new URLSearchParams({
     client_id: app.id,
@@ -120,6 +120,7 @@ export async function restore() {
     if(flow.layout) {
       const entry=new URLSearchParams({layout:flow.layout});
       if(flow.work)entry.set("work",flow.work);
+      if(flow.panel==="mount")entry.set("panel","mount");
       history.replaceState(null,"",location.pathname+"?"+entry);
     }
     const result = await broker("exchange", {

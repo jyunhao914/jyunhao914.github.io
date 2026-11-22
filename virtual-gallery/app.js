@@ -213,7 +213,7 @@ async function enter(workId) {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=wheel29");
+    let { gallery } = await import("./gallery.js?v=mount30");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -368,7 +368,7 @@ $("scrollPosition").oninput = e => viewer?.seek(Number(e.target.value)/1000);
 $("overview").onclick = () => viewer?.overview();
 function showFocus(a) {
   if(a)updateEditLink(a);
-  const wide = a && a.width >= 4*a.height;
+  const wide = a && (a.mount==="手卷" || (a.mount!=="冊頁" && a.width >= 4*a.height));
   $("inspectControls").hidden = !wide;
   $("focusTitle").textContent = a?.title || "";
   const help=wide ? "拖長卷慢移，放手即停" : a ? "左右滑作品換件 · 拖空牆轉身" : "點作品靠近 · 拖空牆轉身";

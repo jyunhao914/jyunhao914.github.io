@@ -312,7 +312,59 @@
     .wall-save{display:flex;align-items:center;gap:6px;min-height:20px;padding:2px 8px;color:#465a65;font-size:12px}
     [data-save-retry]:not([hidden]){border-color:#8b4931;color:#793c28;background:#fff7ee}
     .wall-save button{flex:none;padding:4px 8px}
-    </style>
+
+    #mount-controls{border-top:3px solid #536c77;border-radius:4px;scroll-margin:8px}
+    #mount-controls [hidden]{display:none!important}
+    .mount-section+.mount-section{margin-top:1rem;border-top:1px solid #dde3e4;padding-top:.85rem}
+    .mount-size-readout{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center;background:#eaf0f1;color:#203e4c;border-bottom:1px solid #b9c9ce;margin:0 0 12px;padding:6px 8px;font:500 .8rem/1.5 system-ui;font-variant-numeric:tabular-nums}
+    .mount-size-readout span{white-space:nowrap}
+    .mount-section h3{font-size:.88rem;margin:0 0 .55rem;color:#344b59}
+    .mount-grid,.mount-palettes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .mount-grid label{font-size:.82rem;align-content:start}
+    .mount-grid :is(input,select){width:100%;min-height:44px;box-sizing:border-box}
+    .mount-grid input[type=color]{padding:3px}
+    .mount-grid input[type=range]{padding:0;accent-color:#234963}
+    .mount-grid label:has(output){position:relative}
+    .mount-grid output{position:absolute;right:0;top:0;font-variant-numeric:tabular-nums}
+    .mount-palettes{margin-bottom:10px}
+    .mount-palette{display:flex;align-items:center;gap:7px;min-height:44px;font-size:13px;text-align:left;padding:5px}
+    .mount-palette[aria-pressed=true]{border-color:#28506b;box-shadow:inset 0 0 0 1px #28506b}
+    .mount-chips{display:flex;flex:none;overflow:hidden;border:1px solid #0003;border-radius:3px}
+    .mount-chips i{display:block;width:7px;height:19px}
+    .mount-recipe-picker{display:grid;gap:5px;margin:0 0 14px}
+    .mount-recipe-picker :is(select,button){max-width:100%;min-height:44px}
+    .mount-recipe-picker button{justify-self:start}
+    .box-example .frame-slice{width:27%;height:23px;position:absolute;left:11%}
+    .box-example-backing{position:absolute;left:17%;right:11%;height:18px;border-top:1px solid #7f9ca4;border-bottom:3px solid #978776}
+    .box-example-backing::after{content:"";position:absolute;left:22%;right:1%;bottom:3px;border-bottom:2px solid #aa7954}
+    .mount-samples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+    .mount-samples button{display:grid;gap:3px;padding:4px;min-height:51px;justify-items:center;font-size:13px}
+    .mount-samples button[aria-pressed=true]{background:#edf3f3;border-color:#34576b;box-shadow:inset 0 0 0 1px #34576b}
+    #mount-controls button:focus-visible{outline:3px solid #2878a9;outline-offset:2px}
+    .mount-example{position:relative;display:grid;place-items:center;width:100%;height:28px}
+    .frame-slice{width:76%;height:19px;background:linear-gradient(115deg,#ae8863,#70523c)}
+    [data-sample-key=scrollStyle] .mount-example{height:58px}
+    [data-sample-key=albumStyle] .mount-example{height:58px}
+    .album-sample{position:absolute;display:block;transform:translate(-50%,-50%)}
+    .mount-ratio{min-height:44px;margin-top:8px}
+    [data-sample-key=handscrollStyle] .mount-example{height:30px}
+    .handscroll-sample{display:block;position:relative;width:50%;height:10px}
+    .handscroll-sample .paper-sample::after{left:16%;width:65%;top:40%;height:0;border:0;border-top:1px dashed #736a57}
+    .scroll-sample{display:block;position:absolute;top:53%;left:50%;width:16px;height:26px;transform:translate(-50%,-50%)}
+    .paper-sample{display:block;position:absolute;inset:0;background:#f3eadd}
+    .paper-sample::after{content:"";position:absolute;top:18%;height:64%;left:45%;border-left:1px dashed #736a57}
+    .mount-section details>summary{cursor:pointer;min-height:44px;align-content:center}
+    .mount-section details>div>button{margin:6px 0 10px}
+    .mount-restore{min-height:44px;margin-top:6px}
+    .wall button.piece{border:0;overflow:visible;border-radius:0;background:transparent}
+    .plan-face,.plan-mount,.plan-mount i{display:block;position:absolute;pointer-events:none}
+    .plan-face,.plan-mount{inset:0}
+    .plan-face{background:#a2b9be center / 100% 100% no-repeat}
+    .piece .plan-label{display:none;position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);white-space:nowrap;background:#183344;color:white;padding:2px 4px;border-radius:3px;font-size:11px;pointer-events:none}
+    .piece:focus-visible{z-index:1}.piece:focus-visible .plan-label{display:block}
+    @media(hover:hover){.piece:hover{z-index:1}.piece:hover .plan-label{display:block}}
+    @media(max-width:400px){.surface-tools{gap:3px}.surface-tools button{font-size:.8rem;padding:3px 5px}}
+  </style>
   <header>
     <strong>虛擬策展工作室</strong
     ><span id="status" role="status">正在開啟策展後台…</span><button data-save-retry hidden>重試儲存</button>
@@ -344,5 +396,5 @@
     <div class="preview-heading"><button id="closePreview">返回布展</button><strong id="previewTitle"></strong></div>
     <iframe title="草稿預覽" allowfullscreen></iframe>
   </dialog>
-  <script type="module" src="./login.js?v=wheel29"></script>
+  <script type="module" src="./login.js?v=mount30"></script>
 </html>

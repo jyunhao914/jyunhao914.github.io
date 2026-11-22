@@ -1,11 +1,11 @@
-import { login } from "./storage.js?v=session25";
-import { authorize, restore, signOut, accessToken, deviceSaveFailed, keys } from "./oauth.js?v=studio27";
+import { login } from "./storage.js?v=mount30";
+import { authorize, restore, signOut, accessToken, deviceSaveFailed, keys } from "./oauth.js?v=mount30";
 const $ = (id) => document.getElementById(id);
 let studio;
 async function show(value,provider) {
   await login(value,provider);
   $("key").value = "";
-  studio=await import("./studio.js?v=wheel29");
+  studio=await import("./studio.js?v=mount30");
   $("login").hidden = true;
   $("logout").hidden = false;
   $("status").textContent = deviceSaveFailed ? "已登入，瀏覽器未允許記住裝置。" : "已連線至私人作品庫";

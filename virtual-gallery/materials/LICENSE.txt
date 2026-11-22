@@ -29,3 +29,9 @@ exposure and foliage saturation have been adjusted for the gallery windows.
 Wood Floor (Dimitrios Savva), 1.70 m scan. https://polyhaven.com/a/wood_floor
 Quatrefoil Jacquard Fabric (colormass and Rico Cilliers), 0.28 m scan; diffuse recolored for scroll mounting. https://polyhaven.com/a/quatrefoil_jacquard_fabric
 Both assets are CC0.
+
+Mount materials in mount/: the walnut, oak, ash and teak finish simulations use
+different colour-neutralized, seamless board sections from the CC0 Wood Table
+and Wood Floor scans credited above. Their names describe the simulated finish.
+The brushed surface, cotton board, plain silk and linen maps are procedurally
+generated for this gallery.

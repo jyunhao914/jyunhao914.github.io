@@ -1,3 +1,5 @@
+import { mountFields, validateMount } from "../mount-fields.js?v=mount30";
+
 const owner = "jyunhao914",
   privateRepo = "virtual-gallery-private",
   publicRepo = "jyunhao914.github.io";
@@ -123,6 +125,15 @@ function validate(s) {
       !Number.isFinite(a.height)
     )
       throw Error("作品媒體或尺寸無效。");
+  if (s.mountStyles != null) {
+    if (!Array.isArray(s.mountStyles) ||
+        s.mountStyles.some(t => !t || typeof t.name !== "string" || !t.name.trim() ||
+          typeof t.id !== "string" || !t.settings || typeof t.settings !== "object") ||
+        new Set(s.mountStyles.map(t => t.id)).size !== s.mountStyles.length)
+      throw Error("私人裝裱樣式格式無效。");
+    s.mountStyles.forEach(t => validateMount(t.settings));
+  }
+  s.arts.forEach(validateMount);
   let ids = new Set(s.arts.map((a) => a.id));
   for (let x of s.shows) {
     if (
@@ -133,6 +144,7 @@ function validate(s) {
       (x.start && x.end && x.start > x.end)
     )
       throw Error("請檢查展覽作品、播放清單與檔期。");
+    Object.values(x.layout).forEach(validateMount);
   }
 }
 async function save(s) {
@@ -150,10 +162,10 @@ async function save(s) {
   loadedRevision = next;
   return next;
 }
-const workFields =
-  "id title artist category type description src mount tiles source voice captions subtitle room wall x y z width height rotate frame frameWidth mat depth finish kelvin power angle lx ly lz".split(
-    " ",
-  );
+const workFields = [
+  ..."id title artist category type description src tiles source voice captions subtitle room wall x y z width height rotate kelvin power angle lx ly lz".split(" "),
+  ...mountFields,
+];
 function pick(obj, keys) {
   return Object.fromEntries(
     keys.filter((k) => Object.hasOwn(obj, k)).map((k) => [k, obj[k]]),

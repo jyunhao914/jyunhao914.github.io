@@ -1,7 +1,9 @@
+import {mountFields} from "./mount-fields.js?v=mount30";
 import {mobileControls} from "./mobile-controls.js?v=stickspace20";
-import {roomSize} from "./room-size.js";
+import {roomSize} from "./room-size.js?v=mount30";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=pinch28";
+import {mountRenderer, disposeMount} from "./mount-render.js?v=mount30";
+import { architecture } from "./architecture.js?v=mount30";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -34,13 +36,13 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.needsUpdate = true;
   renderer.shadowMap.type = T.PCFShadowMap;
-  const {theme,width:halfWidth,depth:halfDepth}=roomSize(works);
-  const dark = theme === "calligraphy";
+  const {theme,width:halfWidth,depth:halfDepth,height:roomHeight}=roomSize(works);
+  const mounts=mountRenderer(renderer), mounted=new Map();
   const hasBench = theme === "ink" || !theme;
   cam.far = Math.max(80,4*(halfWidth+halfDepth));
   cam.rotation.order = "YXZ";
   const station=new T.Vector3(0,1.65,2), entranceLook=new T.Vector3(0,1.65,-5);
-  const building = architecture(scene, box, renderer, theme, halfWidth, halfDepth);
+  const building = architecture(scene, box, renderer, theme, halfWidth, halfDepth, roomHeight);
   let reflection,
     disposed = false;
   building.ready
@@ -70,6 +72,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     g.rotation.set(0, ang, 0);
     g.rotateZ(((a.rotate || 0) * Math.PI) / 180);
     let depth = ((a.wall % 2 ? halfWidth : halfDepth) - .13) - (a.z || 0);
+    const shadow=g.getObjectByName("mount-contact");
+    if(shadow){
+      shadow.position.z=-.067-(a.z || 0);
+      shadow.visible=Math.abs(a.z || 0)<.09;
+    }
     g.position.set(
       Math.cos(ang) * a.x - Math.sin(ang) * depth,
       a.y,
@@ -94,84 +101,24 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       .forEach((v, i) => ctx.fillText(v, 36, 210 + i * 38, 690));
     return new T.CanvasTexture(c);
   }
+  function mountedSurfaceTarget(g,a,spec) {
+    if(!spec.isHandscroll && !spec.isAlbum)return null;
+    // Pick the blank frontispiece and colophon as parts of the roll, including beyond the image UVs.
+    const strip=new T.Mesh(new T.PlaneGeometry(spec.width,spec.height),new T.MeshBasicMaterial());
+    strip.name=spec.isHandscroll ? "handscroll-hit" : "album-hit"; strip.visible=false;
+    strip.userData={a,mountSurface:true};
+    strip.position.set((spec.left+spec.right)/2,(spec.top+spec.bottom)/2,spec.faceZ-.0024);
+    g.add(strip); targets.push(strip);
+    return strip;
+  }
   works.forEach((a) => {
     let g = new T.Group();
     scene.add(g);
     groups.push(g);
     layout(g, a);
-    let w = a.width,
-      h = a.height,
-      f = a.frame === "無框" ? 0 : a.frameWidth,
-      m = a.mat,
-      d = a.depth;
-    if (a.mount === "掛軸") {
-      const contactCanvas = document.createElement("canvas");
-      contactCanvas.width = 256;
-      contactCanvas.height = 192;
-      const ink = contactCanvas.getContext("2d");
-      ink.filter = "blur(4px)";
-      ink.fillStyle = "rgba(26,19,13,.42)";
-      ink.fillRect(9, 8, 238, 175);
-      const shadowMap = new T.CanvasTexture(contactCanvas);
-      textures.push(shadowMap);
-      const shadow = new T.Mesh(
-        new T.PlaneGeometry((w + 2 * (f + m)) * 1.08, (h + 2 * (f + m)) * 1.12),
-        new T.MeshBasicMaterial({
-          map: shadowMap,
-          transparent: true,
-          depthWrite: false,
-          toneMapped: false,
-        }),
-      );
-      shadow.position.set(0.018, -0.027, -0.055);
-      g.add(shadow);
-    }
-    if (a.mount === "掛軸") {
-      const silkWidth = w + 2 * m;
-      const silkHeight = h + .48;
-      const brocadeMap = (channel) => {
-        const map = new T.TextureLoader().load(new URL("./materials/brocade-" + channel + ".webp", import.meta.url).href);
-        textures.push(map);
-        map.wrapS = map.wrapT = T.RepeatWrapping;
-        map.repeat.set(silkWidth / .28, silkHeight / .284);
-        map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-        if (channel === "color") map.colorSpace = T.SRGBColorSpace;
-        return map;
-      };
-      box(g, silkWidth, silkHeight, .012, dark ? 0xd4cdb7 : 0xd1c6aa, 0, .05, d / 2 - .006,
-        {map: brocadeMap("color"), normalMap: brocadeMap("normal"), roughnessMap: brocadeMap("rough"),
-          normalScale: new T.Vector2(.25,.25), roughness: .85});
-      box(g, silkWidth, .014, .018, 0x504639, 0, silkHeight / 2 + .05, d / 2);
-      {
-        const height = -silkHeight / 2 + .05;
-        const roller = new T.Mesh(
-          new T.CylinderGeometry(.027, .027, silkWidth + .10, 16),
-          new T.MeshStandardMaterial({...building.wood, color: 0x624636, roughness: .62})
-        );
-        roller.rotation.z = Math.PI / 2;
-        roller.position.set(0, height, d / 2);
-        roller.castShadow = true;
-        g.add(roller);
-      }
-    }
-    if (f)
-      box(
-        g,
-        w + 2 * (f + m),
-        h + 2 * (f + m),
-        d,
-        a.frame === "木框" ? 0x805638 : 0x66717c,
-        0,
-        0,
-        0,
-        {
-          metalness: a.frame === "金屬框" ? 0.7 : 0.08,
-          roughness: a.finish === "亮面" ? 0.16 : 0.82,
-          envMapIntensity: 1,
-          ...(a.frame === "木框" ? building.wood : {}),
-        },
-      );
-    if (m && a.mount !== "掛軸") box(g, w + 2 * m, h + 2 * m, 0.012, 0xf7f2e5, 0, 0, d / 2);
+    const mount=mounts.build(a), spec=mount.userData.spec;
+    g.add(mount);
+    const {w,h}=spec;
     let tex;
     if (
       a.type === "影片" ||
@@ -195,7 +142,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       animated.push({ img, ctx: c.getContext("2d"), tex });
     } else if (a.type === "圖片") tex = new T.TextureLoader().load(a.src,(loaded)=>{
       const image=loaded.image;
-      if(disposed || a.tiles?.length || w < 4*h || image.width<=4096) return;
+      if(disposed || a.tiles?.length || (!spec.isHandscroll && w < 4*h) || image.width<=4096) return;
       const count=Math.ceil(image.width/2048);
       for(let i=0;i<count;i++){
         const left=Math.round(image.width*i/count), right=Math.round(image.width*(i+1)/count);
@@ -221,7 +168,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
         emissiveIntensity: 0.045,
       }),
     );
-    face.position.z = d / 2 + 0.012;
+    face.name="artwork-face";
+    face.position.z=spec.faceZ;
     face.userData.a = a;
     face.userData.picture = true;
     g.add(face);
@@ -230,9 +178,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       tile.colorSpace=T.SRGBColorSpace;
       tile.anisotropy=tex.anisotropy;
       textures.push(tile);
-      const section=new T.Mesh(new T.PlaneGeometry(w/count,h),face.material.clone());
+      const section=new T.Mesh(new T.PlaneGeometry(a.width/count,a.height),face.material.clone());
+      section.name="artwork-tile";
+      section.userData.tile={index,count};
       section.material.map=section.material.emissiveMap=tile;
-      section.position.set(w*((index+.5)/count-.5),0,face.position.z+.001);
+      section.position.set(a.width*((index+.5)/count-.5),0,face.position.z+.001);
       g.add(section);
     }
     if (Array.isArray(a.tiles))
@@ -255,7 +205,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       new T.PlaneGeometry(0.43, 0.16),
       new T.MeshStandardMaterial({ map: tagTex }),
     );
-    plaque.position.set(w / 2 + m + f + 0.28, -h / 2 + 0.08, 0.015);
+    plaque.position.set(spec.right+.28,-h/2+.08,-.064);
+    mounted.set(a.id,{mount,face,plaque,g,a,strip:mountedSurfaceTarget(g,a,spec)});
     g.add(plaque);
     plaque.userData.a = a;
     targets.push(plaque);
@@ -277,11 +228,18 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     for (const art of drag.members) layout(groups[works.indexOf(art)],art);
     rulers?.dirty();
   }
+  function framingCenter(g,spec) {
+    return spec.isHandscroll || spec.isAlbum
+      ? g.localToWorld(new T.Vector3((spec.left+spec.right)/2,(spec.top+spec.bottom)/2,spec.faceZ))
+      : g.position.clone();
+  }
+  function followsWall(a) { return a.mount==="手卷" || (a.mount!=="冊頁" && a.width>=4*a.height); }
   function setEntrance() {
     if (!groups.length) return;
     const a=works[0], g=groups[0], aspect=host.clientWidth/Math.max(1,host.clientHeight);
-    entranceLook.copy(g.position);
-    const retreat=Math.max(3.3,(a.width+2*(a.mat+a.frameWidth))*.61/(Math.tan(T.MathUtils.degToRad(cam.fov/2))*aspect));
+    const spec=mounted.get(a.id).mount.userData.spec;
+    entranceLook.copy(framingCenter(g,spec));
+    const retreat=Math.max(3.3,spec.width*.61/(Math.tan(T.MathUtils.degToRad(cam.fov/2))*aspect));
     station.copy(entranceLook).addScaledVector(new T.Vector3(0,0,1).applyQuaternion(g.quaternion),retreat);
     station.x=T.MathUtils.clamp(station.x,-halfWidth+.4,halfWidth-.4);
     station.z=T.MathUtils.clamp(station.z,-halfDepth+.4,halfDepth-.4);
@@ -441,16 +399,17 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     let obj = hit(e);
     const index = obj ? works.indexOf(obj.userData.a) : -1;
     let gesture = "look";
-    if (!onMove && obj?.userData.picture) {
+    const onArt=obj?.userData.picture || obj?.userData.mountSurface;
+    if (!onMove && onArt) {
       if (reading && index === guide) gesture = "pan";
-      else if (guide>=0 && works[index].width < 4*works[index].height) gesture = "switch";
+      else if (guide>=0 && !followsWall(works[index])) gesture = "switch";
     }
     drag = {
       pointer: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       gesture, index,
-      u: obj?.userData.picture ? ray.intersectObject(obj)[0]?.uv.x : undefined,
+      u: onArt ? obj.parent.worldToLocal(ray.intersectObject(obj)[0].point.clone()).x/works[index].width+.5 : undefined,
       x: e.clientX,
       y: e.clientY,
       dist: 0,
@@ -466,7 +425,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
         const art=works[index];
         rulers.select(index);
         drag.members=tools.members(works,art);
-        drag.move=tools.movement(drag.members,art.wall%2 ? halfDepth : halfWidth,tools.wallHeight(theme));
+        drag.move=tools.movement(drag.members,art.wall%2 ? halfDepth : halfWidth,roomHeight);
       }
       drag.origin = { x: obj.userData.a.x, y: obj.userData.a.y };
     }
@@ -857,30 +816,31 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       cam.lookAt(center); travel=null;
       return;
     }
+    const spec=mounted.get(works[i].id).mount.userData.spec;
     const halfFov = T.MathUtils.degToRad(cam.fov / 2);
     const distance = Math.min(
       cam.far*.8,
       Math.max(
         0.85,
-        ((works[i].width + 2 * (works[i].mat + works[i].frameWidth)) * 0.57) /
+        (spec.width*.57) /
           (Math.tan(halfFov) * Math.max(0.1, cam.aspect)),
-        ((works[i].height + 2 * (works[i].mat + works[i].frameWidth)) * 0.6) /
+        (spec.height*.6) /
           Math.tan(halfFov),
       ),
     );
-    const dest = g.position
-      .clone()
+    const center=framingCenter(g,spec);
+    const dest = center.clone()
       .addScaledVector(
         new T.Vector3(0, 0, 1).applyQuaternion(g.quaternion),
         distance,
       );
-    dest.y = g.position.y;
+    dest.y=center.y;
     if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches)
-      navigate(dest, g.position);
+      navigate(dest,center);
     else {
       travel = null;
       cam.position.copy(dest);
-      cam.lookAt(g.position);
+      cam.lookAt(center);
     }
   }
   function stopInspection() {
@@ -895,18 +855,23 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     const g=groups[guide], a=works[guide];
     const angle=walls[a.wall || 0];
     const normal=new T.Vector3(Math.sin(angle),0,Math.cos(angle));
-    const axis=new T.Vector3(Math.cos(angle),0,-Math.sin(angle));
-    const faceCenter=g.position.clone().addScaledVector(normal,a.depth/2+.012);
+    const {mount,face}=mounted.get(a.id),spec=mount.userData.spec;
+    const axis=new T.Vector3(1,0,0);
+    if(spec.isHandscroll)axis.applyQuaternion(g.quaternion);
+    else axis.set(Math.cos(angle),0,-Math.sin(angle));
+    const centerOffset=spec.isHandscroll ? (spec.left+spec.right)/2 : 0;
+    const rollWidth=spec.isHandscroll ? spec.width : a.width;
+    const faceCenter=g.position.clone().addScaledVector(normal,face.position.z).addScaledVector(axis,centerOffset);
     const halfAngle=T.MathUtils.degToRad(cam.fov/2);
     const distance=a.height/(2*Math.tan(halfAngle));
     const fieldWidth=a.height*cam.aspect;
-    const limit=Math.max(0,(a.width-fieldWidth)/2);
+    const limit=Math.max(0,(rollWidth-fieldWidth)/2);
     x=T.MathUtils.clamp(x,-limit,limit);
     const origin=faceCenter.clone().addScaledVector(normal,distance);
     const at=faceCenter.clone().addScaledVector(axis,x);
     const dest=origin.clone().addScaledVector(axis,x);
     const orientation=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().lookAt(dest,at,cam.up));
-    reading={x,axis,normal,faceCenter,origin,orientation,fieldWidth,closeFieldWidth:fieldWidth,limit};
+    reading={x,axis,normal,faceCenter,origin,orientation,fieldWidth,closeFieldWidth:fieldWidth,limit,rollWidth,centerOffset};
     if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
       navigate(dest,at);
       travel.readStart=x;
@@ -922,12 +887,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     const relative=position.clone().sub(reading.faceCenter);
     const distance=Math.max(.18,relative.dot(reading.normal));
     reading.origin.copy(reading.faceCenter).addScaledVector(reading.normal,distance);
-    reading.origin.y=position.y;
+    reading.origin.y=position.y-relative.dot(reading.axis)*reading.axis.y;
     reading.fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
     // At the roll ends, the cursor can be over the last character. Keep that
     // character anchored even when pulling back reveals a little bare wall.
     reading.x=relative.dot(reading.axis);
-    reading.limit=Math.max(Math.abs(reading.x),(works[guide].width-reading.fieldWidth)/2);
+    reading.limit=Math.max(Math.abs(reading.x),(reading.rollWidth-reading.fieldWidth)/2);
     cam.position.copy(reading.origin).addScaledVector(reading.axis,reading.x);
     onRead(reading.limit ? (reading.x+reading.limit)/(2*reading.limit) : .5);
   }
@@ -941,7 +906,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     const distance=Math.max(cam.near*2,relative.dot(reading.normal));
     reading.origin.copy(reading.faceCenter).addScaledVector(reading.normal,distance);
     reading.fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
-    reading.limit=Math.max(0,(works[guide].width-reading.fieldWidth)/2);
+    reading.limit=Math.max(0,(reading.rollWidth-reading.fieldWidth)/2);
     reading.x=T.MathUtils.clamp(relative.dot(reading.axis),-reading.limit,reading.limit);
     travel=null;
   }
@@ -949,7 +914,15 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     if (!reading) return;
     const {limit}=reading;
     const art=works[guide], halfWall=art.wall%2 ? halfDepth : halfWidth;
-    reading.x=T.MathUtils.clamp(value,Math.max(-limit,-halfWall+.25-art.x),Math.min(limit,halfWall-.25-art.x));
+    const angle=walls[art.wall || 0];
+    const projection=reading.axis.x*Math.cos(angle)-reading.axis.z*Math.sin(angle);
+    const center=art.x+reading.centerOffset*projection;
+    let min=-limit,max=limit;
+    if(Math.abs(projection)>1e-5) {
+      const a=(-halfWall+.25-center)/projection,b=(halfWall-.25-center)/projection;
+      min=Math.max(min,Math.min(a,b)); max=Math.min(max,Math.max(a,b));
+    }
+    reading.x=T.MathUtils.clamp(value,min,max);
     if (!travel) placeOnTrack();
     onRead(limit ? (reading.x+limit)/(2*limit) : .5);
   }
@@ -959,7 +932,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     guide = (i + works.length) % works.length;
     const a=works[guide];
     if (!onMove) onPick(a);
-    if (!onMove && a.width >= 4*a.height) startReading(((u ?? 1)-.5)*a.width,true);
+    if (!onMove && followsWall(a)) {
+      const spec=mounted.get(a.id).mount.userData.spec;
+      const midpoint=spec.isHandscroll ? (spec.left+spec.right)/2 : 0;
+      const start=u!=null ? (u-.5)*a.width-midpoint : (spec.isHandscroll ? spec.width : a.width)/2;
+      startReading(start,true);
+    }
     else focus(guide,true);
     return a;
   }
@@ -981,6 +959,34 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     },
     select(i) {
       return changeWork(i);
+    },
+    updateMount(id,next) {
+      const entry=mounted.get(id);
+      if(!onMove || disposed || !entry || !next)return;
+      const {a,g,face,plaque}=entry;
+      // The editor sends a merged artwork. Missing custom fields restore their original finish.
+      for(const key of mountFields)a[key]=next[key];
+      if(next.width!=null)a.width=next.width;
+      if(next.height!=null)a.height=next.height;
+      const replacement=mounts.build(a), spec=replacement.userData.spec;
+      disposeMount(entry.mount);
+      entry.mount=replacement;
+      g.add(replacement);
+      if(entry.strip) {
+        targets.splice(targets.indexOf(entry.strip),1);
+        entry.strip.removeFromParent();entry.strip.geometry.dispose();entry.strip.material.dispose();
+      }
+      entry.strip=mountedSurfaceTarget(g,a,spec);
+      face.position.z=spec.faceZ;
+      face.scale.set(spec.w/face.geometry.parameters.width,spec.h/face.geometry.parameters.height,1);
+      for(const tile of g.children.filter(child=>child.name==="artwork-tile")) {
+        const {index,count}=tile.userData.tile;
+        tile.position.set(spec.w*((index+.5)/count-.5),0,spec.faceZ+.001);
+        tile.scale.set(spec.w/count/tile.geometry.parameters.width,spec.h/tile.geometry.parameters.height,1);
+      }
+      plaque.position.set(spec.right+.28,-spec.h/2+.08,-.064);
+      renderer.shadowMap.needsUpdate=true;
+      rulers?.dirty();
     },
     updatePlacements(changes) {
       if(!onMove)return;
@@ -1006,6 +1012,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     home:resetView,
     focus,
     dispose() {
+      mounts.dispose();
       building.dispose?.();
       building.textures.forEach((t) => t.dispose());
       scene.traverse((o) => o.shadow?.dispose());

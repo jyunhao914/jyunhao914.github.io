@@ -2,7 +2,7 @@ import * as T from "./vendor/three.module.js";
 
 // The atlas contains diffuse interreflection from the garden window and roof apertures.
 // UV sets are independent: scanned textures tile in metres, irradiance spans the whole room.
-export function architecture(scene, box, renderer, theme = "", halfWidth = 6, halfDepth = 7) {
+export function architecture(scene, box, renderer, theme = "", halfWidth = 6, halfDepth = 7, roomHeight) {
   // Front, rear, window and opposite wall share a plaster finish.
   const palettes = {
     calligraphy: [0x253441, 0x343039, 0x303e39, 0x38404a],
@@ -45,7 +45,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
   if (["calligraphy", "projection", "main","panorama"].includes(theme)) {
     const study = theme === "calligraphy";
     const theater = theme === "projection";
-    const height = study ? 3.65 : theater ? 3.35 : 5.8;
+    const height = roomHeight ?? (study ? 3.65 : theater ? 3.35 : 5.8);
     const w = halfWidth, l = halfDepth;
     const tones = colors || (theater ? [0x20232f, 0x29212d, 0x233231, 0x313541] :
       [0x424a50, 0x47423f, 0x394641, 0x46404a]);
@@ -96,22 +96,23 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     }
     const diffuser = {emissive: 0xffe2ad, emissiveIntensity: .7, roughness: .95};
     if (study) {
-      // A sequence of timber portals and luminous lattice bays defines the promenade.
+      // Recess all timber and light-box faces into the plaster so art can hang across a bay.
+      // The mounting cleat starts 66 mm inside the architectural wall centreline.
       for (const z of [-8.7,-5.8,-2.9,0,2.9,5.8,8.7]) {
         box(scene, w*2, .21, .14, 0x735638, 0, height-.15, z, timber);
         for (const side of [-1,1])
-          box(scene, .08, height-.25, .13, 0x694e39, side*(w-.10), (height-.25)/2, z, timber);
+          box(scene, .08, height-.25, .13, 0x694e39, side*(w-.023), (height-.25)/2, z, timber);
       }
       for (const z of [-7.25,-4.35,-1.45,1.45,4.35,7.25]) {
-        box(scene,.055,1.77,1.85,0xffedcc,-w+.09,1.98,z,diffuser);
+        box(scene,.055,1.77,1.85,0xffedcc,-w+.0332,1.98,z,diffuser);
         for (const offset of [-.93,-.62,-.31,0,.31,.62,.93])
-          box(scene,.06,1.82,.024,0x594935,-w+.14,1.98,z+offset,timber);
+          box(scene,.06,1.82,.024,0x594935,-w+.0338,1.98,z+offset,timber);
         for (const y of [1.09,1.68,2.27,2.87])
-          box(scene,.06,.035,1.90,0x594935,-w+.14,y,z,timber);
+          box(scene,.06,.035,1.90,0x594935,-w+.0338,y,z,timber);
       }
     } else if (theater) {
       for (const side of [-1,1])
-        box(scene,.05,.035,l*2-.4,0xbcb9cf,side*(w-.09),.20,0,diffuser);
+        box(scene,.05,.035,l*2-.4,0xbcb9cf,side*(w-.038),.20,0,diffuser);
     } else {
       for (const x of [-w*.55,0,w*.55])
         box(scene,.36,.08,l*2-.4,0xf4e8d1,x,height-.12,0,diffuser);
