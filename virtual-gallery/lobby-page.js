@@ -37,6 +37,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
   document.addEventListener("fullscreenchange",()=>{if(active)syncFullscreen();});
   function showDirectory() {
     if(!active || crossing || !rooms.length)return;
+    prepareRoom();
     scene?.setPaused(true);
     reveal();
     if(!panel.open)panel.showModal();
@@ -167,20 +168,15 @@ export function lobbyPage(enterRoom,prepareRoom) {
     message.textContent=startZone==="lobby" ? "正在開啟展場大廳…" : "正在載入空間…";message.hidden=false;
     el("lobbyHint").hidden=true;
     try {
-      const {createLobby}=await import("./lobby.js?v=directory42");
+      const {createLobby}=await import("./lobby.js?v=entry43");
       if(!active || version!==generation)return;
       const signs=rooms.map(({title,subtitle,room,show})=>({title,subtitle,room,show:{id:show.id,title:show.title}}));
       scene=createLobby(stage,signs,index=>{
         if(active && !panel.open && rooms[index])enterRoom(rooms[index]);
       },{
         startZone,returnDoorIndex:returnIndex,onNearest:near,onZone:setZone,
-        onMenuOpen(open){cardsOpen=open;near(null);},
-        onTravel:walking=>entrance.classList.toggle("portal-walking",walking),
-        onApproach() {
-          entrance.classList.add("portal-approach");
-          prepareRoom();
-        },
-        onApproachCancel() {entrance.classList.remove("portal-approach");}
+        onMenuOpen(open){cardsOpen=open;if(open)prepareRoom();near(null);},
+        onTravel:walking=>entrance.classList.toggle("portal-walking",walking)
       });
       const canvas=stage.querySelector("canvas");
       canvas.addEventListener("webglcontextlost",e=>{
@@ -234,7 +230,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
       clearTimeout(waitTimer);
       el("portalWait").hidden=true;
       entrance.classList.add("portal-blending");
-      const duration=matchMedia("(prefers-reduced-motion: reduce)").matches ? 90 : 550;
+      const duration=matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 140;
       blend=entrance.animate([{opacity:1},{opacity:0}],{duration,easing:"ease-in-out",fill:"forwards"});
       await blend.finished.catch(()=>{});
     },

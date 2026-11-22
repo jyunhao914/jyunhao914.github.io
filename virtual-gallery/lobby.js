@@ -6,7 +6,6 @@ import { buildLobby } from "./lobby-interior.js?v=directory42";
 
 const eyeHeight = 1.60;
 const walkInRadius = .90;
-const arrivalDistance = 1.05;
 const arrivalPitch = .085;
 const receptionX=1.05, receptionSetback=.68, receptionPitch=.021;
 const movementKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyW", "KeyA", "KeyS", "KeyD"]);
@@ -158,28 +157,9 @@ export function createLobby(host, doors, onEnter, options = {}) {
   }
   function cancelApproach() {
     if (!approach) return;
-    const previous = approach;
     approach = null;
     options.onTravel?.(false);
-    if (previous.kind==="room") options.onApproachCancel?.(previous.door.index);
     invalidate();
-  }
-  function approachWaypoint(route,start,waypoint) {
-    const center=new T.Vector3(waypoint.x,eyeHeight,waypoint.z);
-    const dx=start.x-center.x,dz=start.z-center.z,distance=Math.hypot(dx,dz);
-    // Both points are inside this convex room. Approaching from the side or
-    // from behind a floating label cannot route the viewer through its wall.
-    const gap=Math.min(arrivalDistance,distance*.90);
-    const finish=distance>.0001
-      ? new T.Vector3(center.x+dx/distance*gap,eyeHeight,center.z+dz/distance*gap)
-      : center.clone();
-    for(const bend of interior.lobbyRoute?.(start,finish) || []) {
-      const point=new T.Vector3(bend.x,eyeHeight,bend.z);
-      route.add(new T.LineCurve3(start,point));
-      start=point;
-    }
-    route.add(new T.LineCurve3(start,finish));
-    return finish;
   }
   function routeThroughDoor(route,start,door,finishDepth) {
     const {depth,offset} = doorCoordinates(start,door);
@@ -198,7 +178,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
   }
   function startApproach(kind, door) {
     if (disposed || paused || entering || !door) return false;
-    if (approach?.kind===kind && (approach.door===door || (kind==="room" && approach.door.index===door.index))) return true;
+    if (approach?.kind===kind && approach.door===door) return true;
     cancelApproach();
     clearInput();
     const route = new T.CurvePath();
@@ -214,35 +194,36 @@ export function createLobby(host, doors, onEnter, options = {}) {
         route.add(new T.LineCurve3(start,next));start=next;
       }
     }
-    const viaEntrance = kind==="room" && zone==="grounds";
-    if(viaEntrance)start=routeThroughDoor(route,start,mainDoor,1.65);
-    let finish=kind==="room" ? approachWaypoint(route,start,door) :
-      routeThroughDoor(route,start,door,kind==="museum" ? 1.65 : .85);
-    const look=atDoor(door,kind==="room" ? 0 : -2.4);
+    let finish=routeThroughDoor(route,start,door,kind==="museum" ? 1.65 : .85);
+    const look=atDoor(door,-2.4);
     if(kind==="grounds") {
       const end=new T.Vector3(2.15,eyeHeight,plan.halfDepth+9.5);
       route.add(new T.QuadraticBezierCurve3(finish,atDoor(mainExit,-4.8),end));
       finish=end;
     }
-    const initialLook=viaEntrance ? atDoor(mainDoor,-2.4) : look;
-    const targetYaw=Math.atan2(camera.position.x-initialLook.x,camera.position.z-initialLook.z);
+    const targetYaw=Math.atan2(camera.position.x-look.x,camera.position.z-look.z);
     const turnAngle=Math.abs(shortestTurn(targetYaw-camera.rotation.y));
     approach = {
-      kind,door,route,finish,look,viaEntrance,lead:Math.max(0,turnAngle-.55)*.47,elapsed:0,arrived:false,
+      kind,door,route,finish,look,lead:Math.max(0,turnAngle-.55)*.47,elapsed:0,arrived:false,
       seconds:Math.max(.82,route.getLength()/2.6+.36),turnTime:Math.max(.48,turnAngle*.61),
       yaw:camera.rotation.y,targetYaw:camera.rotation.y,pitch:camera.rotation.x,reduced:reducedMotion.matches
     };
     options.onTravel?.(true);
-    if(kind==="room")options.onApproach?.(door.index);
     invalidate();
     return true;
   }
   function enter(index) {
     if(!plan.doors[index] || disposed || paused || entering)return false;
     selectMenu(index);
-    // Enter through the central aisle of the built north gallery passage.
-    return startApproach("room",{...plan.doors[index],x:2.72,z:-5.7,nx:0,nz:1});
-
+    cancelApproach();
+    clearInput();
+    entering=true;
+    try {
+      onEnter(index);
+    } finally {
+      entering=false;
+    }
+    return true;
   }
   function enterMuseum() {
     if(zone!=="grounds")return false;
@@ -259,7 +240,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
       // Keep the original, fully rendered view in place for the destination's
       // short scene dissolve. Reduced motion avoids both the pan and a blank frame.
       step.arrived = step.elapsed >= .09;
-      if(step.arrived && step.kind!=="room") {
+      if(step.arrived) {
         camera.position.copy(step.finish);
         if(step.kind==="museum"){camera.position.x=receptionX;camera.position.z+=receptionSetback;}
         const yaw=step.kind==="museum" ? receptionYaw(camera.position) : Math.atan2(step.finish.x,step.finish.z-plan.halfDepth);
@@ -270,11 +251,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
       step.route.getPoint(walkingProgress(t),camera.position);
       const depth=mainDoor.z-camera.position.z;
       let aim = Math.atan2(camera.position.x-step.look.x,camera.position.z-step.look.z);
-      if(step.viaEntrance) {
-        const exteriorAim=Math.atan2(camera.position.x, Math.max(.15,camera.position.z-mainDoor.z+2.4));
-        const turnInside=T.MathUtils.smoothstep(mainDoor.z-camera.position.z,.20,2.0);
-        aim=exteriorAim+shortestTurn(aim-exteriorAim)*turnInside;
-      } else if(step.kind==="museum" && camera.position.z<mainDoor.z) {
+      if(step.kind==="museum" && camera.position.z<mainDoor.z) {
         // Visitors turn towards reception after they have crossed the garden elevation.
         const inside=T.MathUtils.smoothstep(mainDoor.z-camera.position.z,.02,1.65);
         camera.position.x+=receptionX*inside;
@@ -298,17 +275,8 @@ export function createLobby(host, doors, onEnter, options = {}) {
   }
   function finishApproach() {
     options.onTravel?.(false);
-    const complete = approach;
-    approach = null;
-    if(complete.kind!=="room") { notifyNearest(); return; }
-    const index = complete.door.index;
-    entering = true;
-    try {
-      Promise.resolve(onEnter(index)).finally(() => { entering = false; });
-    } catch (error) {
-      entering = false;
-      throw error;
-    }
+    approach=null;
+    notifyNearest();
   }
   function enterNearest() {
     if (disposed || paused || entering) return false;

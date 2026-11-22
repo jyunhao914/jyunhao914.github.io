@@ -13,6 +13,8 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
 
   const textures = [],
     loads = [];
+  // Average scan colours preserve the room silhouette during slow texture loads.
+  const baseColours={"plaster-color.webp": "#dadada", "wood-color.webp": "#633f28", "stone-color.webp": "#b19d79", "boards-color.webp": "#806042", "daylight.webp": "#181817", "woodland.webp": "#5e644e"};
   const loader = new T.TextureLoader();
   function texture(file, color = false, x = 1, y = 1) {
     let tex;
@@ -26,6 +28,15 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
         );
       }),
     );
+    if(!tex.image) {
+      const swatch=document.createElement("canvas");
+      swatch.width=swatch.height=1;
+      const ctx=swatch.getContext("2d");
+      ctx.fillStyle=baseColours[file] || (file.endsWith("-normal.webp") ? "#8080ff" : "#cccccc");
+      ctx.fillRect(0,0,1,1);
+      tex.image=swatch;
+      tex.needsUpdate=true;
+    }
     if (color) tex.colorSpace = T.SRGBColorSpace;
     tex.wrapS = tex.wrapT = T.RepeatWrapping;
     tex.repeat.set(x, y);
