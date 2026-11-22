@@ -1,6 +1,6 @@
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=reset11";
+import { architecture } from "./architecture.js?v=space12";
 export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -438,24 +438,35 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if (held) held.button.classList.remove("pressed");
     held=null;
   }
+  let spaceHeld=false;
   const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
-    ArrowUp:"抬頭",ArrowDown:"低頭",ArrowLeft:"左轉",ArrowRight:"右轉"};
+    ArrowUp:"前進",ArrowDown:"後退",ArrowLeft:"左移",ArrowRight:"右移"};
+  const turning={ArrowUp:"抬頭",ArrowDown:"低頭",ArrowLeft:"左轉",ArrowRight:"右轉"};
+  const arrows={ArrowUp:"↑",ArrowDown:"↓",ArrowLeft:"←",ArrowRight:"→"};
+  const actionFor=code=>(spaceHeld && turning[code]) || shortcuts[code];
+  function showKeys(){
+    const active=new Set(Array.from(keys.keys(),actionFor));
+    keyButtons.forEach((button,action)=>button.classList.toggle("key-down",active.has(action)));
+  }
   for (const action of ["前進","後退","左移","右移","抬頭","低頭","左轉","右轉"]) {
     const button=document.createElement("button");
     button.type="button";
-    const code=Object.keys(shortcuts).find(k=>shortcuts[k]===action);
-    const shortcut=code.replace("Key","");
+    const turnKey=Object.keys(turning).find(code=>turning[code]===action);
+    const moveKeys=Object.keys(shortcuts).filter(code=>shortcuts[code]===action);
+    const label=turnKey ? "空白+"+arrows[turnKey] : moveKeys.map(code=>arrows[code] || code.slice(-1)).join(" / ");
     button.textContent=action;
     button.setAttribute("aria-label",action);
     const hint=document.createElement("kbd");
-    hint.textContent=({ArrowUp:"↑",ArrowDown:"↓",ArrowLeft:"←",ArrowRight:"→"})[code] || shortcut;
+    hint.textContent=label;
     hint.setAttribute("aria-hidden","true");
     button.append(hint);
-    keyButtons.set(code,button);
-    button.setAttribute("aria-keyshortcuts",shortcut);
-    button.title=action+"（"+shortcut+"）";
+    keyButtons.set(action,button);
+    if (!turnKey) button.setAttribute("aria-keyshortcuts",moveKeys.map(code=>code.replace("Key","")).join(" "));
+    button.title=action+"（"+label+"）";
     button.onpointerdown=e=>{
       if(held || e.button!==0) return;
+      canvas.focus({preventScroll:true});
+      e.preventDefault();
       button.setPointerCapture(e.pointerId);
       held={action,button,id:e.pointerId,repeatAt:performance.now()+240};
       button.classList.add("pressed");
@@ -565,25 +576,32 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   }
   function key(e) {
     const code=e.code || (e.key.length===1 ? "Key"+e.key.toUpperCase() : e.key);
-    const action=shortcuts[code];
-    if(!action && code!=="KeyR") return;
-    if(e.type==="keyup") { keys.delete(code); keyButtons.get(code)?.classList.remove("key-down"); return; }
+    if(!shortcuts[code] && code!=="KeyR" && code!=="Space") return;
+    if(e.type==="keyup") {
+      if(code==="Space") spaceHeld=false;
+      keys.delete(code);
+      showKeys();
+      return;
+    }
     if(e.altKey || e.metaKey || e.ctrlKey || document.querySelector("dialog[open]")) return;
     const field=e.target.closest?.("input,textarea,select,[contenteditable=true]");
     if(field && field.getClientRects().length &&
        !(field.type==="range" && code.startsWith("Key"))) return;
     if(host.getBoundingClientRect().bottom<40 || host.getBoundingClientRect().top>innerHeight) return;
+    if(code==="Space" && e.target.closest?.("button,a,summary")) return;
     e.preventDefault();
+    if(code==="Space") { spaceHeld=true; showKeys(); return; }
     if(keys.has(code) || e.repeat) return;
     if(code==="KeyR"){resetView();return;}
     keys.set(code,performance.now()+200);
-    keyButtons.get(code)?.classList.add("key-down");
-    operate(action,.14);
+    showKeys();
+    operate(actionFor(code),.14);
   }
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
   let blur = () => {
     keys.clear();
+    spaceHeld=false;
     keyButtons.forEach(button=>button.classList.remove("key-down"));
     neutral();
   };
@@ -604,7 +622,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     last = now;
     if (held && now >= held.repeatAt) operate(held.action,dt);
     for(const [code,repeatAt] of keys)
-      if(now>=repeatAt) operate(shortcuts[code],dt);
+      if(now>=repeatAt) operate(actionFor(code),dt);
     if (travel) {
       const t = T.MathUtils.clamp(
           (now - travel.started) / travel.duration,
