@@ -1,4 +1,4 @@
-import { mountFields } from "../mount-fields.js?v=mount31";
+import { mountFields } from "../mount-fields.js?v=mount32";
 
 // Explicit defaults replace any decoration inherited from the destination's library record.
 function snapshot(art) {

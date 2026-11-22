@@ -7,7 +7,7 @@ export const mountChoices = {
   woodSpecies: ["白橡木", "胡桃木", "梣木", "柚木"],
   metalFinish: ["鋁合金", "黃銅", "不鏽鋼"],
   matMaterial: ["棉紙", "亞麻"],
-  silkPattern: ["素絹", "織錦", "細麻"],
+  silkPattern: ["素絹", "花綾", "織錦", "細麻"],
   rodMaterial: ["木軸", "銅軸", "漆軸"],
   surfaceCover: ["原材", "包膜"],
   glazing: ["無罩", "透明壓克力", "低反射玻璃"],

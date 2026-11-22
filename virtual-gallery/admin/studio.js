@@ -1,10 +1,10 @@
-import { mountEditor, paintWallMount } from "./mount-editor.js?v=mount31";
-import { mountTemplates } from "./mount-templates.js?v=mount31";
+import { mountEditor, paintWallMount } from "./mount-editor.js?v=mount32";
+import { mountTemplates } from "./mount-templates.js?v=mount32";
 import { readDimensions } from "./dimensions.js";
-import * as wallTools from "./wall-tools.js?v=mount31";
-import {roomSize} from "../room-size.js?v=mount31";
+import * as wallTools from "./wall-tools.js?v=mount32";
+import {roomSize} from "../room-size.js?v=mount32";
 import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
-import { state, post, versions, exhibition } from "./storage.js?v=mount31";
+import { state, post, versions, exhibition } from "./storage.js?v=mount32";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
   status = $("#status");
@@ -647,7 +647,7 @@ function layout(keepScene=false) {
         toggle.setAttribute("aria-pressed",String(!readout.hidden));
       };
       let t = token;
-      import("../gallery.js?v=mount31")
+      import("../gallery.js?v=mount32")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(

@@ -35,3 +35,7 @@ different colour-neutralized, seamless board sections from the CC0 Wood Table
 and Wood Floor scans credited above. Their names describe the simulated finish.
 The brushed surface, cotton board, plain silk and linen maps are procedurally
 generated for this gallery.
+
+The floral-twill (花綾) colour, OpenGL normal and roughness maps are original
+procedural fabric textures. The plum-blossom design uses a single dye with
+opposing diagonal twill directions across the flowers and ground.

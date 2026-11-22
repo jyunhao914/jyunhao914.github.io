@@ -1,11 +1,11 @@
 import * as T from "./vendor/three.module.js";
-import {mountSpec,scrollBands,handscrollBands,albumPanels,mirrorBands,frameProfiles} from "./mount-spec.js?v=mount31";
+import {mountSpec,scrollBands,handscrollBands,albumPanels,mirrorBands,frameProfiles} from "./mount-spec.js?v=mount32";
 
 const woodMaps={"白橡木":"oak","胡桃木":"walnut","梣木":"ash","柚木":"teak"};
-const weaveMaps={"織錦":"brocade","素絹":"plain-silk","細麻":"linen"};
+const weaveMaps={"織錦":"brocade","素絹":"plain-silk","花綾":"floral-twill","細麻":"linen"};
 // Each tile spans a measured length and width. A mitred corner changes the grain direction.
 const period={walnut:[1.22,.14],oak:[2.65,.255],ash:[2.45,.25],teak:[1.34,.185],
-  brush:[.25,.06],linen:[.079,.079],cotton:[.073,.073],"plain-silk":[.064,.064],brocade:[.28,.284]};
+  brush:[.25,.06],linen:[.079,.079],cotton:[.073,.073],"plain-silk":[.064,.064],"floral-twill":[.13,.13],brocade:[.28,.284]};
 
 function putMesh(group,name,geometry,material) {
   const mesh=new T.Mesh(geometry,material);
@@ -77,13 +77,16 @@ export function mountRenderer(renderer) {
   function surface(kind,strength) {
     if(!kind)return {};
     const props={map:map(kind,"color"),normalMap:map(kind,"normal"),normalScale:new T.Vector2(strength,strength)};
-    if(kind==="brocade" || Object.values(woodMaps).includes(kind))props.roughnessMap=map(kind,"rough");
+    if(kind==="brocade" || kind==="floral-twill" || Object.values(woodMaps).includes(kind))props.roughnessMap=map(kind,"rough");
     return props;
   }
   function cloth(kind,color,gloss=.15) {
+    const twill=kind==="floral-twill";
+    const sheen=twill ? .62 : kind==="linen" ? .12 : .45;
     return new T.MeshPhysicalMaterial({...surface(kind,kind==="brocade" ? .35 : .66),color,
-      roughness:.93-gloss*.42,sheen:kind==="linen" ? .12 : .45,sheenRoughness:.58,
-      sheenColor:new T.Color(color), envMapIntensity:.63});
+      roughness:.93-gloss*.42,sheen,sheenRoughness:twill ? .47 : .58,
+      sheenColor:new T.Color(color), envMapIntensity:.63,
+      ...(twill ? {anisotropy:.32,anisotropyRotation:Math.PI/4} : {})});
   }
   function boxInterior(g,s) {
     const width=s.innerW,height=s.innerH,kind=s.matMaterial==="亞麻" ? "linen" : "cotton";

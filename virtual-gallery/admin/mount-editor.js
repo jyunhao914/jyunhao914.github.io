@@ -1,5 +1,5 @@
-import { mountChoices } from "../mount-fields.js?v=mount31";
-import { mountSpec, frameProfiles, scrollBands, handscrollBands, albumPanels, mirrorBands } from "../mount-spec.js?v=mount31";
+import { mountChoices } from "../mount-fields.js?v=mount32";
+import { mountSpec, frameProfiles, scrollBands, handscrollBands, albumPanels, mirrorBands } from "../mount-spec.js?v=mount32";
 
 const framePalettes = [
   ["胡桃與暖白", { frameColor: "#624532", matColor: "#f3ebd9" }],
@@ -198,7 +198,10 @@ export function mountEditor(host, art, save, addTemplates) {
     if (when) wrap.dataset.mountWhen = when;
     const input = elem(opts.choices ? "select" : "input");
     input.dataset.mountField = key;
-    if (opts.choices) input.append(...opts.choices.map(x => new Option(x, x)));
+    if (opts.choices) {
+      const aliases = key === "handscrollStyle" ? {"大鑲手卷":"大鑲手卷（翻邊）","套邊手卷":"套邊手卷（包邊）"} : {};
+      input.append(...opts.choices.map(value => new Option(aliases[value] ?? value, value)));
+    }
     else {
       input.type = opts.type;
       if (opts.type === "number" || opts.type === "range") {

@@ -94,7 +94,7 @@ export function mountSpec(a) {
   const surfaceCover=select(a.surfaceCover,["原材","包膜"]), filmPattern=select(a.filmPattern,["素色","木紋","髮絲紋","織紋"]);
   const metalFinish=select(a.metalFinish,["鋁合金","黃銅","不鏽鋼"]);
   const surfaceSheen=Math.min(1,number(a.surfaceSheen,a.finish==="亮面" ? .85 : .19));
-  const matMaterial=select(a.matMaterial,["棉紙","亞麻"]), silkPattern=select(a.silkPattern,["織錦","素絹","細麻"]);
+  const matMaterial=select(a.matMaterial,["棉紙","亞麻"]), silkPattern=select(a.silkPattern,["織錦","素絹","花綾","細麻"]);
   const rodMaterial=select(a.rodMaterial,["木軸","銅軸","漆軸"]);
   // The guide group sits 70 mm in front of the inner wall surface.
   const backZ=-.064, isBox=frameWidth>0 && profile==="立體盒框";
