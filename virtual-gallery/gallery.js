@@ -1,6 +1,6 @@
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=slowpan9";
+import { architecture } from "./architecture.js?v=keys10";
 export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -278,7 +278,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   }
   cam.position.copy(station);
   cam.lookAt(entranceLook);
-  let keys = new Set(),
+  let keys = new Map(),
     ray = new T.Raycaster(),
     drag,
     guide = -1;
@@ -411,7 +411,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   pad.setAttribute("aria-label","三維空間操作鍵");
   host.append(pad);
   let held = null, travel = null;
-  const velocity = new T.Vector2(), wish = new T.Vector2();
   function operate(action,dt) {
     if (reading && (action==="左移" || action==="右移")) {
       if (travel) { travel=null; placeOnTrack(); }
@@ -420,7 +419,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     }
     stopInspection();
     travel=null;
-    velocity.set(0,0);
     const yaw=cam.rotation.y;
     const forward=Number(action==="前進")-Number(action==="後退");
     const side=Number(action==="右移")-Number(action==="左移");
@@ -437,10 +435,16 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if (held) held.button.classList.remove("pressed");
     held=null;
   }
+  const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
+    ArrowUp:"抬頭",ArrowDown:"低頭",ArrowLeft:"左轉",ArrowRight:"右轉"};
   for (const action of ["前進","後退","左移","右移","抬頭","低頭","左轉","右轉"]) {
     const button=document.createElement("button");
     button.type="button";
+    const code=Object.keys(shortcuts).find(k=>shortcuts[k]===action);
+    const shortcut=code.replace("Key","");
     button.textContent=action;
+    button.setAttribute("aria-keyshortcuts",shortcut);
+    button.title=action+"（"+shortcut+"）";
     button.onpointerdown=e=>{
       if(held || e.button!==0) return;
       button.setPointerCapture(e.pointerId);
@@ -527,47 +531,27 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       duration: Math.min(2100, Math.max(550, (curve.getLength() || 0) * 180)),
       rotation: cam.quaternion.clone(),
     };
-    velocity.set(0, 0);
   }
   function key(e) {
-    if (
-      /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) ||
-      document.querySelector("dialog[open]")
-    )
-      return;
-    if (
-      e.type === "keydown" &&
-      (host.getBoundingClientRect().bottom < 40 ||
-        host.getBoundingClientRect().top > innerHeight)
-    )
-      return;
-    let k = e.key.toLowerCase();
-    if (
-      [
-        "w",
-        "a",
-        "s",
-        "d",
-        "arrowup",
-        "arrowdown",
-        "arrowleft",
-        "arrowright",
-      ].includes(k)
-    ) {
-      e.preventDefault();
-      if (e.type === "keydown") {
-        stopInspection();
-        travel = null;
-        keys.add(k);
-      } else keys.delete(k);
-    }
+    const code=e.code || (e.key.length===1 ? "Key"+e.key.toUpperCase() : e.key);
+    const action=shortcuts[code];
+    if(!action) return;
+    if(e.type==="keyup") { keys.delete(code); return; }
+    if(e.altKey || e.metaKey || e.ctrlKey || document.querySelector("dialog[open]")) return;
+    const field=e.target.closest?.("input,textarea,select,[contenteditable=true]");
+    if(field && field.getClientRects().length &&
+       !(field.type==="range" && code.startsWith("Key"))) return;
+    if(host.getBoundingClientRect().bottom<40 || host.getBoundingClientRect().top>innerHeight) return;
+    e.preventDefault();
+    if(keys.has(code) || e.repeat) return;
+    keys.set(code,performance.now()+200);
+    operate(action,.14);
   }
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
   let blur = () => {
     keys.clear();
     neutral();
-    velocity.set(0, 0);
   };
   window.addEventListener("blur", blur);
   let ro = new ResizeObserver(() => {
@@ -585,14 +569,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     let dt = Math.min(0.085, Math.max(0, (now - last) / 1000));
     last = now;
     if (held && now >= held.repeatAt) operate(held.action,dt);
-    let has = (a, b) => Number(keys.has(a) || keys.has(b));
-    wish
-      .set(
-        has("d", "arrowright") - has("a", "arrowleft"),
-        has("s", "arrowdown") - has("w", "arrowup"),
-      )
-      .clampLength(0, 1);
-    velocity.lerp(wish, 1 - Math.exp(-14 * dt));
+    for(const [code,repeatAt] of keys)
+      if(now>=repeatAt) operate(shortcuts[code],dt);
     if (travel) {
       const t = T.MathUtils.clamp(
           (now - travel.started) / travel.duration,
@@ -618,14 +596,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
         travel = null;
         if (reading) placeOnTrack();
       }
-    } else if (!reading) {
-      const yaw = cam.rotation.y,
-        dx = velocity.x * dt * 3.2,
-        dz = velocity.y * dt * 3.2;
-      move(
-        cam.position.x + dx * Math.cos(yaw) + dz * Math.sin(yaw),
-        cam.position.z - dx * Math.sin(yaw) + dz * Math.cos(yaw),
-      );
     }
     for (let { img, ctx, tex } of animated) {
       if (img.complete && img.naturalWidth) {

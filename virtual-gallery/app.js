@@ -176,7 +176,7 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=slowpan9");
+    let { gallery } = await import("./gallery.js?v=keys10");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -189,6 +189,7 @@ async function enter() {
           $("readPosition").textContent = Math.round((1-fraction)*100) + "%";
         },
       );
+    if (n === seq && viewer) $("stage").querySelector("canvas")?.focus({preventScroll:true});
   } catch (e) {
     $("stage").textContent = "此裝置無法啟動 WebGL 2。可於展出作品區開啟展籤。";
     console.error(e);
@@ -238,6 +239,7 @@ function showFocus(a) {
 }
 function menu(open) {
   $("visitMenu").hidden = !open;
+  if(!open && !$("visit").hidden) $("stage").querySelector("canvas")?.focus({preventScroll:true});
   $("menuButton").setAttribute("aria-expanded", String(open));
 }
 $("menuButton").onclick = () => menu($("visitMenu").hidden);
