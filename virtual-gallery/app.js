@@ -177,7 +177,7 @@ async function enter() {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=stickspace20");
+    let { gallery } = await import("./gallery.js?v=quietkeys21");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -261,8 +261,14 @@ function endInteraction(e) {
 }
 window.addEventListener("pointerup",endInteraction,true);
 window.addEventListener("pointercancel",endInteraction,true);
-document.addEventListener("keydown",e=>{if(e.key==="Tab")keyboardFocus=true; if(fullView())revealControls()},true);
-visit.addEventListener("focusin",()=>{if(fullView())revealControls()});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Tab" || !fullView()) return;
+  keyboardFocus=true;
+  revealControls();
+},true);
+visit.addEventListener("focusin",e=>{
+  if(fullView() && keyboardFocus && e.target.matches("button,input,select,summary,a")) revealControls();
+});
 function resetControls() {
   activePointers.clear();
   wakeTap=null;
@@ -287,8 +293,9 @@ function showFocus(a) {
     : "";
 }
 function menu(open) {
+  const changed = $("visitMenu").hidden === open;
   $("visitMenu").hidden = !open;
-  revealControls();
+  if(changed) revealControls();
   if(!open && !$("visit").hidden) $("stage").querySelector("canvas")?.focus({preventScroll:true});
   $("menuButton").setAttribute("aria-expanded", String(open));
 }
