@@ -152,6 +152,8 @@ const defaults = {
   lz: 2,
 };
 function render() {
+  const inspector=$("#layout-inspector");
+  const previousScroll=inspector?.dataset.show===sid ? inspector.scrollTop : 0;
   token++;
   viewer?.dispose();
   viewer = null;
@@ -169,7 +171,15 @@ function render() {
   );
   if (tab === "作品資料庫") library();
   else if (tab === "展覽管理") manage();
-  else if (tab === "布展編輯") layout();
+  else if (tab === "布展編輯") {
+    layout();
+    const panel=$("#layout-inspector");
+    if(panel) {
+      panel.dataset.show=sid;
+      panel.scrollTop=previousScroll;
+      if(!inspector)requestAnimationFrame(()=>{if(panel.isConnected)$("#wall-preview").scrollIntoView({block:"start"});});
+    }
+  }
   else backup();
 }
 function listButtons(arr, selected, fn, host) {
@@ -498,7 +508,12 @@ function layout(keepScene=false) {
     '<h1>布展編輯</h1><div class="bar"><label>展覽<select id="ex"></select></label><label>編輯作品<select id="sel"></select></label>' +
     btn("2D", "2D 展牆") +
     btn("3D", "實景布展") +
-    btn("preview","參觀預覽") + '</div><div class="hanging-desk"><section class="inventory"><h2>布展清單</h2><p id="wall-progress"></p><div id="wall-list"></div></section><section id="surface"></section></div><div id="form"></div>';
+    '</div><div class="hanging-desk"><section id="wall-preview" aria-label="即時展牆預覽"><div class="surface-tools"><strong>展牆預覽</strong>'+
+    (mode==="3D" && a ? '<button id="ruler-toggle" aria-pressed="true">隱藏尺標</button>' : '')+
+    btn("preview","參觀預覽")+'</div><div id="surface"></div>' +
+    '<div id="position-pad" role="group" aria-label="作品位置微調"><div class="pad-caption"><strong id="adjusting-title"></strong><span>每次 5 公分</span></div><div class="nudge-keys">'+
+    btn("left","← 左移")+btn("right","右移 →")+btn("up","↑ 升高")+btn("down","↓ 降低")+
+    '</div></div></section><div id="layout-inspector" role="region" aria-label="作品清單與布展設定" tabindex="0"><section class="inventory"><h2>布展清單</h2><p id="wall-progress"></p><div id="wall-list"></div></section><div id="form"></div></div></div>';
   function picker(el, items, current, fn) {
     el.replaceChildren(...items.map((x) => new Option(x.title, x.id)));
     el.value = current;
@@ -528,6 +543,8 @@ function layout(keepScene=false) {
       mode = m;
       render();
     });
+  $("#position-pad").hidden=!a;
+  $("#adjusting-title").textContent=a?.title || "";
   if (!a) {
     $("#surface").textContent = "請先於展覽管理勾選展出作品";
     return;
@@ -555,11 +572,16 @@ function layout(keepScene=false) {
     wallTools.movement(list,span/2,height)(dx,dy);
     savePositions(list);
   }
+  function refreshPlacement() {
+    if(!viewer){render();return;}
+    viewer.updatePlacements(nearby);
+    layout(true);
+  }
   function scene() {
     let surface = $("#surface");
     if (mode === "3D") {
       surface.innerHTML =
-         '<div class="bar"><span>拖作品掛畫，拖空白處轉身，推搖桿走動。</span><button id="ruler-toggle" aria-pressed="true">隱藏尺標</button></div><div id="stage"></div><output class="wall-readout" aria-label="展牆量測"></output>';
+         '<div id="stage"><span class="stage-loading">正在開啟展牆…</span></div><output class="wall-readout" aria-label="展牆量測"></output>';
       const toggle=$("#ruler-toggle"), readout=$(".wall-readout");
       toggle.onclick=()=>{
         readout.hidden=!readout.hidden;
@@ -569,7 +591,7 @@ function layout(keepScene=false) {
         toggle.setAttribute("aria-pressed",String(!readout.hidden));
       };
       let t = token;
-      import("../gallery.js?v=wall24")
+      import("../gallery.js?v=preview26")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
@@ -589,7 +611,11 @@ function layout(keepScene=false) {
           );
           viewer.focus(nearby.indexOf(a));
         })
-        .catch(error);
+        .catch(e=>{
+          if(t!==token)return;
+          error(e); mode="2D"; render();
+          $("#surface")?.insertAdjacentHTML("afterbegin","<p>此裝置暫時無法顯示 3D，已切換為可調整的 2D 展牆。</p>");
+        });
       return;
     }
     surface.innerHTML =
@@ -601,6 +627,7 @@ function layout(keepScene=false) {
     let w = $(".wall"),
       span = 2 * roomSize(nearby)[wall % 2 ? "depth" : "width"];
     w.style.aspectRatio=span+"/"+height;
+    w.style.setProperty("--wall-ratio",span/height);
     const pieces=new Map();
     for (let o of same) {
       let b = document.createElement("button");
@@ -661,10 +688,8 @@ function layout(keepScene=false) {
     same.filter(o=>!o.groupId || o.groupId===a.groupId || o.id===aid).map(o=>
       '<label><input type="checkbox" data-panel="'+esc(o.id)+'" '+(group.includes(o)?'checked ':'')+(o.id===aid?'disabled':'')+'>'+esc(o.title)+'</label>').join("")+
     '</div><div class="bar">'+btn("group","儲存連屏組合")+(group.length>1?btn("ungroup","解散連屏")+'<label>屏間淨距（公分）<input id="panel-gap" type="number" min="0" step="any"></label>'+btn("spacePanels","套用屏間距"):"")+'</div></fieldset>'+
-    '<fieldset><legend>位置微調</legend><div class="bar">' +
-    btn("left","左移 5 公分")+btn("right","右移 5 公分")+btn("up","升高 5 公分")+btn("down","降低 5 公分")+
-    '</div>'+(ordered.length>1 ? '<label>同牆作品間距（公分）<input id="gap" type="number" min="0" step="any" value="'+currentGap+'"></label>'+btn("spacing","套用同牆間距") : '')+
-    '</fieldset><fieldset><legend>展牆與掛點</legend><div class="fields">' +
+    (ordered.length>1 ? '<fieldset><legend>同牆間距</legend><label>同牆作品間距（公分）<input id="gap" type="number" min="0" step="any" value="'+currentGap+'"></label>'+btn("spacing","套用同牆間距")+'</fieldset>' : '')+
+    '<fieldset><legend>展牆與掛點</legend><div class="fields">' +
     field(a, "room", "展廳名稱", null, "text", "required") +
     field(a, "wall", "展牆（0 北、1 西、2 南、3 東）", [0, 1, 2, 3]) +
     n("x", "水平 X（公尺）", -100, 100) +
@@ -728,7 +753,7 @@ function layout(keepScene=false) {
         shift([w],left-b.left,0);
         left+=b.right-b.left+gap;
       }
-      render();
+      refreshPlacement();
     });
   }
   action("group",()=>{
@@ -744,17 +769,21 @@ function layout(keepScene=false) {
       const value=a[k], old=(s.layout[a.id]?.[k] ?? db.arts.find(o=>o.id===a.id)[k]);
       a[k]=old;
       shift(group,k==="x"?value-old:0,k==="y"?value-old:0);
+      viewer?.updatePlacements(group);
     } else if(k==="wall" || k==="room") {
       if(k==="wall")a.wall=Number(a.wall);
       group.forEach(o=>patch(o.id,{[k]:a[k]}));
     } else patch(a.id, { [k]: a[k] });
   });
   $("#form").onchange=(e)=>{
-    if(!e.target.closest("[data-key]"))return;
-    setTimeout(()=>{if(tab==="布展編輯")render();},0);
+    const key=e.target.closest("[data-key]")?.dataset.key;
+    if(!key)return;
+    setTimeout(()=>{if(tab==="布展編輯") {
+      if(["x","y","z","rotate"].includes(key))refreshPlacement();else render();
+    }},0);
   };
   for(const [name,dx,dy] of [["left",-.05,0],["right",.05,0],["up",0,.05],["down",0,-.05]]) {
-    action(name,()=>{shift(group,dx,dy);render();});
+    action(name,()=>{shift(group,dx,dy);refreshPlacement();});
   }
   function spaceRow(gap) {
     const length=total+gap*(ordered.length-1);
@@ -765,7 +794,7 @@ function layout(keepScene=false) {
       shift(list,left-boxes[i].left,0);
       left+=boxes[i].right-boxes[i].left+gap;
     });
-    render();
+    refreshPlacement();
   }
   action("spacing",()=>{
     const input=$("#gap");
@@ -782,7 +811,7 @@ function layout(keepScene=false) {
       const box=wallTools.envelope(list);
       shift(list,0,center-(box.top+box.bottom)/2);
     });
-    render();
+    refreshPlacement();
   });
   action("distribute",()=>spaceRow(Math.max(0,(span-total)/(ordered.length+1))));
   for (let [k, v] of [

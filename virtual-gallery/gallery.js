@@ -823,6 +823,17 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     select(i) {
       return changeWork(i);
     },
+    updatePlacements(changes) {
+      if(!onMove)return;
+      const byId=new Map(changes.map(work=>[work.id,work]));
+      works.forEach((work,index)=>{
+        const next=byId.get(work.id);
+        if(!next)return;
+        Object.assign(work,{x:next.x,y:next.y,z:next.z,rotate:next.rotate,groupId:next.groupId});
+        layout(groups[index],work);
+      });
+      rulers?.dirty();
+    },
     home:resetView,
     focus,
     dispose() {
