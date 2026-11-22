@@ -1,6 +1,6 @@
 // The stone sees the same room as the visitor. Mirror only views from inside
 // the hall and clip at the real floor, keeping objects below the slab out.
-export function createFloorReflection(T,renderer,scene,floor){
+export function createFloorReflection(T,renderer,scene,floor,invalidate){
   if(!floor)return null;
   const mirror=new T.PerspectiveCamera(),target=new T.WebGLRenderTarget(1,1,{
     depthBuffer:true,stencilBuffer:false,minFilter:T.LinearFilter,magFilter:T.LinearFilter
@@ -35,11 +35,17 @@ export function createFloorReflection(T,renderer,scene,floor){
         #include <opaque_fragment>`);
   };
   material.needsUpdate=true;
-  let last=-Infinity;
+  let last=-Infinity,pending=0,forceNext=false;
   function render(camera,inside,now){
     enabled.value=Number(inside);
-    if(!inside || now-last<28)return;
-    last=now;
+    if(!inside){clearTimeout(pending);pending=0;forceNext=false;return;}
+    // Texture loads, the last step of a walk and the final card transition may
+    // arrive inside the rate limit. Always capture their settled state once.
+    if(!forceNext && now-last<28){
+      if(!pending)pending=setTimeout(()=>{pending=0;forceNext=true;invalidate();},Math.ceil(29-(now-last)));
+      return;
+    }
+    clearTimeout(pending);pending=0;forceNext=false;last=now;
     renderer.getSize(size);
     const scale=Math.min(.46,590/Math.max(size.x,size.y)),w=Math.max(2,Math.round(size.x*scale)),h=Math.max(2,Math.round(size.y*scale));
     if(target.width!==w||target.height!==h)target.setSize(w,h);
@@ -62,5 +68,5 @@ export function createFloorReflection(T,renderer,scene,floor){
     try{renderer.setRenderTarget(target);renderer.clear();renderer.render(scene,mirror);}
     finally{renderer.setRenderTarget(original);floor.visible=visible;}
   }
-  return {render,dispose(){target.dispose();}};
+  return {render,dispose(){clearTimeout(pending);target.dispose();}};
 }

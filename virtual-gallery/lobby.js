@@ -1,7 +1,7 @@
 import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=atrium40";
-import {createFloorReflection} from "./lobby-floor-reflection.js?v=reception41";
+import {createFloorReflection} from "./lobby-floor-reflection.js?v=reception41b";
 import { buildLobby } from "./lobby-interior.js?v=reception41";
 
 const eyeHeight = 1.60;
@@ -635,7 +635,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
   }
   try {
     interior = buildLobby(T, scene, plan.doors, {...plan, invalidate});
-    floorReflection=createFloorReflection(T,renderer,scene,interior.reflectionFloor);
+    floorReflection=createFloorReflection(T,renderer,scene,interior.reflectionFloor,invalidate);
     grounds = buildMuseumGrounds(T,scene,{halfWidth:plan.halfWidth,halfDepth:plan.halfDepth,panorama:interior.panorama,invalidate});
     receptionTargets=[...interior.hits.filter(hit=>hit.userData.receptionGuide),...(interior.deskHits || [])];
     scene.updateMatrixWorld(true);
