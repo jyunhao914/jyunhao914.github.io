@@ -360,16 +360,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
         layout(drag.obj.parent, a);
       }
     } else if (drag.gesture === "pan" && reading) {
-      if (travel && drag.dist > 3) {
-        // A drag takes over from the approach at the current wall distance.
-        const relative=cam.position.clone().sub(reading.faceCenter);
-        const distance=Math.max(cam.near*2,relative.dot(reading.normal));
-        reading.origin.copy(reading.faceCenter).addScaledVector(reading.normal,distance);
-        reading.fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
-        reading.limit=Math.max(0,(works[guide].width-reading.fieldWidth)/2);
-        reading.x=T.MathUtils.clamp(relative.dot(reading.axis),-reading.limit,reading.limit);
-        travel=null;
-      }
+      if (drag.dist > 3) takeOverApproach();
       // Move 35% of the drag distance on screen. During an interrupted
       // approach, use the close-reading scale to avoid a large sideways jump.
       const panWidth = Math.min(reading.fieldWidth, reading.closeFieldWidth);
@@ -613,7 +604,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       const {x,y}=mobile.vector;
       if (reading) {
         const axis=mobile.readingAxis;
-        if (axis) panTo(reading.x + axis * Math.min(reading.fieldWidth,reading.closeFieldWidth) * .20 * dt);
+        if (axis) {
+          takeOverApproach();
+          panTo(reading.x + axis * Math.min(reading.fieldWidth,reading.closeFieldWidth) * .20 * dt);
+        }
       }
       else {
         if(x) operate(x>0?"右移":"左移",dt*Math.abs(x));
@@ -736,6 +730,16 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   function placeOnTrack() {
     cam.position.copy(reading.origin).addScaledVector(reading.axis,reading.x);
     cam.quaternion.copy(reading.orientation);
+  }
+  function takeOverApproach() {
+    if (!travel) return;
+    const relative=cam.position.clone().sub(reading.faceCenter);
+    const distance=Math.max(cam.near*2,relative.dot(reading.normal));
+    reading.origin.copy(reading.faceCenter).addScaledVector(reading.normal,distance);
+    reading.fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
+    reading.limit=Math.max(0,(works[guide].width-reading.fieldWidth)/2);
+    reading.x=T.MathUtils.clamp(relative.dot(reading.axis),-reading.limit,reading.limit);
+    travel=null;
   }
   function panTo(value) {
     if (!reading) return;
