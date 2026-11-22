@@ -1,38 +1,49 @@
 <!doctype html>
 <html lang="zh-Hant">
-  <link rel="icon" type="image/webp" href="media/art1.webp" />
+  <link rel="icon" href="data:," />
   <meta charset="utf-8" /><meta
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>美術館園區｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=grounds37" />
+  ><link rel="stylesheet" href="style.css?v=atrium40" />
   <link rel="stylesheet" href="typography.css?v=hall34">
   <header>
     <strong>虛擬策展工作室</strong>
     <nav aria-label="參觀導覽"><a id="entranceLink" href="./">美術館園區</a><a id="worksLink" href="#works" hidden>展出作品</a></nav>
   </header>
   <main>
-    <section id="hallEntrance" aria-labelledby="entranceTitle">
-      <div id="lobbyStage" aria-label="可步行的 3D 展場大廳"></div>
+    <section id="hallEntrance" data-zone="grounds" aria-labelledby="entranceTitle">
+      <div id="lobbyStage" aria-describedby="lobbyHint" aria-label="可步行的 3D 展場大廳"></div>
       <div class="lobby-head">
         <h1 id="entranceTitle">美術館園區</h1>
-        <button type="button" id="lobbyExpand">全螢幕</button>
-        <button type="button" id="lobbyDirectory" aria-haspopup="dialog" aria-controls="lobbyDirectoryPanel" disabled>展廳名錄</button>
+        <div class="lobby-tools">
+          <button type="button" id="lobbyExpand" aria-label="全螢幕" aria-pressed="false">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path class="expand-icon" d="M3 9V3h6m6 0h6v6m0 6v6h-6m-6 0H3v-6"/><path class="collapse-icon" d="M9 3v6H3m18 0h-6V3m0 18v-6h6m-18 0h6v6"/></svg>
+            <span class="lobby-tool-label">全螢幕</span>
+          </button>
+          <button type="button" id="lobbyDirectory" aria-label="展廳名錄" aria-haspopup="dialog" aria-controls="lobbyDirectoryPanel" disabled>
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"/></svg>
+            <span class="lobby-tool-label">展廳名錄</span>
+          </button>
+        </div>
       </div>
-      <p id="lobbyMessage" role="status">正在開啟美術館園區…</p>
+      <p id="lobbyMessage" role="status">正在載入空間…</p>
       <div id="portalWait" hidden><span role="status">正在準備展廳</span><button type="button" id="portalBack">返回大廳</button></div>
-      <div class="lobby-wayfinding">
+      <div id="lobbyMenuNav" class="lobby-wayfinding" role="group" aria-label="展廳卡片">
+        <button type="button" id="lobbyPrevHall" class="lobby-carousel-step" aria-label="上一個展廳" aria-keyshortcuts="ArrowLeft" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
         <button type="button" id="lobbyEnterDoor" hidden></button>
-        <p id="lobbyHint" hidden>拖曳環顧 · 點門或走進展廳</p>
+        <button type="button" id="lobbyNextHall" class="lobby-carousel-step" aria-label="下一個展廳" aria-keyshortcuts="ArrowRight" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button>
+        <span id="lobbySelection" aria-live="polite" class="lobby-sr"></span>
       </div>
+      <p id="lobbyHint" class="visually-hidden" hidden>拖曳環顧 · 左右滑動展廳卡片，點選進場</p>
       <dialog id="lobbyDirectoryPanel" aria-labelledby="directoryTitle">
         <div class="entrance-heading"><h2 id="directoryTitle">展廳名錄</h2><button type="button" id="lobbyDirectoryClose" autofocus>返回大廳</button></div>
         <p id="hallStatus" role="status"></p>
-        <div id="hallList"></div>
+        <nav id="hallList" aria-label="開放展廳"></nav>
         <details id="lobbyGuide" class="gesture-guide">
           <summary>大廳操作指引</summary>
-          <p>從園區點美術館正門即可入館，進入大廳後點選展廳。拖曳畫面轉身。輕推左下角搖桿慢走，推遠加快，放手即停。點門或走過門檻即可進場。</p>
-          <p>方向鍵或 WASD 移動。按住空白鍵配合方向鍵轉頭，走近門口按 Enter 進場，按 Esc 停下自動行走，按 R 回到所在區域的起點。</p>
+          <p>從園區沿步道入館，也可以輕點前方開放廊道或右下角箭頭。在大廳左右滑動卡片切換展廳，點選卡片即可進場。拖曳空白處轉身，輕推搖桿慢走，推遠加快，放手即停。</p>
+          <p>方向鍵或 WASD 移動。按住空白鍵配合方向鍵轉頭，按 Enter 進入目前展廳。按 Tab 移至卡片選擇器後，可用左右鍵換廳，按 Esc 停下自動行走，按 R 回到所在區域的起點。</p>
           <div class="touch-motion"><button type="button" id="lobbyGyro" aria-pressed="false">陀螺儀轉向</button> <span id="lobbyGyroStatus" role="status"></span></div>
         </details>
         <div class="lobby-directory-actions"><button type="button" id="lobbyHome">回到大廳起點</button><button type="button" id="lobbyReturnGrounds" hidden>回到美術館園區</button><button type="button" id="lobbyRetry" hidden>重新開啟 3D 大廳</button><a id="lobbyAdminLink" href="admin/">策展後台</a><a id="lobbyDownload" href="studio.zip" download>下載工作室</a></div>
@@ -44,7 +55,7 @@
       </div>
     </section>
     <article class="hero" hidden>
-      <img src="media/hero.webp" alt="展覽空間" />
+      <img alt="" hidden />
       <div>
         <p id="dates"></p>
         <h1 id="title"></h1>
@@ -142,7 +153,7 @@
       }
       if(!preview && (!location.hash || location.hash==="#entrance")) {
         const preload=document.createElement("link");
-        preload.rel="modulepreload";preload.href="./lobby.js?v=grounds38";
+        preload.rel="modulepreload";preload.href="./lobby.js?v=atrium40";
         document.head.append(preload);
       }
       function captureEarlyNavigation(stage,surface) {
@@ -184,5 +195,5 @@
       captureEarlyNavigation(document.getElementById("lobbyStage"),document.getElementById("hallEntrance"));
     })();
   </script>
-  <script type="module" src="app.js?v=grounds38"></script>
+  <script type="module" src="app.js?v=atrium40"></script>
 </html>

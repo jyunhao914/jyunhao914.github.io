@@ -570,69 +570,131 @@ body.in-lobby > :is(header,footer) {display:none}
 #portalWait button {min-height:40px;border:1px solid #fff6;color:inherit;background:transparent}
 #lobbyStage .walk-pad {bottom:max(18px,env(safe-area-inset-bottom));left:max(16px,env(safe-area-inset-left));z-index:2}
 .lobby-head {
-  position:absolute;top:max(16px,env(safe-area-inset-top));left:max(18px,env(safe-area-inset-left));right:max(18px,env(safe-area-inset-right));
-  display:flex;align-items:center;gap:0;pointer-events:none;
+  position:absolute;inset:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 24px max(18px,env(safe-area-inset-left));
+  background:linear-gradient(to bottom,rgba(18,24,23,.64),transparent);
+  color:#fff;pointer-events:none;
 }
-.lobby-head h1,.lobby-head button,#lobbyMessage,.lobby-wayfinding :is(p,button) {
-  margin:0;padding:8px 14px;background:#f5f3eaf0;color:#303630;border:0;border-radius:2px;
+#entranceTitle {
+  margin:0;line-height:1.35;font-weight:500 !important;text-shadow:0 1px 4px #172322af;
 }
-.lobby-head h1 {margin-right:auto;font-size:1rem;letter-spacing:.12em;line-height:1.4}
-.lobby-head button {font-size:.875rem;border-radius:0}
-.lobby-head button:first-of-type {border-radius:2px 0 0 2px}
-.lobby-head button:last-of-type {border-radius:0 2px 2px 0;position:relative}
-.lobby-head button:last-of-type::before {position:absolute;content:"";left:0;top:30%;bottom:30%;border-left:1px solid #3036303d}
-.lobby-head button,.lobby-wayfinding button {min-height:44px;pointer-events:auto}
-.lobby-head button:hover,.lobby-wayfinding button:hover {background:#fffef8}
-#lobbyMessage {position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+.lobby-tools {
+  display:flex;align-items:stretch;border:1px solid #ffffff59;border-radius:5px;overflow:hidden;
+  background:#25302de8;pointer-events:auto;
+}
+.lobby-tools button {
+  min-height:44px;padding:0 clamp(9px,2.2vw,15px);border:0;border-radius:0;color:#fff;
+  background:transparent;white-space:nowrap;
+}
+.lobby-tools button+button {position:relative}
+.lobby-tools button+button::before {content:"";position:absolute;left:0;top:30%;bottom:30%;border-left:1px solid #ffffff47}
+.lobby-tools button:focus-visible {outline-offset:-4px}
+.lobby-tools button:hover {background:#35483d}
+.lobby-tools button:disabled {opacity:.65}
+#lobbyMessage {
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;padding:9px 16px;
+  background:#25302ded;color:#fff;border-radius:4px;text-align:center;pointer-events:none;
+}
 .lobby-wayfinding {
-  position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));
-  display:grid;justify-items:end;gap:6px;max-width:calc(100% - 112px);pointer-events:none;
+  position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));
+  max-width:calc(100% - 118px);pointer-events:none;
 }
-.lobby-wayfinding p {line-height:1.4;font-size:.8rem}
+.lobby-wayfinding button {
+  position:relative;display:block;max-width:100%;min-height:44px;padding:8px 21px 8px 8px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:transparent;
+  border:0;color:#fff;font-weight:550;
+  text-shadow:-1px 0 2px #102b35,1px 0 2px #102b35,0 -1px 2px #102b35,0 1px 2px #102b35,0 2px 5px #102b35;
+  pointer-events:auto;
+}
+.lobby-wayfinding button::after {
+  position:absolute;content:"";right:6px;top:50%;width:7px;height:7px;margin-top:-4px;
+  border:solid currentColor;border-width:1.4px 1.4px 0 0;transform:rotate(45deg);
+  filter:drop-shadow(0 1px 1px #102b35);
+}
+.lobby-wayfinding button:is(:hover,:focus-visible) {
+  background:transparent;text-decoration:underline;text-underline-offset:.3em;
+}
+.lobby-tools svg {display:none}
+#hallEntrance .lobby-head {justify-content:flex-end;background:transparent}
+#hallEntrance :is(#entranceTitle,.lobby-tool-label) {
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip-path:inset(50%);white-space:nowrap;border:0;
+}
+#hallEntrance .lobby-tools {gap:4px;border:0;background:transparent;overflow:visible}
+#hallEntrance .lobby-tools button {
+  width:44px;height:44px;display:grid;place-items:center;padding:0;color:white;background:transparent;
+}
+#hallEntrance .lobby-tools button::before {display:none}
+#hallEntrance .lobby-tools svg {
+  display:block;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.65;
+  stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 1px #102b35) drop-shadow(0 1px 2px #102b35);
+}
+#lobbyExpand[aria-pressed="false"] .collapse-icon,#lobbyExpand[aria-pressed="true"] .expand-icon {display:none}
+#hallEntrance[data-zone="grounds"] #lobbyEnterDoor {width:50px;height:50px;padding:0}
+#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::before,
+#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::after {
+  content:"";position:absolute;display:block;filter:drop-shadow(0 1px 2px #163037) drop-shadow(0 0 1px #162b30);
+}
+#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::before {
+  top:13px;left:24px;height:25px;border-left:2px solid currentColor;
+}
+#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::after {
+  left:18px;top:14px;width:12px;height:12px;margin:0;border-width:2px 2px 0 0;transform:rotate(-45deg);
+}
+#hallEntrance[data-zone="lobby"] #lobbyMenuNav {
+  display:flex;align-items:stretch;gap:0;max-width:calc(100% - 120px);
+  overflow:hidden;border:1px solid #c2d7d344;border-radius:8px;
+  background:linear-gradient(145deg,#273531d4,#17211fdf);box-shadow:0 2px 9px #12231c25;
+}
+#hallEntrance[data-zone="lobby"] #lobbyMenuNav button {
+  height:44px;min-width:0;color:#f0f6f0;border:0;border-radius:0;text-shadow:none;
+}
+#hallEntrance[data-zone="lobby"] #lobbyMenuNav button::after {display:none}
+#hallEntrance[data-zone="lobby"] #lobbyMenuNav button:hover {background:#e2f5eb16}
+#hallEntrance[data-zone="lobby"] #lobbyMenuNav button:focus-visible {outline-offset:-4px}
+#hallEntrance[data-zone="lobby"] #lobbyEnterDoor {flex:0 1 auto;padding:0 9px;overflow:hidden;text-overflow:ellipsis}
+#hallEntrance[data-zone="lobby"] #lobbyMenuNav .lobby-carousel-step {flex:0 0 44px;width:44px;display:grid;place-items:center;padding:0}
+.lobby-carousel-step svg {display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#lobbyHint.visually-hidden,.lobby-sr {
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip-path:inset(50%);white-space:nowrap;border:0;
+}
 .lobby-quiet .lobby-head,.lobby-quiet .lobby-wayfinding {visibility:hidden;opacity:0}
 .lobby-quiet .walk-pad {opacity:0}
 .lobby-quiet.stick-active .walk-pad,.lobby-quiet .walk-pad:focus-within {opacity:1}
 #lobbyDirectoryPanel {
-  width:min(680px,calc(100% - 20px));max-height:calc(100dvh - 32px);overscroll-behavior:contain;
-  background:#f5f6f5;color:#1b3242;padding:clamp(12px,2vw,24px);
+  width:min(540px,calc(100% - 24px));max-height:calc(100dvh - 32px);overscroll-behavior:contain;
+  padding:clamp(14px,4vw,30px);border:1px solid #cdd0c9;border-radius:7px;
+  background:#fafaf7;color:#23342e;box-shadow:0 14px 65px #10211b40;
 }
-#lobbyDirectoryPanel::backdrop {background:#111e26a6}
-#lobbyDirectoryPanel .entrance-heading {margin:0;align-items:center;padding-bottom:10px}
-#lobbyDirectoryPanel h2,#lobbyDirectoryPanel #hallStatus {margin:0}
-#lobbyDirectoryPanel #hallStatus {padding:12px 0}
-#lobbyDirectoryPanel #hallList {grid-template-columns:1fr;gap:8px}
-#lobbyDirectoryPanel .hall-door {grid-template-columns:clamp(64px,15vw,94px) minmax(0,1fr) auto;align-content:stretch;min-height:66px}
-#lobbyDirectoryPanel .hall-picture {grid-column:auto;position:relative;align-self:stretch;aspect-ratio:auto}
-#lobbyDirectoryPanel .hall-picture img {position:absolute;inset:0}
-#lobbyDirectoryPanel .hall-caption {padding:8px}
-.lobby-directory-actions {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:14px}
-.lobby-directory-actions :is(a,button),#lobbyDirectoryClose {min-height:44px;align-content:center}
-@media(max-width:420px) {
-  .lobby-head {gap:4px;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right))}
-  .lobby-head :is(h1,button),.lobby-wayfinding p {padding-inline:8px}
+#lobbyDirectoryPanel::backdrop {background:#16201e91}
+#lobbyDirectoryPanel .entrance-heading {display:flex;align-items:center;justify-content:space-between;gap:10px}
+#directoryTitle {margin:0;font-weight:600 !important}
+#lobbyDirectoryClose,#lobbyDirectoryPanel .lobby-directory-actions :is(a,button) {
+  min-height:44px;display:inline-flex;align-items:center;justify-content:center;
+  padding:7px 10px;border:1px solid #c8cec8;border-radius:4px;background:transparent;color:inherit;
+  text-decoration:none;text-align:center;
 }
+#lobbyDirectoryPanel :is(#lobbyDirectoryClose,.lobby-directory-actions :is(a,button)):hover {background:#e6ebe4}
+#lobbyDirectoryPanel #hallStatus {margin:4px 0 14px;color:#516159}
+#hallList {display:block;border-top:1px solid #a7b3a9}
+.hall-door {
+  display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding:10px 5px;
+  text-decoration:none;color:inherit;border-bottom:1px solid #cbd3cb;
+}
+.hall-door:focus-visible {outline-offset:-2px}
+.hall-door:hover {background:#e8eee6}
+.hall-caption {min-width:0}
+.hall-caption strong,.hall-caption span {display:block;overflow-wrap:anywhere;line-height:1.45}
+.hall-caption strong {font-weight:550}
+.hall-caption span {color:#516159}
+.door-action {flex:none;width:11px;height:11px;margin:0 10px;border-top:1.5px solid;border-right:1.5px solid;transform:rotate(45deg)}
+#lobbyGuide {margin-top:9px}
+#lobbyDirectoryPanel .lobby-directory-actions {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px}
 header nav a {display:inline-flex;align-items:center;min-height:44px;text-decoration:none}
 header nav a[aria-current="page"] {box-shadow:inset 0 -2px #26445a;font-weight:650}
-.entrance-heading {display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:clamp(18px,3vw,34px);border-bottom:1px solid #b6c3c8}
-.entrance-heading h1 {margin:0 0 18px;font-size:clamp(2.1rem,4.8vw,4.25rem);font-weight:750;line-height:1.1;letter-spacing:.012em}
-.entrance-heading p {font-size:.9rem;color:#415664;white-space:nowrap}
-#hallList {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(14px,2vw,30px)}
-.hall-door {min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start;align-items:center;overflow:hidden;background:white;border:1px solid #cdd5d8;border-radius:5px;text-decoration:none;color:#193247}
-.hall-door:focus-visible {outline-offset:3px}
-.hall-door:hover {border-color:#576e77}
-.hall-picture {grid-column:1/-1;aspect-ratio:1.95;overflow:hidden;background:linear-gradient(110deg,#283d48,#506066 55%,#899396)}
-.hall-picture img {display:block;width:100%;height:100%;object-fit:cover;object-position:50% 44%}
-.hall-caption {min-width:0;padding:16px 4px 17px 18px}
-.hall-caption h2 {margin:0 0 4px;font-size:clamp(1.2rem,2vw,1.65rem);line-height:1.25;font-weight:700;overflow-wrap:anywhere}
-.hall-caption p {margin:0;font-size:.86rem;color:#4a616d;overflow-wrap:anywhere}
-.door-action {padding:10px 16px 10px 5px;white-space:nowrap;font-size:.85rem;font-weight:650;color:#26485f}
 #visit #backToEntrance {width:100%;margin:0 0 10px;min-height:44px;font-weight:650}
-@media(max-width:960px) {#hallList {grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:550px) {
-  #hallList {grid-template-columns:1fr;gap:12px}
-  .hall-door {grid-template-columns:clamp(77px,23vw,120px) minmax(0,1fr) auto;align-content:stretch;min-height:96px}
-  .hall-picture {grid-column:auto;align-self:stretch;min-height:100%;aspect-ratio:auto;position:relative}
-  .hall-picture img {position:absolute;inset:0}
-  .hall-caption {padding:14px 2px 14px 12px}
-  .door-action {padding:6px 10px 6px 4px;font-size:.76rem}
+@media(max-width:420px) {
+  .lobby-head {gap:6px;padding-inline:max(10px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-right))}
 }

@@ -1,6 +1,13 @@
+// Pavilion coordinates are measured from the garden elevation. The front
+// follows an oblique line while the upper roof rises gently towards the lawn.
+export function pavilionProfile(width) {
+  const left=-width-8.25,right=width+2.05;
+  return {left,right,depth:5.20,face:x=>.34*x+.64,
+    base:()=>4.72,top:x=>7.46+1.36*(x-left)/(right-left)};
+}
 // The parent group is centred on the south wall: local +z faces the garden.
 // The grounds own the shared panorama, the materials array and all child geometries.
-export function buildFacade(T,root,{width,depth=5.9,panorama,materials}){
+export function buildFacade(T,root,{width,depth=5.9,panorama,timberTexture,materials}){
   const w=width, group=new T.Group();
   group.name="museum-facade";
   root.add(group);
@@ -8,8 +15,8 @@ export function buildFacade(T,root,{width,depth=5.9,panorama,materials}){
     const m=new T.MeshStandardMaterial(opts);
     materials.push(m);return m;
   }
-  const metal=finish({color:0x44534e,metalness:.29,roughness:.47});
-  const flashing=finish({color:0x88918c,metalness:.36,roughness:.45});
+  const metal=finish({color:0x263e3b,metalness:.29,roughness:.47});
+  const flashing=finish({color:0x545950,metalness:.36,roughness:.45});
   const roof=finish({color:0x89958e,roughness:.64,metalness:.21});
   const lead=finish({color:0x61706b,roughness:.63,metalness:.28});
 
@@ -18,36 +25,38 @@ export function buildFacade(T,root,{width,depth=5.9,panorama,materials}){
   const windowMaterial=new T.ShaderMaterial({
     transparent:true,depthWrite:false,side:T.DoubleSide,
     uniforms:{environs:{value:panorama},halfWidth:{value:w}},
-    vertexShader:`varying vec3 localPoint;varying vec3 worldPoint;
-      void main(){localPoint=position;vec4 p=modelMatrix*vec4(position,1.);worldPoint=p.xyz;
+    vertexShader:`varying vec3 localPoint;varying vec3 worldPoint;varying vec3 paneNormal;
+      void main(){localPoint=position;paneNormal=normalize(mat3(modelMatrix)*normal);vec4 p=modelMatrix*vec4(position,1.);worldPoint=p.xyz;
       gl_Position=projectionMatrix*viewMatrix*p;}`,
     fragmentShader:`uniform sampler2D environs;uniform float halfWidth;
-      varying vec3 localPoint;varying vec3 worldPoint;
+      varying vec3 localPoint;varying vec3 worldPoint;varying vec3 paneNormal;
       void main(){
         vec3 sight=normalize(cameraPosition-worldPoint);
-        float incidence=abs(sight.z);
+        float incidence=abs(dot(sight,normalize(paneNormal)));
         float fresnel=.045+.955*pow(1.-incidence,5.);
         // Small deviations in large laminated panes disturb reflections while keeping the interior legible.
-        vec3 n=normalize(vec3(.0021*sin(localPoint.x*3.4+localPoint.y),.0017*cos(localPoint.y*3.2),1.));
+        vec3 n=normalize(paneNormal+vec3(.0021*sin(localPoint.x*3.4+localPoint.y),.0017*cos(localPoint.y*3.2),0.));
         vec3 r=reflect(-sight,n);
-        vec3 panoramaRay=vec3(.887*r.x+.462*r.z,r.y,-.462*r.x+.887*r.z);
+        vec3 panoramaRay=vec3(-.407*r.x+.913*r.z,r.y,-.913*r.x-.407*r.z);
         vec2 uv=vec2(fract(atan(panoramaRay.z,-panoramaRay.x)/6.283185+.99999),asin(clamp(panoramaRay.y,-1.,1.))/3.141593+.5);
         vec3 garden=texture2D(environs,uv).rgb;
         vec3 reflected=garden*vec3(.88,.99,1.05)+vec3(.009,.017,.023);
-        if(r.y>.002 && localPoint.y<3.415){
-          float t=(3.415-localPoint.y)/r.y;vec3 p=localPoint+r*t;
-          if(p.z>.01 && p.z<3.37 && abs(p.x)<halfWidth+.86){
-            float slat=abs(fract((p.x+halfWidth+.82)/.29+.5)-.5)*.29;
-            reflected=mix(vec3(.14,.100,.063),vec3(.068,.055,.040),smoothstep(.020,.047,slat));
-          }
+        float left=-halfWidth-8.25,right=halfWidth+2.05,slope=0.;
+        if(r.y-slope*r.x>.001){
+          float t=(4.72+slope*(localPoint.x-left)-localPoint.y)/(r.y-slope*r.x);
+          vec3 p=localPoint+r*t;float depth=p.z-.34*p.x-.64;
+          if(t>0. && p.x>left-.32 && p.x<right+.32 && depth> -5.52 && depth<.32)
+            reflected=vec3(.13,.114,.081)*(.8+.20*smoothstep(.002,.008,abs(fract(depth/.205+.5)-.5)*.205));
         }
         if(r.y<-.008){
-          float t=-localPoint.y/r.y;vec3 p=localPoint+r*t;
-          if(p.z>.15 && p.z<15. && p.x>-2.75 && p.x<3.86)
+          vec3 p=localPoint-r*localPoint.y/r.y;
+          float middle=.28-2.65*smoothstep(1.,14.,p.z);
+          float spread=4.86-2.23*smoothstep(1.,8.,p.z);
+          if(p.z>.03 && p.z<32. && abs(p.x-middle)<spread*.5)
             reflected=mix(reflected,vec3(.20,.185,.151),.60);
         }
         float alpha=clamp(.19+.75*fresnel+(1.-incidence)*.10,.10,.93);
-        if(sight.z<0.){
+        if(dot(sight,paneNormal)<0.){
           reflected=mix(vec3(.16,.125,.089),vec3(.67,.72,.71),smoothstep(-.1,.70,r.y));
           alpha=.036+.67*fresnel;
         }
@@ -59,7 +68,7 @@ export function buildFacade(T,root,{width,depth=5.9,panorama,materials}){
   materials.push(windowMaterial);
 
   // The opaque pieces are merged per finish. Keep glazing in its own transparent draw so
-  // interior door lettering and artworks are visible, including as the camera approaches.
+  // the light court beyond the glass remains visible from the garden.
   const opaque=new Map();
   function geometryData(){return {p:[],n:[],index:[]};}
   function polygon(data,points){
@@ -84,9 +93,8 @@ export function buildFacade(T,root,{width,depth=5.9,panorama,materials}){
   const glass=geometryData();
   const pane=(left,right,bottom,topL,topR,z)=>polygon(glass,
     [[left,bottom,z],[right,bottom,z],[right,topR,z],[left,topL,z]]);
-  // Match the existing metal mullions in the foyer. The door and its stacked leaves
-  // occupy the middle 2.4 m. No glazing crosses this route, even at the floor.
-  const sideStart=1.39,sideEnd=w-.36,sill=.55,head=3.64;
+  // Gallery glazing stops at either side of the open 4.8 m garden passage.
+  const sideStart=2.40,sideEnd=w-.36,sill=.10,head=3.64;
   for(const side of [-1,1]){
     const low=side<0?-sideEnd:sideStart,high=side<0?-sideStart:sideEnd;
     const bays=Math.max(1,Math.round((high-low)/1.65));
@@ -102,44 +110,159 @@ export function buildFacade(T,root,{width,depth=5.9,panorama,materials}){
     block(flashing,(low+high)/2,sill+.035,.273,high-low,.014,.054);
   }
 
-  const vaults=3,halfBay=w/vaults,spring=4.14,rise=.72,topPlate=3.86;
-  const zGlass=-.115,zFront=.142,zEnd=-2*depth-.05;
-  block(metal,0,topPlate+.021,.004,2*w+.02,.051,.42);
-  block(flashing,0,topPlate+.044,.160,2*w+.06,.014,.15);
-  block(lead,0,topPlate+.027,.230,2*w+.06,.027,.018);
-  function vaultY(dx){return spring+rise*Math.sqrt(Math.max(0,1-(dx/halfBay)**2));}
-  for(let i=0;i<vaults;i++){
-    const cx=(-vaults+1+2*i)*halfBay,divisions=48;
-    // The low arched top of the clerestory is clear glass. Its long sill continues
-    // across the three bays without the solid gable used for a load-bearing wall.
-    for(let j=0;j<divisions;j++){
-      const t=-Math.PI/2+j*Math.PI/divisions,q=-Math.PI/2+(j+1)*Math.PI/divisions;
-      const x1=cx+halfBay*Math.sin(t),x2=cx+halfBay*Math.sin(q);
-      const h1=spring+rise*Math.cos(t),h2=spring+rise*Math.cos(q);
-      pane(x1,x2,topPlate+.043,h1-.018,h2-.018,zGlass);
-      polygon(piece(metal),[[x1,h1-.037,zGlass+.020],[x2,h2-.037,zGlass+.020],[x2,h2+.008,zGlass+.020],[x1,h1+.008,zGlass+.020]]);
-      // The folded edge is 58 mm tall. Standing-seam sheets follow the actual
-      // underside (+65 mm) and recede behind the facade; no solid semicircular cap.
-      const y1=h1+.065,y2=h2+.065;
-      polygon(piece(flashing),[[x1,y1-.058,zFront],[x2,y2-.058,zFront],[x2,y2,zFront],[x1,y1,zFront]]);
-      polygon(piece(lead),[[x1,h1+.007,zGlass+.015],[x2,h2+.007,zGlass+.015],[x2,y2-.056,zFront],[x1,y1-.056,zFront]]);
-      polygon(piece(roof),[[x1,y1,zFront],[x2,y2,zFront],[x2,y2,zEnd],[x1,y1,zEnd]]);
-      if((j%8===4 || j%8===5) && j>2 && j<divisions-3){
-        const left=j%8===4,x=left?x2:x1,y=left?y2:y1,edge=x+(left?-.009:.009);
-        polygon(piece(lead),[[x,y+.020,zFront-.045],[edge,y,zFront-.045],[edge,y,zEnd],[x,y+.020,zEnd]]);
-      }
-    }
-    for(const fraction of [-1,-.40,.40,1]){
-      if(i>0 && fraction===-1)continue;
-      const dx=fraction*halfBay,h=vaultY(dx)-topPlate;
-      block(metal,cx+dx,topPlate+h/2,zGlass+.029,.034,h,.092);
-      block(flashing,cx+dx,topPlate+h/2,zGlass+.082,.012,h,.015);
-    }
+  // Flat roof over the perimeter gallery; the central light court is open to the sky.
+  // The larger cut-out meets the splayed stone lining below its top lip.
+  const zFront=.14,zEnd=-2*depth-.05,roofHeight=4.34;
+  const frontOfCourt=-.10-depth,backOfCourt=-5.39-depth,clearance=2.84;
+  const parapet=finish({color:0x5a5d55,roughness:.86});
+  block(parapet,0,4.124,zFront-.07,2*w+.08,.65,.20);
+  block(flashing,0,4.46,zFront-.085,2*w+.13,.023,.26);
+  block(lead,0,3.80,zFront+.028,2*w+.05,.012,.041);
+  function roofDeck(left,right,back,front){
+    if(front<=back || right<=left)return;
+    polygon(piece(roof),[[left,roofHeight,front],[right,roofHeight,front],
+      [right,roofHeight,back],[left,roofHeight,back]]);
   }
+  roofDeck(-w,w,frontOfCourt,zFront);
+  roofDeck(-w,-clearance,backOfCourt,frontOfCourt);
+  roofDeck(clearance,w,backOfCourt,frontOfCourt);
+  // The upper gallery is lifted clear of the recessed ground-floor glazing.
+  // Its black folded fascia and pale concrete blades stay distinct in silhouette.
+  const pavilion=pavilionProfile(w), back=pavilion.depth;
+  const {left:L,right:R,base:low,top,face}=pavilion;
+  const black=finish({color:0x202624,metalness:.36,roughness:.48});
+  const edge=finish({color:0x424946,metalness:.40,roughness:.44});
+  const soffit=finish({color:0x767566,roughness:.86});
+  if(timberTexture)soffit.onBeforeCompile=shader=>{
+    shader.uniforms.grain={value:timberTexture};
+    shader.vertexShader="varying vec3 soffitPoint;\n"+shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nsoffitPoint=position;");
+    shader.fragmentShader="varying vec3 soffitPoint;uniform sampler2D grain;\n"+shader.fragmentShader.replace("#include <color_fragment>",`#include <color_fragment>
+      vec2 deck=vec2(soffitPoint.x,soffitPoint.z-.34*soffitPoint.x);
+      float grainValue=texture2D(grain,deck/vec2(2.25,.32)).r;
+      float joint=abs(fract(deck.y/.205+.5)-.5)*.205;
+      diffuseColor.rgb=vec3(.17,.14,.096)*(.70+.53*grainValue)*(.73+.27*smoothstep(.002,.007,joint));`);
+  };
+  const inside=finish({color:0x435356,roughness:.78});
+  const brace=finish({color:0x91a2a0,metalness:.16,roughness:.66});
+  function strip(mat,a,b,ruleA,ruleB) {
+    mat.side=T.DoubleSide;
+    polygon(piece(mat),[ruleA(a),ruleA(b),ruleB(b),ruleB(a)]);
+  }
+  const roofAt=(x,z)=>top(x)-.018*z;
+  // Two thin roof folds overhang the curtain wall on three sides.
+  for(const [baseFn,thickness,projection,skin] of [[low,.32,.32,soffit],[roofAt,.12,.40,black]]){
+    const left=L-projection,right=R+projection,rear=-back-projection,front=projection;
+    const point=(x,z,dy=0)=>[x,baseFn(x,z)+dy,face(x)+z];
+    strip(skin,left,right,x=>point(x,front),x=>point(x,rear));
+    strip(black,left,right,x=>point(x,front,thickness),x=>point(x,rear,thickness));
+    strip(edge,left,right,x=>point(x,front),x=>point(x,front,thickness));
+    strip(black,left,right,x=>point(x,rear),x=>point(x,rear,thickness));
+    for(const x of [left,right])polygon(piece(black),[point(x,rear),point(x,front),point(x,front,thickness),point(x,rear,thickness)]);
+  }
+  // The eastern return contains a structural core from grade to the roof.
+  // It overlaps the occupied ground-floor wing and supports the rear of the gallery.
+  const core=finish({color:0x46504d,roughness:.80});
+  core.side=T.DoubleSide;
+  const cL=R-2.72,cR=R-.08,coreFace=-3.18,coreRear=-back+.05;
+  for(const offset of [coreFace,coreRear]){
+    strip(core,cL,cR,x=>[x,.0,face(x)+offset],x=>[x,roofAt(x,offset),face(x)+offset]);
+    strip(black,cL,cR,x=>[x,low(x)-.012,face(x)+offset+.008],x=>[x,low(x)+.012,face(x)+offset+.008]);
+  }
+  for(const x of [cL,cR]){
+    polygon(piece(core),[[x,0,face(x)+coreRear],[x,0,face(x)+coreFace],
+      [x,roofAt(x,coreFace),face(x)+coreFace],[x,roofAt(x,coreRear),face(x)+coreRear]]);
+  }
+  // The lower eastern wing turns the corner in glass and merges into the end core.
+  const ex=w+.07,er=w+4.87,ez=-.71,eb=-4.50,eh=3.64;
+  block(inside,(ex+er)/2,eh/2,eb,er-ex,eh,.18);
+  block(black,(ex+er)/2,eh+.09,(ez+eb)/2,er-ex+.20,.18,ez-eb+.22);
+  block(soffit,(ex+er)/2,.065,(ez+eb)/2,er-ex,.13,ez-eb);
+  for(let i=0;i<3;i++){
+    const xa=ex+(er-ex)*i/3,xb=ex+(er-ex)*(i+1)/3;
+    pane(xa+.017,xb-.017,.13,eh-.04,eh-.04,ez);
+    block(metal,xa,eh/2,ez+.014,.034,eh,.055);
+  }
+  for(let i=0;i<2;i++){
+    const za=eb+(ez-eb)*i/2,zb=eb+(ez-eb)*(i+1)/2;
+    polygon(glass,[[er,.13,zb-.02],[er,.13,za+.02],[er,eh-.04,za+.02],[er,eh-.04,zb-.02]]);
+    block(metal,er,eh/2,zb,.06,eh,.035);
+  }
+  // Two continuous downstand beams run directly over the concrete blades,
+  // tying the floor deck to the rear occupied wing instead of a floating gap.
+  for(const z of [-.96,-3.72]){
+    const facePoint=(x,offset,dy)=>[x,low(x)+dy,face(x)+z+offset];
+    strip(edge,L+.20,R-.20,x=>facePoint(x,.14,-.23),x=>facePoint(x,.14,.018));
+    strip(black,L+.20,R-.20,x=>facePoint(x,-.14,-.23),x=>facePoint(x,.14,-.23));
+    strip(inside,L+.20,R-.20,x=>facePoint(x,-.14,.018),x=>facePoint(x,-.14,-.23));
+    for(const x of [L+.20,R-.20])polygon(piece(black),[facePoint(x,-.14,-.23),facePoint(x,.14,-.23),facePoint(x,.14,.018),facePoint(x,-.14,.018)]);
+  }
+  strip(inside,-w,w,x=>[x,3.96,face(x)-back+.18],x=>[x,low(x)+.08,face(x)-back+.18]);
+  // The ground-floor gallery sits deeper under the left cantilever; its end
+  // wall, rear wall and dark window band are visible through the colonnade.
+  const gx=L+1.30,gr=-w+.08,gz=face(gx)-1.20,gh=3.62;
+  block(inside,(gx+gr)/2,gh/2,gz-1.46,gr-gx,gh,.18);
+  block(inside,gx+.06,gh/2,gz-.72,.12,gh,1.55);
+  block(inside,gr-.06,gh/2,gz-.72,.12,gh,1.55);
+  block(black,(gx+gr)/2,gh+.06,gz-.68,gr-gx+.24,.14,1.84);
+  for(let i=0;i<4;i++){
+    const a=gx+(gr-gx)*i/4,b=gx+(gr-gx)*(i+1)/4;
+    pane(a+.02,b-.02,.14,gh-.06,gh-.06,gz);
+    block(metal,a,gh/2,gz+.025,.045,gh,.065);
+  }
+  // Shadowed depth, diagonal structure and rear wall can be seen through the coating.
+  strip(inside,L,R,x=>[x,low(x)+.32,face(x)-back+.09],x=>[x,top(x)-.06,face(x)-back+.09]);
+  for(let i=0;i<7;i++){
+    const ax=L+(R-L)*i/7,bx=L+(R-L)*(i+1)/7;
+    strip(brace,ax,bx,x=>[x+.055,(x===ax)===(i%2===0)?low(x)+.20:top(x)-.06,face(x)-.60],
+      x=>[x-.055,(x===ax)===(i%2===0)?low(x)+.20:top(x)-.06,face(x)-.60]);
+  }
+  const upperGlass=new T.ShaderMaterial({
+    transparent:true,depthWrite:false,side:T.DoubleSide,
+    uniforms:{sky:{value:panorama}},
+    vertexShader:`varying vec3 world;varying vec3 faceNormal;
+    void main(){world=(modelMatrix*vec4(position,1.)).xyz;faceNormal=normalize(mat3(modelMatrix)*normal);
+      gl_Position=projectionMatrix*viewMatrix*vec4(world,1.);}`,
+    fragmentShader:`uniform sampler2D sky;varying vec3 world;varying vec3 faceNormal;
+    void main(){
+      vec3 eye=normalize(cameraPosition-world);vec3 n=normalize(faceNormal);
+      vec3 r=reflect(-eye,n);vec2 local=mat2(-.407,-.913,.913,-.407)*r.xz;
+      vec2 uv=vec2(fract(atan(local.y,-local.x)/6.283185),asin(clamp(r.y,-1.,1.))/3.141593+.5);
+      vec3 exterior=texture2D(sky,uv,.48).rgb;
+      float grazing=pow(1.-abs(dot(n,eye)),3.);
+      float value=dot(exterior,vec3(.21,.72,.07));
+      vec3 coated=vec3(.006,.038,.058)+min(value,.72)*vec3(.090,.175,.211)+exterior*vec3(.034,.058,.066)*(.80+.34*grazing);
+      gl_FragColor=vec4(coated,.72+.15*grazing);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`});
+  materials.push(upperGlass);
+  const upperPanes=geometryData(), bays=13, rows=4;
+  for(let i=0;i<bays;i++){
+    const a=L+(R-L)*i/bays,b=L+(R-L)*(i+1)/bays;
+    const h=(x,t)=>low(x)+.30+(top(x)-low(x)-.30)*t;
+    for(let j=0;j<rows;j++){
+      const z=i%4===1?.010:0;
+      polygon(upperPanes,[[a+.017,h(a,j/rows)+.013,face(a)+z],[b-.017,h(b,j/rows)+.013,face(b)+z],
+        [b-.017,h(b,(j+1)/rows)-.013,face(b)+z],[a+.017,h(a,(j+1)/rows)-.013,face(a)+z]]);
+      if(j>0)strip(black,a,b,x=>[x,h(x,j/rows)-.013,face(x)+.019],x=>[x,h(x,j/rows)+.013,face(x)+.019]);
+    }
+    block(black,a,(top(a)+low(a)+.30)/2,face(a)+.005,.032,top(a)-low(a)-.30,.055);
+  }
+  for(const x of [L,R]){
+    for(let j=0;j<rows;j++){
+      const bottom=low(x)+.30+(top(x)-low(x)-.30)*j/rows;
+      const high=low(x)+.30+(top(x)-low(x)-.30)*(j+1)/rows;
+      polygon(upperPanes,[[x,bottom+.011,face(x)],[x,bottom+.011,face(x)-back],
+        [x,high-.011,face(x)-back],[x,high-.011,face(x)]]);
+      block(black,x,bottom,face(x)-back/2,.04,.025,back);
+    }
+    for(let j=0;j<3;j++)block(black,x,(top(x)+low(x)+.30)/2,face(x)-j*back/2,.045,top(x)-low(x)-.30,.035);
+  }
+  mesh("museum-lifted-glass-gallery",upperPanes,upperGlass).renderOrder=2;
   const glazing=mesh("museum-reflective-glazing",glass,windowMaterial);
   glazing.renderOrder=3;glazing.raycast=()=>{};
   for(const [mat,data] of opaque){
-    mesh(mat===roof?"museum-vault-standing-seam":mat===flashing?"museum-vault-flashing":mat===lead?"museum-roof-folds":"museum-window-caps",data,mat);
+    mesh(mat===roof?"museum-roof-deck":mat===flashing?"museum-roof-flashing":mat===lead?"museum-roof-folds":"museum-window-caps",data,mat);
   }
   return group;
 }

@@ -52,10 +52,15 @@ seamless derivatives have a 0.70 m × 0.52 m repeat. The albedo is colour
 balanced for a light honed finish and the averaged normals are renormalized.
 limestone-color.webp is sRGB and limestone-normal.webp is non-colour data.
 
-Garden surroundings and glazing reflections: Ballawley Park by Savva Zakharov, Poly Haven.
+Garden surroundings and glazing reflections: Sunny Vondelpark by Greg Zaal, Poly Haven.
+https://polyhaven.com/a/sunny_vondelpark
+CC0 1.0 Universal. garden-canopy.webp is a tone-mapped, colour-graded and oriented
+2816 × 1408 derivative of the 4K HDR panorama. The landscape foreground, pavilion
+and courtyard are site geometry.
+
+Previous garden panorama: Ballawley Park by Savva Zakharov, Poly Haven.
 https://polyhaven.com/a/ballawley_park
-CC0 1.0 Universal. garden-panorama.webp is a tone-mapped and colour-graded
-2816 × 1408 derivative of the 4K HDR panorama. Planters and architecture are 3D geometry.
+CC0 1.0 Universal. garden-panorama.webp is retained for cached versions.
 
 Garden lawn: Grass Ground by Charlotte Baglioni, Poly Haven.
 https://polyhaven.com/a/grass_ground

@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=grounds38";
+import {lobbyPage} from "./lobby-page.js?v=atrium40";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
@@ -88,7 +88,10 @@ function detail(a) {
   $("detail").showModal();
 }
 $("close").onclick = () => $("detail").close();
-$("detail").onclose = () => $("content").replaceChildren();
+$("detail").onclose = () => {
+  clearMedia($("content"));
+  $("content").replaceChildren();
+};
 function leave(entireFullscreen=false) {
   $("visit").inert=false;
   $("stage").dispatchEvent(new Event("discardnavigation"));
@@ -118,10 +121,21 @@ function draw() {
   $("editLayout").hidden=new URLSearchParams(location.search).has("studio-preview") || location.pathname.startsWith("/public/") || location.pathname.startsWith("/preview/");
   updateEditLink(current.works[0]);
   $("title").textContent = $("visitTitle").textContent = current.title;
+  $("room").replaceChildren(
+    ...[...new Set(current.works.map((a) => a.room))].map(
+      (r) => new Option(r, r),
+    ),
+  );
+  musicIndex = 0;
+  track();
+  $("vol").value = current.volume ?? 0.5;
+  $("music").volume = Number($("vol").value);
+}
+function drawCatalogue() {
   const cover = current.works.find((work) => work.type === "圖片");
   const heroImage = document.querySelector(".hero img");
-  heroImage.src = cover?.src || "media/hero.webp";
-  heroImage.alt = cover?.title || current.title;
+  heroImage.hidden=!cover;
+  if(cover) {heroImage.src=cover.src;heroImage.alt=cover.title || current.title;}
   $("desc").textContent = current.description;
   $("dates").textContent =
     current.start || current.end
@@ -146,18 +160,9 @@ function draw() {
     card.append(visitButton,info);
     $("cards").append(card);
   }
-  $("room").replaceChildren(
-    ...[...new Set(current.works.map((a) => a.room))].map(
-      (r) => new Option(r, r),
-    ),
-  );
-  musicIndex = 0;
-  track();
-  $("vol").value = current.volume ?? 0.5;
-  $("music").volume = Number($("vol").value);
 }
 function track() {
-  let src = current.playlist[musicIndex];
+  let src = current.playlist?.[musicIndex];
   $("musicLabel").hidden = $("volLabel").hidden = !src;
   if (src) $("music").src = src;
   else $("music").removeAttribute("src");
@@ -174,7 +179,7 @@ $("music").onended = () => {
 };
 $("music").ontimeupdate = () => {
   let p = $("music"),
-    f = current.fade;
+    f = current?.fade;
   if (f && Number.isFinite(p.duration))
     p.volume =
       Number($("vol").value) *
@@ -196,7 +201,7 @@ function offerCatalogue(message) {
   browse.focus({preventScroll:true});
   return notice;
 }
-async function enter(workId,throughDoor=false,entranceImage=null) {
+async function enter(workId,throughDoor=false) {
   const target=current.works.find(work=>work.id===workId);
   if(target)$("room").value=target.room;
   if(!privatePreview)lastDoor=Array.from($("hallList").children).find(card=>
@@ -237,7 +242,7 @@ async function enter(workId,throughDoor=false,entranceImage=null) {
           $("scrollPosition").value = Math.round(fraction*1000);
           $("scrollPosition").setAttribute("aria-valuetext", "自卷首向左 " + Math.round((1-fraction)*100) + "%");
           $("readPosition").textContent = Math.round((1-fraction)*100) + "%";
-        }, undefined, throughDoor && {image:entranceImage},
+        }, undefined, throughDoor,
       );
     if (n === seq && viewer) {
       if(target)viewer.select(roomWorks.indexOf(target));
@@ -475,31 +480,47 @@ function visitUrl(show, room, view, work) {
   url.hash=show ? encodeURIComponent(show.id) : "";
   return url;
 }
+// Only create media elements for a catalogue the visitor actually opened.
+function clearMedia(container) {
+  for(const element of container.querySelectorAll("img[src], video[src], audio[src]")) {
+    if(element instanceof HTMLMediaElement) {
+      element.pause();
+      element.removeAttribute("src");
+      element.removeAttribute("poster");
+      element.load();
+    } else element.removeAttribute("src");
+  }
+}
 function showCatalogue(visible) {
-  for(const el of [document.querySelector(".hero"),$("exhibits"),$("works"),$("cards"),$("worksLink")])el.hidden=!visible;
+  const hero=document.querySelector(".hero");
+  if(visible)drawCatalogue();
+  else {
+    clearMedia(hero);
+    clearMedia($("cards"));
+    $("cards").replaceChildren();
+    if($("detail").open)$("detail").close();
+    clearMedia($("content"));
+    $("content").replaceChildren();
+  }
+  for(const el of [hero,$("exhibits"),$("works"),$("cards"),$("worksLink")])el.hidden=!visible;
 }
 let lastRoute, lastDoor;
 const doors=[];
 let incomingDoor;
-function loadRoomRenderer() {return import("./gallery.js?v=grounds38");}
-function prepareRoom() {
-  loadRoomRenderer().catch(()=>{});
-  const urls=["materials/plaster-color.webp","materials/wood-color.webp","materials/wood-normal.webp",
-    "materials/stone-color.webp"];
-  for(const url of urls.filter(Boolean)) {
-    const image=new Image();
-    image.decoding="async";
-    image.src=url;
-  }
-}
-const lobby=lobbyPage((door,image)=>{
-  incomingDoor={door,image};
+function loadRoomRenderer() {return import("./gallery.js?v=atrium40");}
+const lobby=lobbyPage(door=>{
+  incomingDoor=door;
   openRoom(door.show,door.room);
-},prepareRoom);
+},()=>{loadRoomRenderer().catch(()=>{});});
 function showEntrance() {
   const expanded=visit.classList.contains("expanded");
   const exit=leave();
   incomingDoor=null;
+  const music=$("music");
+  if(music.hasAttribute("src")) {
+    music.removeAttribute("src");
+    music.load();
+  }
   lobby.close();
   showCatalogue(false);
   $("hallEntrance").hidden=false;
@@ -513,9 +534,8 @@ function restorePageFocus(target,exit) {
   else focus();
 }
 function displayShow(show,room,work,catalogue) {
-  const throughDoor=Boolean(incomingDoor && incomingDoor.door.show===show &&
-    (!room || incomingDoor.door.room===room) && !work && !catalogue);
-  const entranceImage=incomingDoor?.image;
+  const throughDoor=Boolean(incomingDoor && incomingDoor.show===show &&
+    (!room || incomingDoor.room===room) && !work && !catalogue);
   incomingDoor=null;
   const expanded=throughDoor ? lobby.hold() : lobby.close();
   $("hallEntrance").hidden=!throughDoor;
@@ -524,7 +544,7 @@ function displayShow(show,room,work,catalogue) {
     current=show;
     $("shows").value=$("visitShows").value=String(shows.indexOf(show));
     draw();
-  }
+  } else if(show.playlist?.length && !$("music").hasAttribute("src"))track();
   if(room && show.works.some(a=>a.room===room))$("room").value=room;
   else $("room").selectedIndex=0;
   document.title=show.title+"｜虛擬策展工作室";
@@ -536,7 +556,7 @@ function displayShow(show,room,work,catalogue) {
   } else {
     showCatalogue(false);
     if(expanded)visit.classList.add("expanded");
-    enter(work,throughDoor,entranceImage);
+    enter(work,throughDoor);
   }
 }
 function applyRoute() {
@@ -573,33 +593,23 @@ function drawEntrance() {
   doors.length=0;
   for(const show of shows) {
     const rooms=new Map();
-    for(const work of show.works) {
-      if(!rooms.has(work.room))rooms.set(work.room,[]);
-      rooms.get(work.room).push(work);
-    }
-    for(const [room,works] of rooms) {
+    for(const {room} of show.works)rooms.set(room,(rooms.get(room) || 0)+1);
+    for(const [room,count] of rooms) {
       const name=room || show.title;
-      const subtitle=[show.title!==name ? show.title : "",works.length+" 件作品"].filter(Boolean).join(" · ");
-      const cover=works.find(a=>a.type==="圖片" && a.src);
-      doors.push({show,room,title:name,subtitle,cover:cover && {src:cover.src,width:cover.width,height:cover.height}});
-      const card=node("a"), picture=node("div"), caption=node("div");
+      const subtitle=[show.title!==name ? show.title : "",count+" 件作品"].filter(Boolean).join(" · ");
+      doors.push({show,room,title:name,subtitle});
+      const card=node("a"), caption=node("div");
       card.className="hall-door";card.dataset.show=show.id;card.dataset.room=room || "";
       card.href=visitUrl(show,room);
       card.setAttribute("aria-label","進入"+name+(show.title===name ? "" : " · "+show.title));
       const doorIndex=doors.length-1;
       card.onclick=e=>linkAction(e,()=>{if(!lobby.choose(doorIndex))openRoom(show,room);});
-      picture.className="hall-picture";
-      picture.setAttribute("aria-hidden","true");
-      if(cover) {
-        const img=node("img");
-        img.alt="";img.decoding="async";img.loading=list.children.length<2 ? "eager" : "lazy";
-        img.src=cover.tiles?.length ? cover.tiles[Math.floor(cover.tiles.length/2)] : cover.src;
-        picture.append(img);
-      }
       caption.className="hall-caption";
-      caption.append(node("h2",name),node("p",subtitle));
-      const enterText=node("span","進入展廳 →");enterText.className="door-action";
-      card.append(picture,caption,enterText);list.append(card);
+      caption.append(node("strong",name),node("span",subtitle));
+      const arrow=node("span");
+      arrow.className="door-action";
+      arrow.setAttribute("aria-hidden","true");
+      card.append(caption,arrow);list.append(card);
     }
   }
   $("hallStatus").textContent="開放參觀 · "+list.childElementCount+" 個展廳";

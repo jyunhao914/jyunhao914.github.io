@@ -78,6 +78,29 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     videos = [],
     textures = [],
     animated = [];
+  // Keep the underlying image handles so returning during a slow load can
+  // detach unfinished stills and roll tiles along with the playback elements.
+  const pendingStills=new Set();
+  function artworkTexture(src,onLoad,onError) {
+    const image=new Image(), texture=new T.Texture();
+    image.crossOrigin="anonymous";
+    pendingStills.add(image);
+    image.onload=()=>{
+      pendingStills.delete(image);
+      image.onload=image.onerror=null;
+      if(disposed)return;
+      texture.image=image;
+      texture.needsUpdate=true;
+      onLoad?.(image);
+    };
+    image.onerror=()=>{
+      pendingStills.delete(image);
+      image.onload=image.onerror=null;
+      onError?.();
+    };
+    image.src=src;
+    return texture;
+  }
   const walls = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
   function layout(g, a) {
     renderer.shadowMap.needsUpdate = true;
@@ -185,16 +208,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
           addSection(new T.CanvasTexture(crop),i,count);
         }
       }
-      const image=portalEntry?.image;
-      if(image?.naturalWidth && (image.currentSrc || image.src)===new URL(a.src,document.baseURI).href) {
-        tex=new T.Texture(image);
-        tex.needsUpdate=true;
-        // As with TextureLoader, build any high-resolution tiles after the face exists.
-        queueMicrotask(()=>loadedImage(image));
-      } else {
-        tex=new T.TextureLoader().load(a.src,loaded=>loadedImage(loaded.image),
-          undefined,()=>{if(a===works[0])releaseArtwork();});
-      }
+      tex=artworkTexture(a.src,loadedImage,()=>{if(a===works[0])releaseArtwork();});
     }
     else tex = labelTexture(a);
     tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -228,7 +242,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       g.add(section);
     }
     if (Array.isArray(a.tiles))
-      a.tiles.forEach((url,index)=>addSection(new T.TextureLoader().load(url),index,a.tiles.length));
+      a.tiles.forEach((url,index)=>addSection(artworkTexture(url),index,a.tiles.length));
     const tag = document.createElement("canvas");
     tag.width = 512;
     tag.height = 190;
@@ -1126,6 +1140,13 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       mobile?.dispose();
       canvas.removeEventListener("wheel",handleWheel);
       disposed = true;
+      releaseArtwork();
+      for(const image of pendingStills) {
+        image.onload=image.onerror=null;
+        image.removeAttribute("src");
+      }
+      pendingStills.clear();
+      for(const {img} of animated)img.removeAttribute("src");
       reflection?.dispose();
       renderer.setAnimationLoop(null);
       ro.disconnect();
