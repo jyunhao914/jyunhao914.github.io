@@ -6,19 +6,27 @@ export function mobileControls(host, turn, suspended) {
   pad.innerHTML = '<button class="walk-stick" type="button" aria-label="移動搖桿"><span class="walk-knob"></span></button>';
   const stick = pad.firstElementChild, knob = stick.firstElementChild;
   host.append(pad);
-  const vector = new T.Vector2();
+  const input = new T.Vector2(), vector = new T.Vector2();
+  // Ignore a resting thumb, then progressively increase speed toward the rim.
+  function response(distance) {
+    const t = Math.max(0,(distance-.06)/.94);
+    return t*(.15+.85*t);
+  }
   let pointer = null, previous = null, listening = false, disposed = false, timer;
   function release() {
     pointer = null;
+    input.set(0,0);
     vector.set(0,0);
     knob.style.transform = "";
     previous = null;
   }
   function steer(e) {
     const r = stick.getBoundingClientRect();
-    vector.set((e.clientX-r.left-r.width/2)/(r.width*.36),(e.clientY-r.top-r.height/2)/(r.height*.36)).clampLength(0,1);
-    if(vector.lengthSq()<.012) vector.set(0,0);
-    knob.style.transform = 'translate('+vector.x*19+'px,'+vector.y*19+'px)';
+    input.set((e.clientX-r.left-r.width/2)/(r.width/2),(e.clientY-r.top-r.height/2)/(r.height/2)).clampLength(0,1);
+    const distance=input.length();
+    vector.copy(input).multiplyScalar(distance ? response(distance)/distance : 0);
+    knob.style.transform = 'translate('+input.x*19+'px,'+input.y*19+'px)';
+
   }
   stick.onpointerdown = e => {
     if(pointer!==null)return;
@@ -72,7 +80,9 @@ export function mobileControls(host, turn, suspended) {
   }
   if(toggle){toggle.disabled=false;toggle.setAttribute("aria-pressed","false");status.textContent="已關閉";toggle.onclick=toggleMotion;}
   window.addEventListener("blur",release);
-  return {vector,release,dispose(){
+  return {vector,release,
+    get readingAxis() { return Math.sign(input.x)*response(Math.abs(input.x)); },
+    dispose(){
     disposed=true;disable();release();window.removeEventListener("blur",release);
     if(toggle)toggle.onclick=null;
     pad.remove();

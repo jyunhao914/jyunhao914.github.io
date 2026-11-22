@@ -1,4 +1,4 @@
-import {mobileControls} from "./mobile-controls.js";
+import {mobileControls} from "./mobile-controls.js?v=stick17";
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
 import { architecture } from "./architecture.js?v=space12";
@@ -611,7 +611,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     } else {elapsed=frames=fastFrames=0;}
     if(mobile && mobile.vector.lengthSq()>0) {
       const {x,y}=mobile.vector;
-      if (reading) { if(x) operate(x>0?"右移":"左移",dt*Math.abs(x)); }
+      if (reading) {
+        const axis=mobile.readingAxis;
+        if (axis) panTo(reading.x + axis * Math.min(reading.fieldWidth,reading.closeFieldWidth) * .20 * dt);
+      }
       else {
         if(x) operate(x>0?"右移":"左移",dt*Math.abs(x));
         if(y) operate(y>0?"後退":"前進",dt*Math.abs(y));
