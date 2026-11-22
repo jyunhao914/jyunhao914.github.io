@@ -148,9 +148,28 @@ p {
   object-fit: cover;
   background: #dfe6e9;
 }
-.card div {
-  padding: 16px;
+.card {
+  display:flex;
+  flex-direction:column;
+  border:1px solid #dbe1e2;
+  border-radius:5px;
 }
+.card-visit {
+  flex:1;
+  width:100%;
+  padding:0;
+  border:0;
+  text-align:left;
+  background:#fff;
+}
+.card-visit:focus-visible,.card-info:focus-visible {outline-offset:-3px}
+.card-visit img,.card-visit video {display:block;object-fit:contain}
+.card-caption {display:grid;gap:.3rem;padding:12px 14px}
+.card-caption strong {font-size:1.15rem;overflow-wrap:anywhere}
+.card-caption span {font-size:.85rem;color:#36546a}
+.card-info {min-height:44px;border:0;border-top:1px solid #dbe1e2;border-radius:0;text-align:left;font-size:.88rem}
+.gallery-fallback {position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:20px;background:#e7ecea;color:#263531}
+#editLayout {display:block;padding:8px 0;overflow-wrap:anywhere}
 .muted,
 small {
   color: #526777;

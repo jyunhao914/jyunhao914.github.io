@@ -610,7 +610,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   const frameMeter=document.getElementById("frameMeter");
   let elapsed=0, frames=0, fastFrames=0, highRefresh=false;
   let last = performance.now();
-  renderer.setAnimationLoop((now) => {
+  function renderFrame(now) {
     let dt = Math.min(0.040, Math.max(0, (now - last) / 1000));
     const ms=now-last;
     last = now;
@@ -694,7 +694,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     if (!travel) marker.visible = false;
     renderer.render(scene, cam);
     rulers?.draw();
-  });
+  }
+  renderer.setAnimationLoop(renderFrame);
   function focus(i, animate = false) {
     const g = groups[i];
     if (!g) return;
@@ -833,6 +834,16 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
         layout(groups[index],work);
       });
       rulers?.dirty();
+    },
+    setPaused(paused) {
+      if(disposed)return;
+      blur();
+      last=performance.now();
+      renderer.setAnimationLoop(paused ? null : renderFrame);
+      for(const video of videos) {
+        if(paused)video.pause();
+        else video.play().catch(()=>{});
+      }
     },
     home:resetView,
     focus,

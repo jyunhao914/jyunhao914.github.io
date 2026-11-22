@@ -10,16 +10,12 @@
     content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://script.google.com https://script.googleusercontent.com https://api.github.com 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; frame-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'"
   />
   <style>
-    #preview {
-      width: 95vw;
-      height: 90dvh;
-      border: 0;
-    }
-    #preview iframe {
-      width: 100%;
-      height: 90%;
-      border: 0;
-    }
+    #preview {box-sizing:border-box;width:min(98vw,1500px);height:94dvh;max-height:98dvh;padding:0;border:0;border-radius:8px;background:#f4f6f7}
+    #preview[open]{display:grid;grid-template-rows:auto minmax(0,1fr)}
+    #preview::backdrop{background:#122336b3}
+    .preview-heading{display:flex;align-items:center;gap:.7rem;padding:.4rem .65rem;color:#19364e}
+    #closePreview{min-height:44px;flex:none}#previewTitle{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #preview iframe{width:100%;height:100%;min-height:0;border:0}
     #login {
       max-width: 600px;
       margin: 6vh auto;
@@ -309,10 +305,14 @@
       .hanging-desk{height:94dvh;grid-template-columns:minmax(0,1.4fr) minmax(210px,1fr);gap:8px}
       #wall-preview{--preview-height:max(90px,calc(93dvh - 160px))}
     }
+    .live-exhibition{display:inline-flex;align-items:center;padding:8px;color:#174866;text-underline-offset:.2em}
+    .wall-save{display:flex;align-items:center;gap:6px;min-height:20px;padding:2px 8px;color:#465a65;font-size:12px}
+    [data-save-retry]:not([hidden]){border-color:#8b4931;color:#793c28;background:#fff7ee}
+    .wall-save button{flex:none;padding:4px 8px}
     </style>
   <header>
     <strong>虛擬策展工作室</strong
-    ><span id="status" role="status">尚未登入</span>
+    ><span id="status" role="status">尚未登入</span><button data-save-retry hidden>重試儲存</button>
     <button id="logout" hidden>登出</button>
   </header>
   <main>
@@ -337,9 +337,9 @@
     <nav id="tabs"></nav>
     <div id="app"></div>
   </main>
-  <dialog id="preview">
-    <button id="closePreview">返回布展</button
-    ><iframe title="草稿預覽"></iframe>
+  <dialog id="preview" aria-label="參觀預覽">
+    <div class="preview-heading"><button id="closePreview">返回布展</button><strong id="previewTitle"></strong></div>
+    <iframe title="草稿預覽" allowfullscreen></iframe>
   </dialog>
-  <script type="module" src="./login.js?v=preview26"></script>
+  <script type="module" src="./login.js?v=studio27"></script>
 </html>

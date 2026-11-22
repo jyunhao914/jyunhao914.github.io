@@ -26,11 +26,14 @@ function media(a, thumb = false) {
       (a.src.startsWith("data:image") || /\.gif$/i.test(a.src)))
   ) {
     n = node("img");
-    n.alt = a.title;
+    n.alt = thumb ? "" : a.title;
+    if (thumb) n.loading = "lazy";
   } else if (["影片", "動態"].includes(a.type)) {
     n = node("video");
     n.playsInline = true;
     n.muted = thumb;
+    n.preload = thumb ? "metadata" : "auto";
+    if (thumb && a.src === "media/motion.mp4") n.poster = "media/motion.webp";
     n.controls = !thumb;
   } else if (a.type === "語音" && !thumb) {
     n = node("audio");
@@ -98,10 +101,17 @@ function leave() {
   document.querySelector(".hero").hidden = false;
   $("music").pause();
 }
+function updateEditLink(work) {
+  const params=new URLSearchParams({layout:current.id});
+  if(work)params.set("work",work.id);
+  const link=$("editLayout");
+  link.href="admin/?"+params;
+  link.textContent=work ? "調整《"+work.title+"》位置（策展登入）" : "調整作品位置（策展登入）";
+}
 function draw() {
   $("music").pause();
-  $("editLayout").hidden=location.search==="?studio-preview" || location.pathname.startsWith("/public/");
-  $("editLayout").href="admin/?layout="+encodeURIComponent(current.id);
+  $("editLayout").hidden=new URLSearchParams(location.search).has("studio-preview") || location.pathname.startsWith("/public/") || location.pathname.startsWith("/preview/");
+  updateEditLink(current.works[0]);
   $("title").textContent = $("visitTitle").textContent = current.title;
   const cover = current.works.find((work) => work.type === "圖片");
   const heroImage = document.querySelector(".hero img");
@@ -115,13 +125,21 @@ function draw() {
   $("count").textContent = current.works.length + " 件作品";
   $("cards").replaceChildren();
   for (let a of current.works) {
-    let b = node("button");
-    b.className = "card";
-    let d = node("div");
-    d.append(node("small", a.category || a.type), node("h3", a.title));
-    b.append(media(a, true), d);
-    b.onclick = () => detail(a);
-    $("cards").append(b);
+    const card = node("article"), visitButton = node("button"), info = node("button","作品資料");
+    card.className="card";
+    visitButton.className="card-visit";
+    visitButton.setAttribute("aria-label","到展牆看《"+a.title+"》");
+    const caption=node("span");
+    caption.className="card-caption";
+    caption.append(node("small",[a.room,a.category || a.type].filter(Boolean).join(" · ")),
+      node("strong",a.title),node("span","到展牆看 →"));
+    visitButton.append(media(a,true),caption);
+    visitButton.onclick=()=>enter(a.id);
+    info.className="card-info";
+    info.setAttribute("aria-label","《"+a.title+"》作品資料");
+    info.onclick=()=>detail(a);
+    card.append(visitButton,info);
+    $("cards").append(card);
   }
   $("room").replaceChildren(
     ...[...new Set(current.works.map((a) => a.room))].map(
@@ -160,7 +178,22 @@ $("music").ontimeupdate = () => {
         Math.min(1, p.currentTime / f, (p.duration - p.currentTime) / f),
       );
 };
-async function enter() {
+function offerCatalogue(message) {
+  const notice=node("div");
+  notice.className="gallery-fallback";
+  const browse=node("button","查看展出作品");
+  browse.onclick=()=>{
+    leave();
+    $("cards").querySelector(".card-info")?.focus();
+  };
+  notice.append(node("p",message),browse);
+  $("stage").append(notice);
+  browse.focus({preventScroll:true});
+  return notice;
+}
+async function enter(workId) {
+  const target=current.works.find(work=>work.id===workId);
+  if(target)$("room").value=target.room;
   let n = ++seq;
   viewer?.dispose();
   viewer = null;
@@ -171,6 +204,7 @@ async function enter() {
   showFocus(null);
   syncExpand();
   const roomWorks = current.works.filter((a) => a.room === $("room").value);
+  updateEditLink(target || roomWorks[0]);
   $("tour").replaceChildren(
     new Option("選擇導覽作品", ""),
     ...roomWorks.map((a, i) => new Option(a.title, i)),
@@ -179,11 +213,11 @@ async function enter() {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=layout23");
+    let { gallery } = await import("./gallery.js?v=flow27");
     if (n === seq)
       viewer = gallery(
         $("stage"),
-        current.works.filter((a) => a.room === $("room").value),
+        roomWorks,
         showFocus,
         undefined,
         fraction => {
@@ -192,14 +226,31 @@ async function enter() {
           $("readPosition").textContent = Math.round((1-fraction)*100) + "%";
         },
       );
-    if (n === seq && viewer) $("stage").querySelector("canvas")?.focus({preventScroll:true});
+    if (n === seq && viewer) {
+      if(target)viewer.select(roomWorks.indexOf(target));
+      const canvas=$("stage").querySelector("canvas");
+      canvas.focus({preventScroll:true});
+      let notice;
+      canvas.addEventListener("webglcontextlost",()=>{
+        if(n===seq && !notice)notice=offerCatalogue("3D 畫面暫停，正在等待圖形服務恢復。");
+      });
+      canvas.addEventListener("webglcontextrestored",()=>{
+        if(n!==seq)return;
+        const restoreFocus=notice?.contains(document.activeElement);
+        notice?.remove();
+        notice=null;
+        if(restoreFocus)canvas.focus({preventScroll:true});
+      });
+    }
   } catch (e) {
-    $("stage").textContent = "此裝置無法啟動 WebGL 2。可於展出作品區開啟展籤。";
+    if(n!==seq)return;
+    $("stage").replaceChildren();
+    offerCatalogue("此裝置暫時無法開啟 3D 展廳。");
     console.error(e);
   }
 }
-$("enter").onclick = enter;
-$("room").onchange = enter;
+$("enter").onclick = () => enter();
+$("room").onchange = () => enter();
 $("leave").onclick = leave;
 for (const [name, step] of [
   ["prev", -1],
@@ -221,6 +272,7 @@ $("tour").onchange = () => {
 $("homeView").onclick = () => viewer?.home();
 $("stage").addEventListener("viewreset", () => {
   showFocus(null);
+  updateEditLink(current.works.find(w=>w.room===$("room").value));
   menu(false);
 });
 const visit = $("visit");
@@ -308,6 +360,7 @@ window.addEventListener("blur",()=>{
 $("scrollPosition").oninput = e => viewer?.seek(Number(e.target.value)/1000);
 $("overview").onclick = () => viewer?.overview();
 function showFocus(a) {
+  if(a)updateEditLink(a);
   const wide = a && a.width >= 4*a.height;
   $("inspectControls").hidden = !wide;
   $("focusTitle").textContent = a?.title || "";
@@ -360,47 +413,72 @@ document.addEventListener("keydown", (e) => {
     syncExpand();
   }
 });
-try {
-  const preview = location.search === "?studio-preview" && parent !== window;
-  shows = preview
-    ? await new Promise((resolve) => {
-        window.addEventListener("message", function receive(e) {
-          if (
-            e.origin === location.origin &&
-            e.source === parent &&
-            Array.isArray(e.data?.galleryPreview)
-          ) {
-            window.removeEventListener("message", receive);
-            resolve(e.data.galleryPreview);
-          }
-        });
-        parent.postMessage("galleryPreviewReady", location.origin);
-      })
-    : (
-        await (await fetch("exhibitions.json", { cache: "no-store" })).json()
-      ).filter(valid);
-  function selectShow(index) {
-    current = shows[index];
-    $("shows").value = $("visitShows").value = String(index);
-    draw();
-    enter();
+const embeddedPreview = location.search === "?studio-preview" && parent !== window;
+let previewWork;
+async function loadExhibitions() {
+  if (embeddedPreview) {
+    return new Promise(resolve=>{
+      window.addEventListener("message",function receive(e) {
+        if(e.origin!==location.origin || e.source!==parent || !Array.isArray(e.data?.galleryPreview))return;
+        window.removeEventListener("message",receive);
+        previewWork=e.data.work;
+        resolve(e.data.galleryPreview);
+      });
+      parent.postMessage("galleryPreviewReady",location.origin);
+    });
   }
-  for (const control of [$("shows"), $("visitShows")]) {
-    control.replaceChildren(...shows.map((s, i) => new Option(s.title, i)));
-    control.onchange = () => {
-      selectShow(Number(control.value));
-      if (!preview) history.replaceState(null, "", "#" + encodeURIComponent(current.id));
-    };
-  }
-  if (shows.length) {
-    selectShow(Math.max(0, shows.findIndex(s => "#" + encodeURIComponent(s.id) === location.hash)));
-  } else {
-    leave();
-    $("title").textContent = "目前休展";
-    $("enter").hidden = true;
-  }
-} catch {
-  leave();
-  $("title").textContent = "展覽資料讀取失敗，請重新整理";
-  $("enter").hidden = true;
+  const response=await fetch("exhibitions.json",{cache:"no-store"});
+  if(!response.ok)throw Error("展覽資料暫時無法讀取");
+  return (await response.json()).filter(valid);
 }
+
+function selectShow(index, openHall, work) {
+  current = shows[index];
+  $("shows").value = $("visitShows").value = String(index);
+  draw();
+  if(openHall)enter(work);
+}
+
+function collectionStatus(message, retry) {
+  leave();
+  for(const el of [document.querySelector(".hero"),$("exhibits"),$("works"),$("cards")])el.hidden=true;
+  const panel=$("collection-status") || node("section");
+  panel.id="collection-status";
+  panel.setAttribute("role","status");
+  panel.replaceChildren(node("h1",message));
+  if(retry) {
+    const button=node("button","重新載入展覽");
+    button.onclick=()=>{
+      button.disabled=true;
+      button.textContent="正在讀取…";
+      openCollection();
+    };
+    panel.append(button);
+  }
+  document.querySelector("main").prepend(panel);
+}
+
+async function openCollection() {
+  try {
+    shows=await loadExhibitions();
+    if(!shows.length) {
+      collectionStatus("目前休展",false);
+      return;
+    }
+    $("collection-status")?.remove();
+    for(const el of [$("exhibits"),$("works"),$("cards")])el.hidden=false;
+    for(const control of [$("shows"),$("visitShows")]) {
+      control.replaceChildren(...shows.map((s,i)=>new Option(s.title,i)));
+      control.onchange=()=>{
+        selectShow(Number(control.value),control===$("visitShows"));
+        if(!embeddedPreview)history.replaceState(null,"","#"+encodeURIComponent(current.id));
+      };
+    }
+    const offlinePreview=location.pathname.startsWith("/preview/");
+    const work=offlinePreview ? new URLSearchParams(location.search).get("work") : previewWork;
+    selectShow(Math.max(0,shows.findIndex(s=>"#"+encodeURIComponent(s.id)===location.hash)),true,work);
+  } catch {
+    collectionStatus("展覽資料暫時無法讀取",!embeddedPreview);
+  }
+}
+openCollection();

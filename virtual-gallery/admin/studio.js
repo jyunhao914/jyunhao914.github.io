@@ -35,29 +35,51 @@ const show = () => db.shows.find((x) => x.id === sid),
           "'": "&#39;",
         })[c],
     );
+let saveMessage="尚無修改", saveFailed=false;
+function showSaveStatus(message,failed=false) {
+  saveMessage=message;
+  saveFailed=failed;
+  status.textContent=message;
+  paintSaveStatus();
+}
+function paintSaveStatus() {
+  const label=$("#wall-save-status");
+  if(label)label.textContent=saveMessage;
+  for(const button of document.querySelectorAll("[data-save-retry]")) {
+    button.hidden=!saveFailed;
+    button.onclick=retrySave;
+  }
+}
+function retrySave() {
+  flush().catch(()=>{}); // flush displays the error and keeps the draft available.
+}
 function flush() {
   clearTimeout(timer);
-  let run = chain
-    .catch(() => {})
-    .then(async () => {
-      if (!dirty) return;
-      let gen = generation;
-      status.textContent = "儲存中…";
-      db.rev = await post("save", db);
-      if (gen === generation) dirty = false;
-      status.textContent = "已儲存 · 版本 " + db.rev;
-    });
-  chain = run;
-  return run;
+  chain=chain.catch(()=>{}).then(async()=>{
+    while(dirty) {
+      const gen=generation;
+      showSaveStatus("儲存中…");
+      try {
+        db.rev=await post("save",db);
+      } catch(e) {
+        showSaveStatus("草稿未儲存 · "+e.message,true);
+        throw e;
+      }
+      if(gen===generation)dirty=false;
+    }
+    if(saveMessage==="儲存中…")showSaveStatus("已儲存 · 版本 "+db.rev);
+  });
+  return chain;
 }
 function changed() {
-  dirty = true;
+  dirty=true;
   generation++;
-  status.textContent = "尚有變更";
+  showSaveStatus("等待儲存");
   clearTimeout(timer);
-  timer = setTimeout(() => flush().catch(error), 1200);
+  timer=setTimeout(retrySave,1200);
 }
 function error(e) {
+  if(saveFailed)return;
   status.textContent = "操作失敗 · " + e.message;
 }
 window.addEventListener("beforeunload", (e) => {
@@ -111,6 +133,7 @@ function action(k, fn) {
       }
     };
 }
+export {flush as saveBeforeLogout};
 function fileData(f, mime) {
   return new Promise((ok, no) => {
     let r = new FileReader();
@@ -392,6 +415,7 @@ function manage() {
     num(s, "fade", "淡入淡出秒數", 0, 30) +
     '<label>依序加入曲目<input type="file" id="tracks" multiple accept="audio/*"></label></div><ol id="tracksList"></ol></fieldset><div class="bar">' +
     btn("preview", "預覽展覽") +
+    (s.status==="已發布" ? '<a class="live-exhibition" target="_blank" rel="noopener noreferrer" href="../#'+encodeURIComponent(s.id)+'">查看公開展覽</a>' : "") +
     btn("publish", "發布至 GitHub Pages") +
     btn("end", "結束並典藏") +
     "</div>";
@@ -452,20 +476,20 @@ function manage() {
         )
       )
         return;
-      await flush();
-      status.textContent = "正在更新 GitHub…";
       document.querySelector("main").inert = true;
       try {
-        await post(k, { id: sid, rev: db.rev });
+        await flush();
+        status.textContent = "正在更新 GitHub…";
+        await post(k, { id: s.id, rev: db.rev });
+        db = await state();
       } finally {
         document.querySelector("main").inert = false;
       }
-      db = await state();
       status.textContent = "GitHub 已更新，Pages 正在建置";
       render();
     });
 }
-async function previewShow(s) {
+async function previewShow(s,work) {
     const dialog = document.querySelector("#preview"),
       frame = dialog.querySelector("iframe");
     const data = exhibition(db, s);
@@ -477,7 +501,7 @@ async function previewShow(s) {
         e.data === "galleryPreviewReady"
       ) {
         frame.contentWindow.postMessage(
-          { galleryPreview: [data] },
+          { galleryPreview: [data], work:work?.id },
           location.origin,
         );
         window.removeEventListener("message", send);
@@ -489,7 +513,9 @@ async function previewShow(s) {
       () => window.removeEventListener("message", send),
       { once: true },
     );
+    $("#previewTitle").textContent=work ? s.title+" ／ "+work.title : s.title;
     dialog.showModal();
+    viewer?.setPaused(true);
     frame.src = "../?studio-preview";
   }
 function layout(keepScene=false) {
@@ -502,7 +528,17 @@ function layout(keepScene=false) {
     ...db.arts.find((a) => a.id === i),
     ...s.layout[i],
   }));
-  if (!works.some((a) => a.id === aid)) aid = works[0]?.id;
+  const needsSelection=unmatchedEntry===s.id && !aid;
+  if (!needsSelection && !works.some((a) => a.id === aid)) aid = works[0]?.id;
+  if(aid) {
+    const route=new URL(location.href);
+    if(route.searchParams.get("layout")!==sid || route.searchParams.get("work")!==aid) {
+      route.searchParams.set("layout",sid);
+      const original=Object.entries(s.publicWorkIds || {}).find(([,id])=>id===aid);
+      route.searchParams.set("work",original?.[0] || aid);
+      if(route.href!==location.href)history.replaceState(null,"",route);
+    }
+  }
   let a = works.find((a) => a.id === aid);
   if(!keepScene) app.innerHTML =
     '<h1>布展編輯</h1><div class="bar"><label>展覽<select id="ex"></select></label><label>編輯作品<select id="sel"></select></label>' +
@@ -513,7 +549,8 @@ function layout(keepScene=false) {
     btn("preview","參觀預覽")+'</div><div id="surface"></div>' +
     '<div id="position-pad" role="group" aria-label="作品位置微調"><div class="pad-caption"><strong id="adjusting-title"></strong><span>每次 5 公分</span></div><div class="nudge-keys">'+
     btn("left","← 左移")+btn("right","右移 →")+btn("up","↑ 升高")+btn("down","↓ 降低")+
-    '</div></div></section><div id="layout-inspector" role="region" aria-label="作品清單與布展設定" tabindex="0"><section class="inventory"><h2>布展清單</h2><p id="wall-progress"></p><div id="wall-list"></div></section><div id="form"></div></div></div>';
+    '</div></div><div class="wall-save"><span role="status" id="wall-save-status"></span><button id="wall-save-retry" data-save-retry hidden>重試儲存</button></div></section><div id="layout-inspector" role="region" aria-label="作品清單與布展設定" tabindex="0"><section class="inventory"><h2>布展清單</h2><p id="wall-progress"></p><div id="wall-list"></div></section><div id="form"></div></div></div>';
+  paintSaveStatus();
   function picker(el, items, current, fn) {
     el.replaceChildren(...items.map((x) => new Option(x.title, x.id)));
     el.value = current;
@@ -524,6 +561,7 @@ function layout(keepScene=false) {
     render();
   });
   function selectWork(chosen) {
+    unmatchedEntry=null;
     const next=works.find(w=>w.id===chosen);
     aid=chosen;
     if(viewer && next?.room===a?.room) {
@@ -532,11 +570,17 @@ function layout(keepScene=false) {
     } else render();
   }
   picker($("#sel"), works, aid, selectWork);
+  if(needsSelection) {
+    const placeholder=new Option("請選擇作品","",false,true);
+    placeholder.disabled=true;
+    $("#sel").prepend(placeholder);
+    $("#sel").value="";
+  }
   const reviewed=works.filter(w=>w.reviewed).length;
   $("#wall-progress").textContent=s.status+"　·　掛位已確認 "+reviewed+" / "+works.length;
   const wallNames=["北牆","西牆","南牆","東牆"];
   artworkList($("#wall-list"),works,aid,selectWork,w=>[w.room,wallNames[w.wall],w.groupId?"連屏":"",w.reviewed?"掛位已確認":"待確認"].filter(Boolean).join(" · "));
-  action("preview",()=>previewShow(s));
+  action("preview",()=>previewShow(s,a));
   for(const m of ["2D","3D"])app.querySelector('[data-act="'+m+'"]').setAttribute("aria-current",String(m===mode));
   for (let m of ["2D", "3D"])
     action(m, () => {
@@ -546,7 +590,7 @@ function layout(keepScene=false) {
   $("#position-pad").hidden=!a;
   $("#adjusting-title").textContent=a?.title || "";
   if (!a) {
-    $("#surface").textContent = "請先於展覽管理勾選展出作品";
+    $("#surface").textContent = works.length ? "這件公開作品無法對應目前的草稿，請從清單選擇要編輯的作品。" : "請先於展覽管理勾選展出作品";
     return;
   }
   room = a.room;
@@ -591,7 +635,7 @@ function layout(keepScene=false) {
         toggle.setAttribute("aria-pressed",String(!readout.hidden));
       };
       let t = token;
-      import("../gallery.js?v=preview26")
+      import("../gallery.js?v=flow27")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
@@ -610,6 +654,7 @@ function layout(keepScene=false) {
             undefined,wallTools
           );
           viewer.focus(nearby.indexOf(a));
+          if($("#preview").open)viewer.setPaused(true);
         })
         .catch(e=>{
           if(t!==token)return;
@@ -829,7 +874,7 @@ async function refreshRestored() {
   sid = db.shows[0]?.id;
   aid = db.arts[0]?.id;
   dirty = false;
-  status.textContent = "已還原 · 版本 " + db.rev;
+  showSaveStatus("已還原 · 版本 " + db.rev);
   render();
 }
 function backup() {
@@ -879,25 +924,45 @@ function backup() {
     await refreshRestored();
   });
 }
-// An authenticated curator can open the exact exhibition from its public hall.
-const requested=new URLSearchParams(location.search).get("layout");
+// A published work can have a different ID in an imported private draft.
+let unmatchedEntry=null;
+const entry=new URLSearchParams(location.search), requested=entry.get("layout");
 if(requested) {
   let draft=db.shows.find(item=>item.id===requested);
-  if(!draft) {
+  const workId=entry.get("work");
+  let selected=draft?.ids.includes(workId) ? workId : draft?.publicWorkIds?.[workId];
+  if(!draft || (workId && !draft.ids.includes(selected))) {
     const live=await (await fetch("../exhibitions.json",{cache:"no-store"})).json();
-    const publicShow=live.find(item=>item.id===requested);
-    if(publicShow) {
-      const {works,...metadata}=publicShow;
-      draft={...metadata,status:"草稿",ids:[],layout:{}};
+    const published=live.find(item=>item.id===requested);
+    if(!draft && published) {
+      const {works,...metadata}=published;
+      draft={...metadata,status:"草稿",ids:[],layout:{},publicWorkIds:{}};
       for(const work of works) {
         const key=db.arts.some(item=>item.id===work.id)?id():work.id;
+        if(key!==work.id)draft.publicWorkIds[work.id]=key;
+        if(work.id===workId)selected=key;
         db.arts.push({...work,id:key});
         draft.ids.push(key);
       }
       db.shows.push(draft);
+    } else if(draft) {
+      const publicWork=published?.works.find(w=>w.id===workId);
+      // Old imports have no ID mapping. Only a unique matching media source qualifies.
+      if(publicWork?.src) {
+        const matches=db.arts.filter(w=>draft.ids.includes(w.id) && w.type===publicWork.type && w.src===publicWork.src);
+        if(matches.length===1) {
+          selected=matches[0].id;
+          (draft.publicWorkIds ??= {})[workId]=selected;
+        }
+      }
     }
   }
-  if(draft){sid=draft.id;aid=draft.ids[0];tab="布展編輯";}
+  if(draft) {
+    sid=draft.id;
+    aid=workId ? (draft.ids.includes(selected) ? selected : null) : draft.ids[0];
+    if(workId && !aid)unmatchedEntry=sid;
+    tab="布展編輯";
+  }
 }
 
 render();
@@ -908,4 +973,5 @@ document.querySelector("#preview").onclose = () => {
   let f = document.querySelector("#preview iframe");
   f.onload = null;
   f.src = "about:blank";
+  viewer?.setPaused(false);
 };

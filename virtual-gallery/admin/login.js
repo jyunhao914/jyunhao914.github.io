@@ -1,13 +1,14 @@
 import { login } from "./storage.js?v=session25";
-import { authorize, restore, signOut, accessToken, deviceSaveFailed, keys } from "./oauth.js?v=session25";
+import { authorize, restore, signOut, accessToken, deviceSaveFailed, keys } from "./oauth.js?v=studio27";
 const $ = (id) => document.getElementById(id);
+let studio;
 async function show(value,provider) {
   await login(value,provider);
   $("key").value = "";
-  await import("./studio.js?v=preview26");
+  studio=await import("./studio.js?v=studio27");
   $("login").hidden = true;
   $("logout").hidden = false;
-  $("status").textContent = deviceSaveFailed ? "已登入；瀏覽器未允許記住裝置。" : "已連線至私人作品庫";
+  $("status").textContent = deviceSaveFailed ? "已登入，瀏覽器未允許記住裝置。" : "已連線至私人作品庫";
 }
 async function run(fn) {
   $("account").disabled = $("signin").disabled = true;
@@ -26,10 +27,18 @@ $("key").onkeydown = (e) => {
 };
 $("logout").onclick = () =>
   run(async () => {
-    try { await signOut(); }
-    finally {
-      channel?.postMessage("logout");
-      location.reload();
+    $("logout").disabled=true;
+    document.querySelector("main").inert=true;
+    try {
+      await studio.saveBeforeLogout();
+      try { await signOut(); }
+      finally {
+        channel?.postMessage("logout");
+        location.reload();
+      }
+    } finally {
+      $("logout").disabled=false;
+      document.querySelector("main").inert=false;
     }
   });
 const channel=typeof BroadcastChannel==="function" ? new BroadcastChannel("virtual-gallery.login") : null;
