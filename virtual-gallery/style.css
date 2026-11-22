@@ -656,6 +656,23 @@ body.in-lobby > :is(header,footer) {display:none}
 #hallEntrance[data-zone="lobby"] #lobbyEnterDoor {flex:0 1 auto;padding:0 9px;overflow:hidden;text-overflow:ellipsis}
 #hallEntrance[data-zone="lobby"] #lobbyMenuNav .lobby-carousel-step {flex:0 0 44px;width:44px;display:grid;place-items:center;padding:0}
 .lobby-carousel-step svg {display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#hallEntrance[data-zone="lobby"][data-card-menu="closed"] #lobbyMenuNav {display:none}
+#hallEntrance .lobby-guide-access {
+  position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));
+  min-height:44px;padding:8px 16px;color:#fbfcf6;background:#24322eee;border:1px solid #bfcec6;border-radius:5px;
+}
+#hallEntrance .lobby-guide-access:not(:focus-visible) {
+  width:1px;height:1px;min-height:0;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);
+  white-space:nowrap;border:0;pointer-events:none;
+}
+#hallEntrance:is(.portal-approach,.portal-outgoing,.portal-walking) .lobby-guide-access {visibility:hidden}
+#hallEntrance[data-zone="lobby"] #lobbyMenuNav #lobbyCloseCards {border-left:1px solid #d5e1db44}
+@media(max-width:405px) {
+  #hallEntrance[data-zone="lobby"] #lobbyMenuNav {
+    bottom:max(12px,env(safe-area-inset-bottom));right:max(7px,env(safe-area-inset-right));max-width:calc(100% - 95px);
+  }
+  #hallEntrance[data-zone="lobby"] #lobbyMenuNav #lobbyEnterDoor {padding-inline:4px}
+}
 #lobbyHint.visually-hidden,.lobby-sr {
   position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
   clip-path:inset(50%);white-space:nowrap;border:0;

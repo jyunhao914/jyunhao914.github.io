@@ -65,3 +65,14 @@ CC0 1.0 Universal. garden-panorama.webp is retained for cached versions.
 Garden lawn: Grass Ground by Charlotte Baglioni, Poly Haven.
 https://polyhaven.com/a/grass_ground
 CC0 1.0 Universal. garden-grass.webp is a 768 px diffuse-map derivative.
+
+Polished reception floor: Granite Tile by Charlotte Baglioni, Poly Haven.
+https://polyhaven.com/a/granite_tile
+CC0 1.0 Universal. reception-granite-color.webp is a black-graded derivative of
+the diffuse scan. reception-granite-normal.webp uses the OpenGL normal map and
+reception-granite-rough.webp is graded for the polished indoor finish.
+
+Reception counter: Marble Rock 02 by Amal Kumar, Poly Haven.
+https://polyhaven.com/a/marble_rock_02
+CC0 1.0 Universal. reception-counter-stone.webp uses the diffuse scan, with a
+warm-grey colour grade for the cut and polished counter slabs.

@@ -1,13 +1,15 @@
 import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=atrium40";
-import { buildLobby } from "./lobby-interior.js?v=atrium40";
+import {createFloorReflection} from "./lobby-floor-reflection.js?v=reception41";
+import { buildLobby } from "./lobby-interior.js?v=reception41";
 
 const eyeHeight = 1.60;
 const wallInset = 1.65;
 const walkInRadius = .90;
 const arrivalDistance = 1.05;
 const arrivalPitch = .085;
+const receptionX=1.05, receptionSetback=.68, receptionPitch=.021;
 const movementKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyW", "KeyA", "KeyS", "KeyD"]);
 const clamp = T.MathUtils.clamp;
 const shortestTurn = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -74,11 +76,13 @@ export function createLobby(host, doors, onEnter, options = {}) {
   const keys = new Map();
   const raycaster = new T.Raycaster(), point = new T.Vector2();
   const opaqueMeshes=[],intersectionPoint=new T.Vector3(),obstructions=[];
+  let floorReflection;
   let interior, grounds, stick, observer, zone;
   let disposed = false, paused = false, entering = false, space = false;
   let drag = null, nearest, dirty = true, frame = 0, last = 0;
   let approach = null, hoverPosition=null, hovered=null;
-  let mouseHighlight=false, cardsAnimating=false;
+  let mouseHighlight=false,cardsAnimating=false,cardsExpanded=false;
+  let receptionTargets=[];
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
   function invalidate() {
@@ -108,19 +112,44 @@ export function createLobby(host, doors, onEnter, options = {}) {
   }
   function syncZone() {
     const next = camera.position.z > plan.halfDepth ? "grounds" : "lobby";
-    if (next !== zone) { zone=next; options.onZone?.(zone); }
+    if(next!==zone) {
+      zone=next;
+      if(zone==="grounds" && cardsExpanded) {
+        cardsExpanded=false;
+        options.onMenuOpen?.(false);
+      }
+      options.onZone?.(zone);
+    }
   }
   function fitView() {
     // A vertical phone can read the full entry façade from the forecourt.
     // On the walk inside, the wider architectural view eases into eye level.
     const wide=clamp(T.MathUtils.radToDeg(2*Math.atan(Math.tan(.449)/camera.aspect)),48,91);
     const blend=T.MathUtils.smoothstep(camera.position.z-plan.halfDepth,1.2,8);
-    const fov=T.MathUtils.lerp(61,wide,blend);
+    // A portrait frame takes in the left counter and the right-hand enfilade
+    // together. Open the lens only once the visitor is within the foyer.
+    const interiorWidth=clamp(T.MathUtils.radToDeg(2*Math.atan(.79/camera.aspect)),61,112);
+    const inside=T.MathUtils.smoothstep(plan.halfDepth-camera.position.z,0,.92);
+    const fov=T.MathUtils.lerp(T.MathUtils.lerp(61,wide,blend),interiorWidth,inside);
     if(Math.abs(fov-camera.fov)>.005) { camera.fov=fov; camera.updateProjectionMatrix(); }
   }
   function menuIndex() {
     const index=interior?.menuIndex?.();
     return Number.isInteger(index) && plan.doors[index] ? index : null;
+  }
+  function setMenuOpen(value) {
+    if(disposed || paused || entering || approach || zone!=="lobby")return false;
+    const open=Boolean(value);
+    if(cardsExpanded!==open) {
+      cardsExpanded=open;
+      setPointerHighlight(false,null);
+      options.onMenuOpen?.(open);
+      invalidate();
+    }
+    return true;
+  }
+  function receptionYaw(position) {
+    return Math.atan2(position.x+1.73,position.z+3.05);
   }
   function notifyNearest() {
     // The visible deck defines selection independently of old exhibition locations.
@@ -131,7 +160,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     }
   }
   function cycleMenu(direction) {
-    if(disposed || paused || entering || approach || zone!=="lobby" || !direction)return null;
+    if(disposed || paused || entering || approach || !cardsExpanded || zone!=="lobby" || !direction)return null;
     const index=interior.shiftMenu?.(Math.sign(direction));
     if(!Number.isInteger(index))return null;
     setPointerHighlight(false,null);
@@ -236,7 +265,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const destination=visible || interior.menuPoint?.(index) || front;
     // For a direct directory selection from the grounds the deck can still be
     // culled. The central card slot remains the indoor navigation destination.
-    const point=destination || {x:matchMedia("(max-width:700px)").matches ? -.24 : -1.62,z:.30};
+    const point=destination || {x:window.innerWidth<window.innerHeight ? -1.68 : -1.56,z:.49};
     return startApproach("room",{...plan.doors[index],x:point.x,z:point.z});
   }
   function enterMuseum() {
@@ -256,17 +285,25 @@ export function createLobby(host, doors, onEnter, options = {}) {
       step.arrived = step.elapsed >= .09;
       if(step.arrived && step.kind!=="room") {
         camera.position.copy(step.finish);
-        const yaw=step.kind==="museum" ? 0 : Math.atan2(step.finish.x,step.finish.z-plan.halfDepth);
-        camera.rotation.set(step.kind==="museum" ? arrivalPitch : 0,yaw,0,"YXZ");
+        if(step.kind==="museum"){camera.position.x=receptionX;camera.position.z+=receptionSetback;}
+        const yaw=step.kind==="museum" ? receptionYaw(camera.position) : Math.atan2(step.finish.x,step.finish.z-plan.halfDepth);
+        camera.rotation.set(step.kind==="museum" ? receptionPitch : 0,yaw,0,"YXZ");
       }
     } else {
       const t = clamp((step.elapsed-step.lead)/step.seconds,0,1);
       step.route.getPoint(walkingProgress(t),camera.position);
+      const depth=mainDoor.z-camera.position.z;
       let aim = Math.atan2(camera.position.x-step.look.x,camera.position.z-step.look.z);
       if(step.viaEntrance) {
         const exteriorAim=Math.atan2(camera.position.x, Math.max(.15,camera.position.z-mainDoor.z+2.4));
         const turnInside=T.MathUtils.smoothstep(mainDoor.z-camera.position.z,.20,2.0);
         aim=exteriorAim+shortestTurn(aim-exteriorAim)*turnInside;
+      } else if(step.kind==="museum" && camera.position.z<mainDoor.z) {
+        // Visitors turn towards reception after they have crossed the garden elevation.
+        const inside=T.MathUtils.smoothstep(mainDoor.z-camera.position.z,.02,1.65);
+        camera.position.x+=receptionX*inside;
+        camera.position.z+=receptionSetback*inside;
+        aim+=shortestTurn(receptionYaw(camera.position)-aim)*inside;
       } else if(step.kind==="grounds") {
         const outside = camera.position.z-mainDoor.z;
         const facadeYaw = Math.atan2(camera.position.x,Math.max(1,outside));
@@ -277,7 +314,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
       step.targetYaw += shortestTurn(aim-step.targetYaw);
       const turn = T.MathUtils.smoothstep(step.elapsed,0,step.turnTime);
       camera.rotation.y = T.MathUtils.lerp(step.yaw,step.targetYaw,turn);
-      const pitch=step.kind==="museum" ? arrivalPitch*T.MathUtils.smoothstep(mainDoor.z-camera.position.z,-.3,1.65) : 0;
+      const pitch=step.kind==="museum" ? T.MathUtils.lerp(arrivalPitch,receptionPitch,T.MathUtils.smoothstep(depth,0,1.65))*T.MathUtils.smoothstep(depth,-.3,1.65) : 0;
       camera.rotation.x = T.MathUtils.lerp(step.pitch,pitch,turn);
       step.arrived = t >= 1 && turn >= 1;
     }
@@ -300,6 +337,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
   function enterNearest() {
     if (disposed || paused || entering) return false;
     if(zone==="grounds")return enterMuseum();
+    if(!cardsExpanded)return setMenuOpen(true);
     const active=menuIndex();
     return active!=null && enter(active);
   }
@@ -310,16 +348,18 @@ export function createLobby(host, doors, onEnter, options = {}) {
       camera.position.set(phone ? 10.6 : 10.5,eyeHeight,plan.halfDepth+(phone ? 23.6 : 20.7));
       camera.lookAt(phone ? -2.30 : -2.15,phone ? 3.47 : 4.05,plan.halfDepth+.36);
     } else if (!door) {
-      camera.position.set(0, eyeHeight, plan.halfDepth - 1.35);
-      camera.rotation.set(arrivalPitch,0,0,"YXZ");
+      camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback);
+      camera.rotation.set(receptionPitch,receptionYaw(camera.position),0,"YXZ");
     } else {
       selectMenu(index);
-      camera.position.set(0,eyeHeight,plan.halfDepth-1.65);
+      camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback);
       const at=interior.menuPoint?.(index);
-      camera.lookAt(at?.x ?? -.65,at?.y ?? eyeHeight,at?.z ?? .30);
+      camera.lookAt(at?.x ?? -1.56,at?.y ?? 1.30,at?.z ?? .49);
     }
     camera.updateMatrixWorld();
-    syncZone();fitView();notifyNearest();
+    syncZone();
+    if(zone==="lobby")setMenuOpen(Boolean(door));
+    fitView();notifyNearest();
     invalidate();
   }
   function home() {
@@ -357,7 +397,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const nextX=clamp(x,-plan.halfWidth+.33,plan.halfWidth-.33);
     const nextZ=clamp(z,-plan.halfDepth-4+.27,plan.halfDepth-.33);
     const next=interior.constrainLobbyStep?.(pos.x,pos.z,nextX,nextZ) || {x:nextX,z:nextZ};
-    const active=menuIndex(),card=active==null ? null : interior.menuPoint?.(active);
+    const active=cardsExpanded ? menuIndex() : null,card=active==null ? null : interior.menuPoint?.(active);
     if(card && forward>0) {
       const vx=card.x-pos.x,vz=card.z-pos.z;
       const before=Math.hypot(vx,vz),after=Math.hypot(card.x-next.x,card.z-next.z);
@@ -425,10 +465,13 @@ export function createLobby(host, doors, onEnter, options = {}) {
         syncZone();fitView();notifyNearest();
         if(hoverPosition)updateHover(pick(hoverPosition));
       }
-      const highlighted=mouseHighlight ? (Number.isInteger(hovered) ? hovered : null) : nearest;
-      const easing=interior.updateWaypoints?.(camera,highlighted,Math.min(.12,elapsed));
+      const highlighted=mouseHighlight ? hovered : (cardsExpanded ? nearest : null);
+      const easing=interior.updateWaypoints?.(camera,highlighted,Math.min(.12,elapsed),cardsExpanded);
       cardsAnimating=Boolean(easing) && !reducedMotion.matches && zone==="lobby";
-      if (!disposed) renderer.render(scene,camera);
+      if (!disposed) {
+        floorReflection?.render(camera,zone==="lobby",now);
+        renderer.render(scene,camera);
+      }
     }
     const needsFrame=dirty || cardsAnimating || approach || keys.size || joy?.lengthSq();
     frame = !disposed && !paused && !document.hidden && needsFrame ? requestAnimationFrame(tick) : 0;
@@ -445,6 +488,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
       cancelApproach();
     }
     if (e.code === "Escape" && approach) {e.preventDefault();cancelApproach();return;}
+    if (e.code === "Escape" && cardsExpanded && setMenuOpen(false)) {e.preventDefault();return;}
     if (e.code === "Space") {
       e.preventDefault();
       space = true;
@@ -487,13 +531,14 @@ export function createLobby(host, doors, onEnter, options = {}) {
     point.set(2 * (e.clientX - bounds.left) / bounds.width - 1, 1 - 2 * (e.clientY - bounds.top) / bounds.height);
     camera.updateMatrixWorld();
     raycaster.setFromCamera(point, camera);
-    const targets=zone==="grounds" ? grounds.hits : interior.hits;
+    const targets=zone==="grounds" ? grounds.hits : (cardsExpanded ? interior.hits : receptionTargets);
     for(const target of targets)target.updateWorldMatrix(true,false);
     const hit=raycaster.intersectObjects(targets,true).find(({object})=>object.userData.pickable!==false);
     if(!hit || blockedAt(hit.distance))return null;
     if(zone==="grounds")return "entrance";
     let object = hit.object;
     while (object) {
+      if(object.userData.receptionGuide || object.userData.receptionDesk)return "reception";
       if (Number.isInteger(object.userData.doorIndex)) return object.userData.doorIndex;
       object = object.parent;
     }
@@ -560,7 +605,8 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const index=zone==="lobby" ? card : pick(e);
     if (index == null) host.dispatchEvent(new Event("lobbyblanktap"));
     else if(index==="entrance") { if(zone==="grounds")enterMuseum(); else exitMuseum(); }
-    else enter(index);
+    else if(index==="reception")setMenuOpen(true);
+    else if(cardsExpanded)enter(index);
   }
   function resize() {
     const width = host.clientWidth, height = host.clientHeight;
@@ -581,6 +627,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     cancelAnimationFrame(frame);
     stick?.dispose();
     grounds?.dispose();
+    floorReflection?.dispose();
     interior?.dispose();
     renderer.dispose();
     renderer.forceContextLoss();
@@ -588,7 +635,9 @@ export function createLobby(host, doors, onEnter, options = {}) {
   }
   try {
     interior = buildLobby(T, scene, plan.doors, {...plan, invalidate});
+    floorReflection=createFloorReflection(T,renderer,scene,interior.reflectionFloor);
     grounds = buildMuseumGrounds(T,scene,{halfWidth:plan.halfWidth,halfDepth:plan.halfDepth,panorama:interior.panorama,invalidate});
+    receptionTargets=[...interior.hits.filter(hit=>hit.userData.receptionGuide),...(interior.deskHits || [])];
     scene.updateMatrixWorld(true);
     scene.traverseVisible(mesh=>{
       if(!mesh.isMesh || !mesh.geometry || !camera.layers.test(mesh.layers))return;
@@ -645,5 +694,5 @@ export function createLobby(host, doors, onEnter, options = {}) {
     dispose();
     throw error;
   }
-  return { dispose,setPaused,enterNearest,enterDoor:enter,menuIndex,cycleMenu,enterMuseum,exitMuseum,home };
+  return { dispose,setPaused,enterNearest,enterDoor:enter,menuIndex,cycleMenu,setMenuOpen,enterMuseum,exitMuseum,home };
 }

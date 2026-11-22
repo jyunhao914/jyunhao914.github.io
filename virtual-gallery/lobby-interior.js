@@ -1,8 +1,22 @@
-import {buildWaypoints} from "./lobby-waypoints.js?v=atrium40";
+import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=reception41";
+import {buildWaypoints} from "./lobby-waypoints.js?v=reception41";
 
 // One sampled centreline is shared by the masonry, the contact shadow, and walking.
-function partitionPlan(w,d){
-  const pts=[[-w-.20,-d+.68],[-3.86,-d+.63],[-1.64,-d-.01],[.54,-d-.91]],line=[];
+function partitionPlan(w,d,obstacles){
+  const pts=[[-w-.22,-d-.77],[-4.91,-d-.74],[-4.25,-d-1.12],[-3.57,-d-1.71]],line=[];
+  const blocks=obstacles.map(o=>{
+    const c=Math.cos(o.yaw||0),s=Math.sin(o.yaw||0),radius=o.radius??0;
+    return {...o,c,s,coreX:o.width/2-radius,coreZ:o.depth/2-radius,reach:Math.hypot(o.width,o.depth)/2+.20,safeRadius:radius+.18};
+  });
+  function clearance(b,x,z){
+    const dx=x-b.x,dz=z-b.z,lx=dx*b.c-dz*b.s,lz=dx*b.s+dz*b.c;
+    const qx=Math.abs(lx)-b.coreX,qz=Math.abs(lz)-b.coreZ,hx=Math.max(qx,0),hz=Math.max(qz,0),outside=Math.hypot(hx,hz);
+    const gap=outside+Math.min(0,Math.max(qx,qz))-b.safeRadius;
+    if(gap>=0)return null;
+    const localX=Math.sign(lx||1)*(outside>.000001?hx/outside:Number(qx>=qz));
+    const localZ=Math.sign(lz||1)*(outside>.000001?hz/outside:Number(qz>qx));
+    return {gap,nx:b.c*localX+b.s*localZ,nz:-b.s*localX+b.c*localZ};
+  }
   for(let i=0;i<=40;i++){
     const t=i/40,u=1-t;
     const [x,z]=[0,1].map(k=>u*u*u*pts[0][k]+3*u*u*t*pts[1][k]+3*u*t*t*pts[2][k]+t*t*t*pts[3][k]);
@@ -36,7 +50,12 @@ function partitionPlan(w,d){
           movedX=Math.max(-w+.16,q.x+nx/norm*(clear+.0002));movedZ=q.z+nz/norm*(clear+.0002);
         }
       }
-      x=movedX;z=movedZ;
+      for(const ob of blocks){
+        if(Math.abs(movedX-ob.x)>ob.reach||Math.abs(movedZ-ob.z)>ob.reach)continue;
+        const contact=clearance(ob,movedX,movedZ);
+        if(contact){movedX+=contact.nx*(-contact.gap+.0002);movedZ+=contact.nz*(-contact.gap+.0002);}
+      }
+      x=Math.max(-w+.16,Math.min(w-.16,movedX));z=movedZ;
     }
     return {x,z};
   }
@@ -45,6 +64,9 @@ function partitionPlan(w,d){
     for(let i=0;i<=steps;i++){
       const x=a.x+i/steps*dx,z=a.z+i/steps*dz;
       if(withinBounds(x,z)&&nearest(x,z).distance<clear-.001)return false;
+      for(const ob of blocks){
+        if(Math.abs(x-ob.x)<=ob.reach&&Math.abs(z-ob.z)<=ob.reach&&clearance(ob,x,z)?.gap<-.001)return false;
+      }
     }
     return true;
   }
@@ -54,6 +76,10 @@ function partitionPlan(w,d){
     for(const sign of [-1,1])guides.push({x:q.x+sign*.68*q.nx,z:q.z+sign*.68*q.nz});
   }
   guides.push({x:tip.x+.80*tip.tx,z:tip.z+.80*tip.tz});
+  for(const ob of blocks)for(const dx of [-1,1])for(const dz of [-1,1]){
+    const lx=dx*(ob.width/2+.24),lz=dz*(ob.depth/2+.24),x=ob.x+lx*ob.c+lz*ob.s,z=ob.z-lx*ob.s+lz*ob.c;
+    if(x>-w+.20 && x<w-.20 && z>-d-3.78 && z<d-.18 && clearPath({x,z},{x,z}))guides.push({x,z});
+  }
   // Only automatic travel needs waypoints. Test each straight segment against the
   // same inflated masonry and choose the shortest clear route around its round end.
   function lobbyRoute(start,end){
@@ -114,20 +140,68 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const canopy=texture("canopy-light.webp",false);
   const oakMap=texture("boards-color.webp"),oakNormal=texture("boards-normal.webp",false);
   const oak=standard({color:0xe3caab,map:oakMap,normalMap:oakNormal,normalScale:new T.Vector2(.16,.16),roughness:.65});
-  const wallStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.12,.12),color:0x75685c,roughness:.85,side:T.DoubleSide});
-  const stone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.13,.13),color:0x80705c,roughness:.72});
-  const limestone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.25,.25),color:0x665c50,roughness:.84,side:T.DoubleSide});
-  const soffit=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.10,.10),color:0x545956,roughness:.93});
-  const splay=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.085,.085),color:0x97816a,roughness:.88,side:T.DoubleSide});
+  const wallStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.12,.12),color:0x998f7c,roughness:.82,side:T.DoubleSide});
+  // The registered black granite scan repeats every 1.20 m. Separate cut joints
+  // describe full-size stones across both rooms, including below the reception counter.
+  const slabMap=texture("reception-granite-color.webp"),slabNormals=texture("reception-granite-normal.webp",false);
+  const stone=standard({map:slabMap,normalMap:slabNormals,roughnessMap:texture("reception-granite-rough.webp",false),
+    normalScale:new T.Vector2(.13,.13),color:0xffffff,metalness:0,roughness:1});
+  const limestone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.25,.25),color:0x77705f,roughness:.81,side:T.DoubleSide});
+  const soffit=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.10,.10),color:0x676b64,roughness:.87});
+  const splay=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.085,.085),color:0xad9475,roughness:.84,side:T.DoubleSide});
+  const timberVeneer=standard({color:0xaa8e73,map:oakMap,normalMap:oakNormal,normalScale:new T.Vector2(.10,.10),roughness:.52});
+  const pierStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.13,.13),color:0xb9b5a5,roughness:.68});
+  stone.name="lobby-polished-black-stone";
+  const portalStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.25,.25),color:0x978673,roughness:.61});
+  const innerStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.13,.13),color:0xa99c88,roughness:.59});
+  const galleryDeck=standard({map:plasterMap,color:0xb1aa9a,roughness:.82});
+  const darkVeneer=standard({map:oakMap,normalMap:oakNormal,normalScale:new T.Vector2(.12,.12),color:0x675f54,roughness:.53});
+  const ribOak=standard({map:oakMap,color:0xad8a62,roughness:.60});
+  const warmCut=standard({color:0xe5b57b,emissive:0xffbc74,emissiveIntensity:1.16,roughness:.70});
+  const bronze=standard({color:0x8d7862,metalness:.44,roughness:.47});
   const metal=standard({color:0x706653,metalness:.32,roughness:.57});
   const recess=standard({color:0x403e39,roughness:.92,side:T.DoubleSide});
-  const partition=partitionPlan(w,d),gardenBays=[];
-  const openingLeft=1.01,openingRight=3.81,northSill=4.27,northHead=5.29;
-  const slotDepth=.48,outerSill=5.18,outerHead=6.18;
-  const slabHeight=t=>3.96-.79*t*t*(3-2*t);
+  const entryZ=-3.08,midZ=(entryZ+wallNorth)/2+.09,entryDepth=.64,head=3.29;
+  const galleryLeft=.63,galleryRight=4.98;
+  // Solid plan dimensions drive the section, pedestrian radius and direct-light occlusion.
+  const piece=(name,x,z,width,depth,height)=>({name,x,z,width,depth,height,radius:0});
+  const piers=[
+    piece("lobby-gallery-left-pier",.045,entryZ-entryDepth/2,1.17,entryDepth,head),
+    piece("lobby-gallery-right-pier",(galleryRight+w)/2,entryZ-entryDepth/2,w-galleryRight,entryDepth,head),
+    piece("lobby-gallery-inner-left",.75,midZ,.64,.69,3.23),
+    piece("lobby-gallery-inner-right",5.23,midZ,.81,.69,3.23),
+    piece("lobby-gallery-side-wall",.28,(wallNorth+entryZ)/2,.28,entryZ-wallNorth,3.44),
+    piece("lobby-reception-back-wall",(-w+.20)/2,-4.64,w+.20,.21,3.02)
+  ];
+  const recesses=[{side:-1,start:-2.93,end:1.85,push:.55,top:3.01},
+    {side:1,start:-.52,end:2.65,push:.53,top:2.63}];
+  const cheeks=recesses.flatMap(b=>[b.start-.085,b.end+.085].map(z=>({x:b.side*(w-b.push/2),z,
+    width:b.push+.07,depth:.17,radius:0})));
+  const galleryLeaves=[
+    piece("lobby-gallery-near-return",.48,entryZ-1.42,.13,1.57,3.15),
+    piece("lobby-gallery-mid-return",(w+5.40)/2,midZ-.80,w-5.40,1.84,3.15),
+    piece("lobby-gallery-far-return",.51,wallNorth+1.52,.13,2.27,3.15)
+  ];
+  const rearX=(.48+w)/2,rearWidth=w-.48;
+  const rearRelief=piece("lobby-gallery-north-relief",rearX,wallNorth+.128,rearWidth,.255,3.20);
+  const jambs=[galleryLeft+.026,galleryRight-.026].map(x=>piece("jamb",x,entryZ-.365,.052,.31,head));
+  const partition=partitionPlan(w,d,[...piers,...cheeks,...galleryLeaves,rearRelief,...jambs,...furnitureObstacles]),gardenBays=[];
+  const openingLeft=-w+.81,openingRight=w-.82,northSill=3.19,northHead=5.97;
+  const slotDepth=.39,outerSill=3.30,outerHead=5.90;
+  const slabHeight=t=>2.90-.36*t*t*(3-2*t);
   const partitionOcclusion=`float partitionVisibility(vec3 o,vec3 r,float limit){
-    if(o.y>4.05 && r.y>=0.)return 1.;
     float light=1.;
+    ${[...piers,
+       {x:(w-.54)/2,z:entryZ-entryDepth/2,width:w+.54,depth:entryDepth,low:head,height:H+.02},
+       {x:(w+.42)/2,z:(wallNorth+entryZ-entryDepth)/2,width:w-.42,depth:entryZ-entryDepth-wallNorth,low:3.23,height:3.54}
+      ].map(p=>`{
+      vec3 lo=vec3(${(p.x-p.width/2).toFixed(4)},${(p.low??.012).toFixed(4)},${(p.z-p.depth/2).toFixed(4)})-o;
+      vec3 hi=vec3(${(p.x+p.width/2).toFixed(4)},${p.height.toFixed(4)},${(p.z+p.depth/2).toFixed(4)})-o;
+      vec3 inverseRay=1./(r+mix(vec3(-.00002),vec3(.00002),step(vec3(0.),r)));
+      vec3 a=lo*inverseRay,b=hi*inverseRay,t0=min(a,b),t1=max(a,b);
+      float entry=max(.032,max(max(t0.x,t0.y),t0.z)),exitT=min(limit,min(min(t1.x,t1.y),t1.z));
+      light*=1.-smoothstep(.003,.042,exitT-entry);}`).join("\n")}
+    if(o.y>2.95 && r.y>=0.)return light;
     ${[8,16,24,32,40].map(i=>{
       const a=partition.line[i-8],b=partition.line[i],length=Math.hypot(b.x-a.x,b.z-a.z);
       return `{vec2 a=vec2(${a.x.toFixed(4)},${a.z.toFixed(4)}),axis=vec2(${((b.x-a.x)/length).toFixed(5)},${((b.z-a.z)/length).toFixed(5)});
@@ -149,7 +223,12 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       float span=length(u+r.xz*t);
       if(span<.19 && o.y+r.y*t<${slabHeight(1).toFixed(4)})light=0.;
     }
-    return light;}`;
+    return light;}
+    float warmSpot(vec3 p,vec3 n,vec3 fixture,vec3 aim){
+      vec3 diff=fixture-p;float d2=max(.03,dot(diff,diff));
+      vec3 l=diff*inversesqrt(d2);float cone=dot(-l,normalize(aim-fixture));
+      return smoothstep(.70,.94,cone)*max(0.,dot(n,l))/(.55+.32*d2);
+    }`;
   function daylight(mat) {
     mat.onBeforeCompile=shader=>{
       shader.uniforms.treeShadow={value:canopy};
@@ -177,15 +256,14 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
           float joint=1.-smoothstep(.0012-aa,.0033+aa,gap);
           diffuseColor.rgb*=1.-.40*joint;`);
       } else if(mat===stone){
-        shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`#include <map_fragment>
-          float scan=dot(diffuseColor.rgb,vec3(.2126,.7152,.0722));
-          diffuseColor.rgb=mix(vec3(scan),diffuseColor.rgb,.57);
-          vec2 metres=vec2(1.64,.92),tile=lobbyPoint.xz/metres;
-          tile.x+=.42*mod(floor(tile.y),2.);
-          vec2 edge=min(fract(tile),1.-fract(tile))*metres;
-          float gap=min(edge.x,edge.y),aa=max(.0007,fwidth(gap));
-          float variation=fract(sin(dot(floor(tile),vec2(8.71,75.33)))*914.8);
-          diffuseColor.rgb*=(.962+.060*variation)*(1.-.24*(1.-smoothstep(.0011-aa,.0027+aa,gap)));`);
+        shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`
+          #include <map_fragment>
+          vec2 cutGrid=lobbyPoint.xz/vec2(1.85,1.05);
+          cutGrid.x+=.5*mod(floor(cutGrid.y),2.);
+          vec2 edge=min(fract(cutGrid),1.-fract(cutGrid))*vec2(1.85,1.05);
+          float gap=min(edge.x,edge.y),aa=max(.00045,fwidth(gap));
+          float joint=1.-smoothstep(.00065-aa,.002+aa,gap);
+          diffuseColor.rgb*=1.-.42*joint;`);
       }else if(mat===oak){
         shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`#include <map_fragment>
           float woodValue=dot(diffuseColor.rgb,vec3(.26,.63,.11));
@@ -210,7 +288,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         float beam=smoothstep(-pn,pn,min(freeRay.x,freeRay.y))*step(p.y,${H.toFixed(4)}+.002);
         // Soft branch shadows from the measured park canopy, projected along the same ray as the roof.
         float leaves=texture2D(treeShadow,(hi-upperCenter)*vec2(.116,.139)+vec2(.37,.64)).r;
-        float dapple=mix(.53,1.,smoothstep(.05,.91,leaves));
+        float dapple=mix(.71,1.,smoothstep(.05,.91,leaves));
         float sunFacing=max(0.,dot(nWorld,normalize(vec3(sunTilt.x,1.,sunTilt.y))));
         vec3 toSky=vec3(upperCenter.x,${rim.y.toFixed(4)},upperCenter.y)-p;
         float sky2=max(.05,dot(toSky,toSky));vec3 skyDir=toSky*inversesqrt(sky2);
@@ -223,13 +301,13 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         float bounce=max(0.,dot(nWorld,toFloor*inversesqrt(floor2)))/(1.+.12*floor2);
         vec3 toGarden=vec3(${((openingLeft+openingRight)/2).toFixed(3)},${((northSill+northHead)/2).toFixed(3)},${wallNorth.toFixed(3)})-p;
         float garden2=max(.05,dot(toGarden,toGarden));vec3 gardenDir=toGarden*inversesqrt(garden2);
-        float gardenFactor=2.86/(2.86+garden2)*max(0.,dot(nWorld,gardenDir))*max(0.,-gardenDir.z);
+        float gardenFactor=${((openingRight-openingLeft)*(northHead-northSill)).toFixed(3)}/(${((openingRight-openingLeft)*(northHead-northSill)).toFixed(3)}+garden2)*max(0.,dot(nWorld,gardenDir))*max(0.,-gardenDir.z);
         // Test both ends of the rising north reveal, then the lowest point of
         // the opaque pitched roof between a receiver and the slot.
         float northSun=max(0.,(p.z-(${wallNorth.toFixed(3)}))/.284);
         float insideY=p.y+northSun,outsideY=insideY+${slotDepth.toFixed(3)}/.284;
         float insideX=p.x+.17*northSun,outsideX=insideX+.17*${slotDepth.toFixed(3)}/.284;
-        vec2 slotClear=min(vec2(min(insideX,outsideX)-${openingLeft.toFixed(3)},${openingRight.toFixed(3)}-max(insideX,outsideX)),
+        vec2 slotClear=min(vec2(min(insideX,outsideX)-(${openingLeft.toFixed(3)}),${openingRight.toFixed(3)}-max(insideX,outsideX)),
           vec2(50.));
         float slotMargin=min(min(slotClear.x,slotClear.y),min(min(insideY-${northSill.toFixed(3)},${northHead.toFixed(3)}-insideY),
           min(outsideY-${outerSill.toFixed(3)},${outerHead.toFixed(3)}-outsideY)));
@@ -257,6 +335,22 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         reflectedLight.indirectDiffuse*=ao*(.74+.16*skyVisible);
         reflectedLight.indirectDiffuse+=diffuseColor.rgb*(vec3(.92,1.01,1.11)*(1.25*westSky+gardenFactor*1.65)+vec3(.86,1.03,1.22)*sky*3.1+
           vec3(1.,.80,.57)*bounce*.91+vec3(1.,.88,.68)*sunFacing*(1.19*windowLight+2.66*beam*dapple));
+        bool inGallery=p.x>.42 && p.z<${(entryZ-entryDepth+.045).toFixed(4)} && p.y<3.54;
+        if(inGallery){
+          // This gallery has its own low ceiling, recessed luminaires and end-wall wash.
+          // Its slit view above the ceiling does not act as a light source below it.
+          float spots=warmSpot(p,nWorld,vec3(2.15,3.27,-4.35),vec3(1.40,.18,-5.63))+
+            warmSpot(p,nWorld,vec3(3.11,3.27,${(midZ-.58).toFixed(3)}),vec3(3.25,.10,${(midZ-1.40).toFixed(3)}))+
+            1.25*warmSpot(p,nWorld,vec3(2.77,3.17,${(wallNorth+.77).toFixed(3)}),vec3(2.75,1.38,${wallNorth.toFixed(3)}));
+          reflectedLight.directDiffuse*=.41;
+          reflectedLight.indirectDiffuse*=.70;
+          reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.82,.61)*(.38+spots*2.3);
+        }
+        float leftStrip=1.-smoothstep(.10,.69,abs(p.z+4.48));
+        float westStrip=1.-smoothstep(.10,.62,abs(p.x+${(w-.064).toFixed(3)}));
+        float vertical=smoothstep(2.93,3.08,p.y)*(1.-smoothstep(3.12,4.23,p.y));
+        float cove=vertical*max(leftStrip*step(p.x,.34),westStrip*step(-4.62,p.z)*step(p.z,1.96));
+        reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.70,.40)*cove*1.95;
         ${mat===soffit?`vec2 fromCourt=max(vec2(0.),abs(p.xz-lowerCenter)-lowerHalf);
           float returnGlow=exp(-length(fromCourt)*.65);
           reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(.72,.67,.55)*(.06+.46*returnGlow);`:""}
@@ -266,11 +360,12 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     };
     mat.customProgramCacheKey=()=>"central-court-"+mat.uuid;
   }
-  for(const mat of [wallStone,stone,limestone,soffit,splay,oak])daylight(mat);
-  function box(wall,mat,width,height,depth,x,y,z) {
+  for(const mat of [wallStone,stone,limestone,soffit,splay,oak,pierStone,timberVeneer,portalStone,innerStone,galleryDeck,darkVeneer,ribOak])daylight(mat);
+  function box(wall,mat,width,height,depth,x,y,z,name="") {
     if(Math.min(width,height,depth)<=0)return;
-    let batch=batches.get(mat);
-    if(!batch){batch={pos:[],normal:[],uv:[],index:[]};batches.set(mat,batch);}
+    const key=name||mat;
+    let batch=batches.get(key);
+    if(!batch){batch={mat,name,pos:[],normal:[],uv:[],index:[]};batches.set(key,batch);}
     const geo=new T.BoxGeometry(width,height,depth);
     const {position,normal}=geo.attributes;
     const c=Math.cos(wall.yaw),s=Math.sin(wall.yaw),first=batch.pos.length/3;
@@ -281,13 +376,15 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       batch.pos.push(X,v,Z);batch.normal.push(nx*c+nz*s,ny,-nx*s+nz*c);
       const across=Math.abs(nx*c+nz*s)>.5 ? Z : X;
       const metreUv=mat===wallStone,cutStone=mat.map===stoneMap;
-      if(mat===oak)batch.uv.push((Math.abs(ny)>.5 ? Z : v)*.64,X*.26);
+      if(mat===stone)batch.uv.push(X/1.20,Z/1.20);
+      else if(mat===darkVeneer||mat===ribOak||mat===timberVeneer)batch.uv.push(across*.68,v*.32);
+      else if(mat===oak)batch.uv.push((Math.abs(ny)>.5 ? Z : v)*.64,X*.26);
       else batch.uv.push(across/(metreUv ? 1 : cutStone ? .86 : 1.96),(Math.abs(ny)>.5 ? Z : v)/(metreUv ? 1 : cutStone ? .64 : 1.96));
     }
     for(const index of geo.index.array) batch.index.push(first+index);
     geo.dispose();
   }
-  box(world,stone,2*w+.08,.16,d+.12-wallNorth,0,-.08,(d+.04+wallNorth-.08)/2);
+  box(world,stone,2*w+.08,.16,d+.12-wallNorth,0,-.08,(d+.04+wallNorth-.08)/2,"lobby-reflective-black-stone");
   // A single level soffit surrounds a splayed court. The floor, the light well, and
   // the exterior roof are open on the same axis; no layer spans the aperture.
   const courtMid=(mouth.north+mouth.south)/2,courtDepth=mouth.south-mouth.north;
@@ -331,18 +428,15 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       }
     }
   }
-  const spacing=.91,beamCount=Math.floor((w-.24)/spacing);
-  for(let i=-beamCount;i<=beamCount;i++){
-    const x=i*spacing;
-    timberRun(x,wallNorth-.06,pitchStart,.195,.279,i*.387);
-    if(Math.abs(x)<mouth.x+.11){
-      timberRun(x,pitchStart,mouth.north-.060,.195,.19,i*.387);
-      timberRun(x,mouth.south+.06,d+.045,.195,.19,i*.387);
-    }else timberRun(x,pitchStart,d+.045,.195,.19,i*.387);
+  // Four primary timber lines leave a broad, quiet centre. The east pair bears on
+  // the stone piers and makes a continuous porch beside the reception room.
+  for(const [i,centre] of [-4.53,-2.88,2.65,4.63].entries()){
+    for(const offset of [-.112,.112]){
+      const x=centre+offset;
+      timberRun(x,wallNorth-.05,pitchStart,.159,.305,.44*i+offset);
+      timberRun(x,pitchStart,d+.04,.159,.260,.44*i+offset);
+    }
   }
-  // The headers carry the cut joists along the edge of the well. No timber crosses its opening.
-  box(world,oak,2*mouth.x+.34,.20,.125,0,H-.094,mouth.south+.052);
-  box(world,oak,2*mouth.x+.34,.271,.15,0,H-.130,mouth.north-.067);
   const beamGeom=new T.BufferGeometry();
   beamGeom.setAttribute("position",new T.Float32BufferAttribute(timberPos,3));beamGeom.setAttribute("uv",new T.Float32BufferAttribute(timberUv,2));beamGeom.computeVertexNormals();
   const beams=new T.Mesh(beamGeom,oak);beams.name="atrium-laminated-oak-beams";root.add(beams);
@@ -436,12 +530,101 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const slotGeometry=new T.BufferGeometry();slotGeometry.setAttribute("position",new T.Float32BufferAttribute(slotP,3));
   slotGeometry.setAttribute("uv",new T.Float32BufferAttribute(slotUV,2));slotGeometry.computeVertexNormals();
   const endWall=new T.Mesh(slotGeometry,wallStone);endWall.name="atrium-north-wall-and-reveal";root.add(endWall);
-  for(const side of [-1,1]){
-    box(northWall,metal,.025,outerHead-outerSill,.041,windowX+side*(frontage/2-.011),(outerSill+outerHead)/2,-slotDepth+.003);
+  // The north clerestory is above the occupied zone. At this height the
+  // chamfered sill and external shades intercept direct sun but admit diffuse sky.
+  box(northWall,limestone,frontage+.055,.11,.69,windowX,northSill-.043,-.23);
+  box(northWall,bronze,frontage,.028,.13,windowX,northSill-.104,.027);
+  for(let i=0;i<=5;i++){
+    const x=openingLeft+(openingRight-openingLeft)*i/5;
+    box(northWall,metal,.047,outerHead-outerSill,.087,x,(outerSill+outerHead)/2,-slotDepth+.019);
   }
-  const glassFinish=material(T.MeshBasicMaterial,{transparent:true,color:0x91a8a5,opacity:.065,side:T.DoubleSide,depthWrite:false});
+  for(const y of [5.22,5.62,5.91])box(northWall,metal,frontage-.06,.032,.25,windowX,y,-slotDepth-.065);
+  const glassFinish=material(T.MeshBasicMaterial,{transparent:true,color:0x97a8a1,opacity:.10,side:T.DoubleSide,depthWrite:false});
   const glass=new T.Mesh(new T.PlaneGeometry(frontage-.02,outerHead-outerSill),glassFinish);
   glass.position.set(windowX,(outerHead+outerSill)/2,exterior);glass.name="atrium-north-clerestory-glass";root.add(glass);
+
+  // A trabeated opening bears on two broad masonry walls. The contrasting, deep
+  // reveal continues into a genuinely walkable secondary bay at the north end.
+  for(const b of piers){
+    const mat=b.name.includes("reception")?darkVeneer:b.name.includes("inner")?innerStone:portalStone;
+    box(world,mat,b.width,b.height,b.depth,b.x,b.height/2,b.z,b.name);
+  }
+  const beamWidth=w+.54,beamMid=(w-.54)/2;
+  box(world,portalStone,beamWidth,H-head+.015,entryDepth,beamMid,(H+head)/2,entryZ-entryDepth/2,"lobby-gallery-stone-lintel");
+  const portalFrame=standard({color:0x433d37,metalness:.28,roughness:.44});
+  for(const x of [galleryLeft+.026,galleryRight-.026]){
+    box(world,portalFrame,.052,head,.31,x,head/2,entryZ-.365);
+  }
+  box(world,portalFrame,galleryRight-galleryLeft,.050,.31,(galleryRight+galleryLeft)/2,head-.022,entryZ-.365);
+  // Slabs stop at the recessed service channel. Light sources and their shields
+  // are modelled inside the recess instead of drawing bright marks onto the ceiling.
+  const start=entryZ-entryDepth+.006,run=start-wallNorth,mid=(start+wallNorth)/2;
+  const slotX=2.72,slotWidth=.175;
+  for(const [left,right,name] of [[.41,slotX-slotWidth/2,"lobby-gallery-ceiling"],[slotX+slotWidth/2,w+.015,"lobby-gallery-ceiling-east"]]){
+    box(world,galleryDeck,right-left,.19,run,(left+right)/2,3.325,mid,name);
+  }
+  box(world,portalFrame,slotWidth+.015,.031,run,slotX,3.395,mid);
+  box(world,innerStone,4.03,.14,.36,2.97,3.15,midZ,"lobby-gallery-secondary-header");
+  const downGeometry=new T.CylinderGeometry(.059,.059,.015,16),lampPositions=[-4.35,midZ-.58,wallNorth+.77];
+  for(const [i,z] of lampPositions.entries()){
+    const lamp=new T.Mesh(i===0?downGeometry:downGeometry.clone(),warmCut);
+    lamp.position.set(slotX,3.30,z);lamp.name="lobby-gallery-downlight";root.add(lamp);
+  }
+  // Finite projecting wall leaves catch the light down the corridor and produce
+  // occluding edges that a visitor passes in sequence over one continuous floor.
+  for(const [i,leaf] of galleryLeaves.entries()){
+    const finish=[innerStone,darkVeneer,ribOak][i],edgeX=leaf.x+(leaf.x<2 ? 1 : -1)*(leaf.width/2-.011);
+    box(world,finish,leaf.width,leaf.height,leaf.depth,leaf.x,leaf.height/2,leaf.z,leaf.name);
+    box(world,bronze,.022,3.12,.028,edgeX,1.57,leaf.z+(leaf.depth-.028)/2);
+  }
+  box(world,darkVeneer,rearWidth,3.24,.09,rearX,1.62,wallNorth+.05,"lobby-gallery-rear-screen");
+  const reedCount=27,reedWidth=(rearWidth-.16)/reedCount;
+  for(let i=0;i<reedCount;i++){
+    const raised=.095+.042*Math.cos(i*.59),x=.56+(i+.5)*reedWidth;
+    box(world,i%4===1?portalStone:i%4===3?ribOak:innerStone,reedWidth-.018,3.08,raised,x,1.58,wallNorth+.092+raised/2);
+  }
+  box(world,metal,rearWidth,.092,.26,rearX,3.18,wallNorth+.16);
+  box(world,warmCut,rearWidth-.21,.016,.034,rearX,3.135,wallNorth+.236);
+
+  // At the welcome bay the ashlar datum becomes a dark timber canopy. Wide vertical
+  // cuts above it are seen in relief from both the threshold and the reception desk.
+  box(world,darkVeneer,w-.37,.28,.40,(-w-.37)/2,2.98,entryZ-.15,"lobby-reception-canopy");
+  box(world,bronze,w-.37,.035,.26,(-w-.37)/2,3.125,entryZ-.13);
+  const warmPiers=(length,place)=>{
+    const widths=[.48,.26,.58,.36,.51,.31],margin=.036;let pos=0;
+    for(let i=0;pos<length-.04;i++){
+      const span=Math.min(widths[i%widths.length],length-pos);
+      const deep=[.108,.070,.148,.086,.134,.072][i%6];
+      place(pos+span/2,span-margin,deep,i%6===2?innerStone:i%6===5?bronze:i%2?ribOak:portalStone);
+      pos+=span;
+    }
+  };
+  const upperHeight=H-3.02,upperMid=(H+3.02)/2;
+  box(world,darkVeneer,w+.19,upperHeight,.10,(-w+.19)/2,upperMid,-4.65);
+  warmPiers(w+.17,(offset,span,deep,mat)=>box(world,mat,span,upperHeight-.045,deep,-w+offset,upperMid,-4.59+deep/2));
+  box(world,bronze,w+.17,.10,.26,(-w+.17)/2,3.015,-4.49);
+  box(world,warmCut,w+.05,.014,.024,(-w+.17)/2,3.045,-4.48);
+  warmPiers(6.48,(offset,span,deep,mat)=>box(world,mat,deep,H-3.13,span,-w+.035+deep/2,(H+3.13)/2,-4.57+offset));
+  box(world,bronze,.22,.081,6.5,-w+.094,3.105,-1.34);
+  box(world,warmCut,.023,.014,6.32,-w+.115,3.136,-1.34);
+  // Cabinet-height side niches leave a service route in front of the joinery.
+  // The full-depth cheeks and the overhead return are continuous with the side walls.
+  for(const b of recesses){
+    const span=b.end-b.start,mid=(b.start+b.end)/2,faceX=b.side*(w-.054);
+    const label=b.side<0?"lobby-reception-recess":"lobby-reading-recess";
+    const skin=new T.BoxGeometry(.10,b.top-.13,span),uv=skin.attributes.uv,pts=skin.attributes.position;
+    for(let i=0;i<uv.count;i++)uv.setXY(i,pts.getZ(i)*.62,pts.getY(i)*.26);
+    const back=new T.Mesh(skin,b.side<0?darkVeneer:timberVeneer);back.position.set(faceX,(b.top+.13)/2,mid);back.name=label;root.add(back);
+    const panels=Math.max(2,Math.round(span/.72));
+    for(let i=1;i<panels;i++)box(world,bronze,.018,b.top-.21,.009,faceX-b.side*.056,(b.top+.14)/2,b.start+span*i/panels);
+    const innerX=b.side*(w-b.push/2);
+    for(const z of [b.start-.085,b.end+.085]){
+      box(world,wallStone,b.push+.07,b.top,.17,innerX,b.top/2,z);
+      box(world,bronze,.019,b.top-.10,.055,b.side*(w-b.push-.028),(b.top-.10)/2+.05,z);
+    }
+    box(world,timberVeneer,b.push+.09,.125,span+.34,innerX,b.top+.010,mid);
+    box(world,bronze,.025,.045,span+.32,b.side*(w-b.push-.030),b.top+.073,mid);
+  }
 
   // Two ashlar skins, a honed cap and a rounded free end wrap the same solid curve.
   // The nearer partition drops away to reveal the raised ceiling and far end wall.
@@ -521,20 +704,23 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   // The garden canopy opens into the hall across a flush, 4.8 m wide stone walk.
   // The two glazed side lights meet the same structural fascia. Nothing is built
   // around this passage, and there is no separate lintel or door leaf.
-  const openHalf=2.40,glassOuter=w-.36,sill=.10,head=3.64,southPlate=H+.045;
-  box(southWall,wallStone,2*w,southPlate-head,.30,0,(southPlate+head)/2,-.15);
+  const openHalf=2.40,glassOuter=w-.36,sill=.10,gardenHeadHeight=3.64,southPlate=H+.045;
+  box(southWall,wallStone,2*w,southPlate-gardenHeadHeight,.30,0,(southPlate+gardenHeadHeight)/2,-.15);
   for(const side of [-1,1]){
     const width=glassOuter-openHalf,mid=side*(glassOuter+openHalf)/2;
     box(southWall,limestone,width,sill,.31,mid,sill/2,-.155);
-    box(southWall,wallStone,w-glassOuter,head,.30,side*(w+glassOuter)/2,head/2,-.15);
-    windowBand(southWall,mid-width/2,mid+width/2,sill,head,Math.max(1,Math.round(width/1.65)));
+    box(southWall,wallStone,w-glassOuter,gardenHeadHeight,.30,side*(w+glassOuter)/2,gardenHeadHeight/2,-.15);
+    windowBand(southWall,mid-width/2,mid+width/2,sill,gardenHeadHeight,Math.max(1,Math.round(width/1.65)));
   }
-  for(const [mat,batch] of batches) {
+  let reflectionFloor;
+  for(const batch of batches.values()) {
     const geo=new T.BufferGeometry();
     geo.setAttribute("position",new T.Float32BufferAttribute(batch.pos,3));
     geo.setAttribute("normal",new T.Float32BufferAttribute(batch.normal,3));
     geo.setAttribute("uv",new T.Float32BufferAttribute(batch.uv,2));
-    geo.setIndex(batch.index);root.add(new T.Mesh(geo,mat));
+    geo.setIndex(batch.index);
+    const mesh=new T.Mesh(geo,batch.mat);mesh.name=batch.name;root.add(mesh);
+    if(batch.mat===stone)reflectionFloor=mesh;
   }
   batches.clear();
   const radius=Math.max(48,3*Math.hypot(w,d));
@@ -545,9 +731,10 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const sky=new T.HemisphereLight(0xf5f7ff,0xc6b496,1.40);root.add(sky);
   const sun=new T.DirectionalLight(0xffedcc,1.32);sun.position.set(1.7,10,-2.84);root.add(sun);
   const bounce=new T.DirectionalLight(0xdbe6eb,.52);bounce.position.set(1,3,d);root.add(bounce);
+  const deskHits=buildReception(T,root,{texture,materials,stoneMap,stoneNormal});
   const updateWaypoints=buildWaypoints(T,root,doors,{materials,textures,hits,halfDepth:d});
   root.updateMatrixWorld(true);
-  return {hits,panorama,updateWaypoints,constrainLobbyStep:partition.constrainLobbyStep,lobbyRoute:partition.lobbyRoute,shiftMenu:updateWaypoints.shiftMenu,menuIndex:updateWaypoints.menuIndex,menuPoint:updateWaypoints.menuPoint,dispose(){
+  return {hits,deskHits,reflectionFloor,floorMaterial:stone,panorama,updateWaypoints,constrainLobbyStep:partition.constrainLobbyStep,lobbyRoute:partition.lobbyRoute,shiftMenu:updateWaypoints.shiftMenu,menuIndex:updateWaypoints.menuIndex,menuPoint:updateWaypoints.menuPoint,dispose(){
     disposed=true;root.removeFromParent();
     root.traverse(node=>node.geometry?.dispose());
     materials.forEach(mat=>mat.dispose());textures.forEach(tex=>tex.dispose());

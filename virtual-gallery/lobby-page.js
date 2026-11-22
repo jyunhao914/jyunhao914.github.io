@@ -8,12 +8,12 @@ export function lobbyPage(enterRoom,prepareRoom) {
     el("lobbyDownload").hidden=true;
   }
   let scene, generation=0, active=false, unavailable=false, fallbackFull=false, quietTimer, zone="grounds";
-  let rooms=[], selectedIndex=0, returnIndex=-1, pointer, crossing=false, waitTimer, blend;
+  let rooms=[], selectedIndex=0, cardsOpen=false, returnIndex=-1, pointer, crossing=false, waitTimer, blend;
   const fullscreen=()=>document.fullscreenElement===document.documentElement || fallbackFull;
   function reveal() {
     clearTimeout(quietTimer);
     entrance.classList.remove("lobby-quiet");
-    if(active && fullscreen() && !panel.open && !entrance.querySelector(".lobby-head :focus-visible, .lobby-wayfinding :focus-visible")) {
+    if(active && fullscreen() && !panel.open && !entrance.querySelector(".lobby-head :focus-visible, .lobby-wayfinding :focus-visible, .lobby-guide-access:focus-visible")) {
       quietTimer=setTimeout(()=>entrance.classList.add("lobby-quiet"),2800);
     }
   }
@@ -50,7 +50,13 @@ export function lobbyPage(enterRoom,prepareRoom) {
     stage.querySelector("canvas")?.focus({preventScroll:true});
     reveal();
   });
-  home.onclick=()=>{scene?.home();panel.close();};
+  home.onclick=()=>{panel.close();scene?.setPaused(false);scene?.home();};
+  el("lobbyOpenCards").onclick=()=>{
+    if(scene?.setMenuOpen(true))el("lobbyEnterDoor").focus({preventScroll:true});
+  };
+  el("lobbyCloseCards").onclick=()=>{
+    if(scene?.setMenuOpen(false))stage.querySelector("canvas")?.focus({preventScroll:true});
+  };
   enter.onclick=()=>{
     if(zone==="grounds")scene?.enterMuseum();
     else if(selectedIndex!=null)scene?.enterDoor(selectedIndex);
@@ -58,7 +64,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
   el("lobbyPrevHall").onclick=()=>scene?.cycleMenu(-1);
   el("lobbyNextHall").onclick=()=>scene?.cycleMenu(1);
   el("lobbyMenuNav").addEventListener("keydown",event=>{
-    if(zone!=="lobby" || event.altKey || event.ctrlKey || event.metaKey ||
+    if(zone!=="lobby" || !cardsOpen || event.altKey || event.ctrlKey || event.metaKey ||
       !["ArrowLeft","ArrowRight"].includes(event.key))return;
     event.preventDefault();
     event.stopPropagation();
@@ -74,6 +80,12 @@ export function lobbyPage(enterRoom,prepareRoom) {
   stage.addEventListener("lobbyblanktap",reveal);
   entrance.addEventListener("keydown",e=>{
     if(e.key==="Tab")reveal();
+    if(e.key==="Escape" && cardsOpen && !panel.open && !entrance.classList.contains("portal-approach")) {
+      if(scene?.setMenuOpen(false)) {
+        e.preventDefault();e.stopPropagation();stage.querySelector("canvas")?.focus({preventScroll:true});
+      }
+      return;
+    }
     if(e.key==="Escape" && fallbackFull && !panel.open){fallbackFull=false;syncFullscreen();}
   },true);
   stage.addEventListener("pointerdown",e=>{
@@ -95,24 +107,29 @@ export function lobbyPage(enterRoom,prepareRoom) {
   function near(index) {
     if(Number.isInteger(index))selectedIndex=index;
     const outdoors=zone==="grounds";
+    entrance.dataset.cardMenu=cardsOpen ? "open" : "closed";
+    el("lobbyOpenCards").hidden=outdoors || unavailable || cardsOpen || !rooms.length;
+    el("lobbyOpenCards").setAttribute("aria-expanded",String(cardsOpen));
+    el("lobbyCloseCards").hidden=outdoors || unavailable || !cardsOpen;
     for(const direction of ["lobbyPrevHall","lobbyNextHall"])
-      el(direction).hidden=outdoors || unavailable || rooms.length<2;
+      el(direction).hidden=outdoors || unavailable || !cardsOpen || rooms.length<2;
     const room=rooms[selectedIndex];
-    enter.hidden=unavailable || (!outdoors && !room);
+    enter.hidden=unavailable || (!outdoors && (!room || !cardsOpen));
     enter.textContent=outdoors || !room ? "" : room.title;
     enter.setAttribute("aria-label",outdoors ? "進入展場大廳" : "進入"+(room?.title || "展廳"));
-    const selection=outdoors || !room ? "" : room.title+"，第 "+(selectedIndex+1)+" 個展廳，共 "+rooms.length+" 個";
+    const selection=outdoors || !cardsOpen || !room ? "" : room.title+"，第 "+(selectedIndex+1)+" 個展廳，共 "+rooms.length+" 個";
     if(el("lobbySelection").textContent!==selection)el("lobbySelection").textContent=selection;
   }
   function setZone(value) {
     zone=value;
+    if(zone==="grounds")cardsOpen=false;
     document.body.dataset.zone=zone;
     entrance.dataset.zone=zone;
     const outside=zone==="grounds";
     el("entranceTitle").textContent=outside ? "美術館園區" : "展場大廳";
     stage.setAttribute("aria-label",outside ? "可步行的美術館園區" : "可步行的 3D 展場大廳");
     stage.querySelector("canvas")?.setAttribute("aria-label",outside ? "美術館園區" : "展場大廳");
-    el("lobbyHint").textContent=outside ? "拖曳環顧 · 沿石徑入館" : "拖曳環顧 · 左右滑動展廳卡片，點選進場";
+    el("lobbyHint").textContent=outside ? "拖曳環顧 · 沿石徑入館" : "點接待台或選擇展廳展開卡片，拖曳空白處環顧";
     el("lobbyReturnGrounds").hidden=outside || unavailable;
     home.textContent=outside ? "回到園區起點" : "回到大廳起點";
     el("lobbyDirectoryClose").textContent=outside ? "返回園區" : "返回大廳";
@@ -130,7 +147,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
   function failed() {
     destroyScene();
     unavailable=true;
-    enter.hidden=true;
+    el("lobbyOpenCards").hidden=el("lobbyCloseCards").hidden=enter.hidden=true;
     el("lobbyReturnGrounds").hidden=el("lobbyPrevHall").hidden=el("lobbyNextHall").hidden=true;
     message.textContent="此裝置暫時無法顯示 3D 大廳。";
     message.hidden=false;
@@ -149,18 +166,20 @@ export function lobbyPage(enterRoom,prepareRoom) {
     home.disabled=true;
     home.hidden=el("lobbyDirectoryClose").hidden=el("lobbyGuide").hidden=false;
     el("hallStatus").textContent="開放參觀 · "+rooms.length+" 個展廳";
-    setZone(returnIndex>=0 ? "lobby" : "grounds");
+    const startZone=returnIndex>=0 || new URLSearchParams(location.search).get("entry")==="lobby" ? "lobby" : "grounds";
+    setZone(startZone);
     enter.disabled=el("lobbyPrevHall").disabled=el("lobbyNextHall").disabled=true;
-    message.textContent=returnIndex>=0 ? "正在開啟展場大廳…" : "正在載入空間…";message.hidden=false;
+    message.textContent=startZone==="lobby" ? "正在開啟展場大廳…" : "正在載入空間…";message.hidden=false;
     el("lobbyHint").hidden=true;
     try {
-      const {createLobby}=await import("./lobby.js?v=atrium40");
+      const {createLobby}=await import("./lobby.js?v=reception41");
       if(!active || version!==generation)return;
       const signs=rooms.map(({title,subtitle,room,show})=>({title,subtitle,room,show:{id:show.id,title:show.title}}));
       scene=createLobby(stage,signs,index=>{
         if(active && !panel.open && rooms[index])enterRoom(rooms[index]);
       },{
-        returnDoorIndex:returnIndex,onNearest:near,onZone:setZone,
+        startZone,returnDoorIndex:returnIndex,onNearest:near,onZone:setZone,
+        onMenuOpen(open){cardsOpen=open;near(null);},
         onTravel:walking=>entrance.classList.toggle("portal-walking",walking),
         onApproach() {
           entrance.classList.add("portal-approach");
@@ -195,7 +214,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
   return {
     open(doors,fromIndex,exit,expanded) {
       resetCrossing();
-      active=true;rooms=doors;returnIndex=fromIndex;selectedIndex=fromIndex>=0 ? fromIndex : 0;fallbackFull=expanded;
+      active=true;rooms=doors;returnIndex=fromIndex;cardsOpen=fromIndex>=0;selectedIndex=fromIndex>=0 ? fromIndex : 0;fallbackFull=expanded;
       document.body.classList.add("in-lobby");
       directory.disabled=false;
       syncFullscreen();
