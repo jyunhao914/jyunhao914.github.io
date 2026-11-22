@@ -558,23 +558,37 @@ body.in-lobby > :is(header,footer) {display:none}
 #lobbyStage,#lobbyStage canvas {position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
 #lobbyStage canvas {outline:none;cursor:grab}
 #lobbyStage canvas:active {cursor:grabbing}
+#hallEntrance.portal-outgoing {z-index:14}
+#hallEntrance:is(.portal-approach,.portal-outgoing,.portal-walking) :is(.lobby-head,.lobby-wayfinding,.walk-pad),
+#visit[inert] :is(.museum-head,.reading-hud,.walk-pad) {opacity:0;visibility:hidden}
+#portalWait {
+  position:absolute;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:14px;white-space:nowrap;background:#23302de8;
+  color:#fff;padding:4px 6px 4px 14px;border-radius:4px;font-size:.875rem;
+}
+#portalWait[hidden] {display:none}
+#portalWait button {min-height:40px;border:1px solid #fff6;color:inherit;background:transparent}
 #lobbyStage .walk-pad {bottom:max(18px,env(safe-area-inset-bottom));left:max(16px,env(safe-area-inset-left));z-index:2}
 .lobby-head {
-  position:absolute;top:max(14px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));
-  display:flex;align-items:center;gap:7px;pointer-events:none;
+  position:absolute;top:max(16px,env(safe-area-inset-top));left:max(18px,env(safe-area-inset-left));right:max(18px,env(safe-area-inset-right));
+  display:flex;align-items:center;gap:0;pointer-events:none;
 }
 .lobby-head h1,.lobby-head button,#lobbyMessage,.lobby-wayfinding :is(p,button) {
-  margin:0;padding:8px 13px;background:#20302de8;color:#faf9f3;border:1px solid #ffffff44;border-radius:5px;
+  margin:0;padding:8px 14px;background:#f5f3eaf0;color:#303630;border:0;border-radius:2px;
 }
-.lobby-head h1 {margin-right:auto}
+.lobby-head h1 {margin-right:auto;font-size:1rem;letter-spacing:.12em;line-height:1.4}
+.lobby-head button {font-size:.875rem;border-radius:0}
+.lobby-head button:first-of-type {border-radius:2px 0 0 2px}
+.lobby-head button:last-of-type {border-radius:0 2px 2px 0;position:relative}
+.lobby-head button:last-of-type::before {position:absolute;content:"";left:0;top:30%;bottom:30%;border-left:1px solid #3036303d}
 .lobby-head button,.lobby-wayfinding button {min-height:44px;pointer-events:auto}
-.lobby-head button:hover,.lobby-wayfinding button:hover {background:#31433d}
+.lobby-head button:hover,.lobby-wayfinding button:hover {background:#fffef8}
 #lobbyMessage {position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
 .lobby-wayfinding {
   position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));
   display:grid;justify-items:end;gap:6px;max-width:calc(100% - 112px);pointer-events:none;
 }
-.lobby-wayfinding p {line-height:1.4}
+.lobby-wayfinding p {line-height:1.4;font-size:.8rem}
 .lobby-quiet .lobby-head,.lobby-quiet .lobby-wayfinding {visibility:hidden;opacity:0}
 .lobby-quiet .walk-pad {opacity:0}
 .lobby-quiet.stick-active .walk-pad,.lobby-quiet .walk-pad:focus-within {opacity:1}

@@ -4,7 +4,7 @@ import {roomSize} from "./room-size.js?v=desk33";
 import * as T from "./vendor/three.module.js";
 import {mountRenderer, disposeMount} from "./mount-render.js?v=desk33";
 import { architecture } from "./architecture.js?v=mount32";
-export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
+export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false) {
   const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";
   const canvasFont=(px,weight)=>weight+" "+px+"px "+family;
   const scene = new T.Scene(),
@@ -45,6 +45,17 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   cam.rotation.order = "YXZ";
   const station=new T.Vector3(0,1.65,2), entranceLook=new T.Vector3(0,1.65,-5);
   const building = architecture(scene, box, renderer, theme, halfWidth, halfDepth, roomHeight);
+  // Keep the previous room on screen until this camera has drawn its own architecture and artwork.
+  let markDrawn, surfaceReady=false, releaseArtwork, arrivalStart=null;
+  const ready=new Promise(resolve=>{markDrawn=resolve;});
+  const artworkReady=new Promise(resolve=>{releaseArtwork=resolve;});
+  if(!portalEntry || works[0]?.type!=="圖片")releaseArtwork();
+  // The visitor can return to the lobby during a slow download. A late surface map
+  // may refine the room later, but keep its first painting off screen until decoded.
+  let readinessLimit;
+  const surfaces=portalEntry ? Promise.race([building.ready,
+    new Promise(resolve=>{readinessLimit=setTimeout(resolve,2200);})]) : building.ready;
+  Promise.all([surfaces,artworkReady]).then(()=>{surfaceReady=true;clearTimeout(readinessLimit);});
   let reflection,
     disposed = false;
   building.ready
@@ -160,6 +171,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       tex = new T.CanvasTexture(c);
       animated.push({ img, ctx: c.getContext("2d"), tex });
     } else if (a.type === "圖片") tex = new T.TextureLoader().load(a.src,(loaded)=>{
+      if(a===works[0])releaseArtwork();
       const image=loaded.image;
       if(disposed || a.tiles?.length || (!spec.isHandscroll && w < 4*h) || image.width<=4096) return;
       const count=Math.ceil(image.width/2048);
@@ -172,7 +184,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
         crop.getContext("2d").drawImage(image,left,0,right-left,image.height,0,0,crop.width,crop.height);
         addSection(new T.CanvasTexture(crop),i,count);
       }
-    });
+    },undefined,()=>{if(a===works[0])releaseArtwork();});
     else tex = labelTexture(a);
     tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     tex.colorSpace = T.SRGBColorSpace;
@@ -267,6 +279,17 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   setEntrance();
   cam.position.copy(station);
   cam.lookAt(entranceLook);
+  const reducedEntry=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const arrivalFrom=station.clone();
+  if(portalEntry && !reducedEntry) {
+    const towardWall=entranceLook.clone().sub(station);
+    towardWall.y=0;
+    arrivalFrom.addScaledVector(towardWall.normalize(),-.54);
+    arrivalFrom.x=T.MathUtils.clamp(arrivalFrom.x,-halfWidth+.14,halfWidth-.14);
+    arrivalFrom.z=T.MathUtils.clamp(arrivalFrom.z,-halfDepth+.14,halfDepth-.14);
+    cam.position.copy(arrivalFrom);
+    cam.lookAt(entranceLook);
+  }
   let keys = new Map(),
     ray = new T.Raycaster(),
     drag,
@@ -677,6 +700,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   const arrowTapMs=180, arrowStep=.12/.9, arrowPrecision=.18/.9;
   let tapTravel = [];
   function key(e) {
+    if(host.closest("[inert]"))return;
     const code=e.code || (e.key.length===1 ? "Key"+e.key.toUpperCase() : e.key);
     if(!shortcuts[code] && code!=="KeyR" && code!=="Space") return;
     if(e.type==="keyup") {
@@ -814,7 +838,17 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     }
     if(wheelZoom)advanceWheel(now);
     if (!travel) marker.visible = false;
+    if(arrivalStart!==null) {
+      const fraction=T.MathUtils.clamp((now-arrivalStart)/520,0,1);
+      cam.position.lerpVectors(arrivalFrom,station,1-(1-fraction)**3);
+      cam.lookAt(entranceLook);
+      if(fraction===1)arrivalStart=null;
+    }
     renderer.render(scene, cam);
+    if(surfaceReady && markDrawn && !renderer.getContext().isContextLost()) {
+      markDrawn();
+      markDrawn=null;
+    }
     rulers?.draw();
   }
   renderer.setAnimationLoop(renderFrame);
@@ -969,6 +1003,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     input.type==="entrylook" ? turn(-input.dx*.003,-input.dy*.003) : key({ ...input, target:canvas, preventDefault() {} })
   }));
   return {
+    ready,
+    arrive() {if(portalEntry && !reducedEntry)arrivalStart=performance.now();},
     seek(fraction) { wheelZoom=null; if (reading) panTo((fraction*2-1)*reading.limit); },
     overview() {
       const i=guide;
@@ -1069,6 +1105,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     home:resetView,
     focus,
     dispose() {
+      clearTimeout(readinessLimit);
+      markDrawn?.();
       mounts.dispose();
       building.dispose?.();
       building.textures.forEach((t) => t.dispose());

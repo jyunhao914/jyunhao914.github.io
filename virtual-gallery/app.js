@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=lobby35";
+import {lobbyPage} from "./lobby-page.js?v=grounds37";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
@@ -90,6 +90,7 @@ function detail(a) {
 $("close").onclick = () => $("detail").close();
 $("detail").onclose = () => $("content").replaceChildren();
 function leave(entireFullscreen=false) {
+  $("visit").inert=false;
   $("stage").dispatchEvent(new Event("discardnavigation"));
   $("visit").classList.remove("immersive", "expanded");
   document.body.classList.remove("visiting");
@@ -195,7 +196,7 @@ function offerCatalogue(message) {
   browse.focus({preventScroll:true});
   return notice;
 }
-async function enter(workId) {
+async function enter(workId,throughDoor=false) {
   const target=current.works.find(work=>work.id===workId);
   if(target)$("room").value=target.room;
   if(!privatePreview)lastDoor=Array.from($("hallList").children).find(card=>
@@ -204,6 +205,7 @@ async function enter(workId) {
   viewer?.dispose();
   viewer = null;
   $("visit").hidden = false;
+  $("visit").inert = throughDoor;
   document.body.classList.add("visiting");
   $("visit").classList.add("immersive");
   menu(false);
@@ -216,10 +218,15 @@ async function enter(workId) {
     ...roomWorks.map((a, i) => new Option(a.title, i)),
   );
   document.querySelector(".hero").hidden = true;
-  $("stage").textContent = "正在開啟 3D 展廳…";
-  $("stage").focus({preventScroll:true});
+  $("stage").textContent = throughDoor ? "" : "正在開啟 3D 展廳…";
+  if(!throughDoor)$("stage").focus({preventScroll:true});
+  function releaseDoor() {
+    lobby.close();
+    $("hallEntrance").hidden=true;
+    $("visit").inert=false;
+  }
   try {
-    let { gallery } = await import("./gallery.js?v=hall34");
+    let { gallery } = await loadRoomRenderer();
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -230,15 +237,17 @@ async function enter(workId) {
           $("scrollPosition").value = Math.round(fraction*1000);
           $("scrollPosition").setAttribute("aria-valuetext", "自卷首向左 " + Math.round((1-fraction)*100) + "%");
           $("readPosition").textContent = Math.round((1-fraction)*100) + "%";
-        },
+        }, undefined, throughDoor,
       );
     if (n === seq && viewer) {
       if(target)viewer.select(roomWorks.indexOf(target));
       const canvas=$("stage").querySelector("canvas");
-      canvas.focus({preventScroll:true});
       let notice;
       canvas.addEventListener("webglcontextlost",()=>{
-        if(n===seq && !notice)notice=offerCatalogue("3D 畫面暫停，正在等待圖形服務恢復。");
+        if(n===seq && !notice) {
+          if(throughDoor)releaseDoor();
+          notice=offerCatalogue("3D 畫面暫停，正在等待圖形服務恢復。");
+        }
       });
       canvas.addEventListener("webglcontextrestored",()=>{
         if(n!==seq)return;
@@ -247,9 +256,19 @@ async function enter(workId) {
         notice=null;
         if(restoreFocus)canvas.focus({preventScroll:true});
       });
+      if(throughDoor) {
+        await viewer.ready;
+        if(n!==seq || !visit.inert)return;
+        viewer.arrive();
+        await lobby.revealRoom();
+        if(n!==seq)return;
+        releaseDoor();
+      }
+      canvas.focus({preventScroll:true});
     }
   } catch (e) {
     if(n!==seq)return;
+    if(throughDoor)releaseDoor();
     $("stage").replaceChildren();
     offerCatalogue("此裝置暫時無法開啟 3D 展廳。");
     console.error(e);
@@ -461,10 +480,27 @@ function showCatalogue(visible) {
 }
 let lastRoute, lastDoor;
 const doors=[];
-const lobby=lobbyPage(door=>openRoom(door.show,door.room));
+let incomingDoor;
+function loadRoomRenderer() {return import("./gallery.js?v=grounds37");}
+function prepareRoom(door) {
+  loadRoomRenderer().catch(()=>{});
+  const urls=["materials/plaster-color.webp","materials/wood-color.webp","materials/wood-normal.webp",
+    "materials/stone-color.webp",door?.cover?.src];
+  for(const url of urls.filter(Boolean)) {
+    const image=new Image();
+    image.decoding="async";
+    image.src=url;
+  }
+}
+const lobby=lobbyPage(door=>{
+  incomingDoor=door;
+  openRoom(door.show,door.room);
+},prepareRoom);
 function showEntrance() {
   const expanded=visit.classList.contains("expanded");
   const exit=leave();
+  incomingDoor=null;
+  lobby.close();
   showCatalogue(false);
   $("hallEntrance").hidden=false;
   document.title="展場大廳｜虛擬策展工作室";
@@ -477,8 +513,11 @@ function restorePageFocus(target,exit) {
   else focus();
 }
 function displayShow(show,room,work,catalogue) {
-  const expanded=lobby.close();
-  $("hallEntrance").hidden=true;
+  const throughDoor=Boolean(incomingDoor && incomingDoor.show===show &&
+    (!room || incomingDoor.room===room) && !work && !catalogue);
+  incomingDoor=null;
+  const expanded=throughDoor ? lobby.hold() : lobby.close();
+  $("hallEntrance").hidden=!throughDoor;
   $("entranceLink").removeAttribute("aria-current");
   if(current!==show) {
     current=show;
@@ -496,7 +535,7 @@ function displayShow(show,room,work,catalogue) {
   } else {
     showCatalogue(false);
     if(expanded)visit.classList.add("expanded");
-    enter(work);
+    enter(work,throughDoor);
   }
 }
 function applyRoute() {
@@ -546,7 +585,8 @@ function drawEntrance() {
       card.className="hall-door";card.dataset.show=show.id;card.dataset.room=room || "";
       card.href=visitUrl(show,room);
       card.setAttribute("aria-label","進入"+name+(show.title===name ? "" : " · "+show.title));
-      card.onclick=e=>linkAction(e,()=>openRoom(show,room));
+      const doorIndex=doors.length-1;
+      card.onclick=e=>linkAction(e,()=>{if(!lobby.choose(doorIndex))openRoom(show,room);});
       picture.className="hall-picture";
       picture.setAttribute("aria-hidden","true");
       if(cover) {
@@ -564,8 +604,9 @@ function drawEntrance() {
   $("hallStatus").textContent="開放參觀 · "+list.childElementCount+" 個展廳";
 }
 $("entranceLink").href=visitUrl();
-$("entranceLink").onclick=e=>linkAction(e,()=>go(visitUrl()));
+$("entranceLink").onclick=e=>linkAction(e,()=>{lastDoor=null;go(visitUrl());});
 $("backToEntrance").onclick=()=>go(visitUrl());
+$("portalBack").onclick=()=>history.back();
 $("worksLink").onclick=e=>linkAction(e,()=>$("works").scrollIntoView());
 window.addEventListener("popstate",applyRoute);
 window.addEventListener("hashchange",applyRoute);

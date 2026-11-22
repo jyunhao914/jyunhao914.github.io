@@ -25,6 +25,8 @@ https://polyhaven.com/a/shady_patch
 Creative Commons CC0 1.0 Universal. The woodland.webp derivative is a
 2048 × 1024 equirectangular sRGB image from the original HDR panorama;
 exposure and foliage saturation have been adjusted for the gallery windows.
+canopy-light.webp is a softened luminance mask of the same photographed canopy
+used to project leaf shadows onto the garden approach.
 
 Wood Floor (Dimitrios Savva), 1.70 m scan. https://polyhaven.com/a/wood_floor
 Quatrefoil Jacquard Fabric (colormass and Rico Cilliers), 0.28 m scan; diffuse recolored for scroll mounting. https://polyhaven.com/a/quatrefoil_jacquard_fabric
@@ -39,3 +41,22 @@ generated for this gallery.
 The floral-twill (花綾) colour, OpenGL normal and roughness maps are original
 procedural fabric textures. The plum-blossom design uses a single dye with
 opposing diagonal twill directions across the flowers and ground.
+
+Limestone for the entrance and stone reveals: Medieval Blocks 05, Rob Tuytel,
+Poly Haven (formerly Texture Haven), Creative Commons CC0 1.0 Universal.
+https://polyhaven.com/a/medieval_blocks_05
+https://polyhaven.com/license
+Source area 2 m × 2 m. Only exposed limestone faces were sampled from the
+matching diffuse and OpenGL normal maps, excluding mortar and soil. The
+seamless derivatives have a 0.70 m × 0.52 m repeat. The albedo is colour
+balanced for a light honed finish and the averaged normals are renormalized.
+limestone-color.webp is sRGB and limestone-normal.webp is non-colour data.
+
+Garden surroundings and glazing reflections: Ballawley Park by Savva Zakharov, Poly Haven.
+https://polyhaven.com/a/ballawley_park
+CC0 1.0 Universal. garden-panorama.webp is a tone-mapped and colour-graded
+2816 × 1408 derivative of the 4K HDR panorama. Planters and architecture are 3D geometry.
+
+Garden lawn: Grass Ground by Charlotte Baglioni, Poly Haven.
+https://polyhaven.com/a/grass_ground
+CC0 1.0 Universal. garden-grass.webp is a 768 px diffuse-map derivative.

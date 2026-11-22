@@ -4,22 +4,23 @@
   <meta charset="utf-8" /><meta
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
-  /><title>展場大廳｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=lobby35" />
+  /><title>美術館園區｜虛擬策展工作室</title
+  ><link rel="stylesheet" href="style.css?v=grounds37" />
   <link rel="stylesheet" href="typography.css?v=hall34">
   <header>
     <strong>虛擬策展工作室</strong>
-    <nav aria-label="參觀導覽"><a id="entranceLink" href="./">展場大廳</a><a id="worksLink" href="#works" hidden>展出作品</a></nav>
+    <nav aria-label="參觀導覽"><a id="entranceLink" href="./">美術館園區</a><a id="worksLink" href="#works" hidden>展出作品</a></nav>
   </header>
   <main>
     <section id="hallEntrance" aria-labelledby="entranceTitle">
       <div id="lobbyStage" aria-label="可步行的 3D 展場大廳"></div>
       <div class="lobby-head">
-        <h1 id="entranceTitle">展場大廳</h1>
+        <h1 id="entranceTitle">美術館園區</h1>
         <button type="button" id="lobbyExpand">全螢幕</button>
         <button type="button" id="lobbyDirectory" aria-haspopup="dialog" aria-controls="lobbyDirectoryPanel" disabled>展廳名錄</button>
       </div>
-      <p id="lobbyMessage" role="status">正在開啟展場大廳…</p>
+      <p id="lobbyMessage" role="status">正在開啟美術館園區…</p>
+      <div id="portalWait" hidden><span role="status">正在準備展廳</span><button type="button" id="portalBack">返回大廳</button></div>
       <div class="lobby-wayfinding">
         <button type="button" id="lobbyEnterDoor" hidden></button>
         <p id="lobbyHint" hidden>拖曳環顧 · 點門或走進展廳</p>
@@ -30,11 +31,11 @@
         <div id="hallList"></div>
         <details id="lobbyGuide" class="gesture-guide">
           <summary>大廳操作指引</summary>
-          <p>拖曳畫面轉身。輕推左下角搖桿慢走，推遠加快，放手即停。點門或走過門檻即可進場。</p>
-          <p>方向鍵或 WASD 移動。按住空白鍵配合方向鍵轉頭，走近門口按 Enter 進場，按 R 回到起點。</p>
+          <p>從園區點美術館正門即可入館，進入大廳後點選展廳。拖曳畫面轉身。輕推左下角搖桿慢走，推遠加快，放手即停。點門或走過門檻即可進場。</p>
+          <p>方向鍵或 WASD 移動。按住空白鍵配合方向鍵轉頭，走近門口按 Enter 進場，按 Esc 停下自動行走，按 R 回到所在區域的起點。</p>
           <div class="touch-motion"><button type="button" id="lobbyGyro" aria-pressed="false">陀螺儀轉向</button> <span id="lobbyGyroStatus" role="status"></span></div>
         </details>
-        <div class="lobby-directory-actions"><button type="button" id="lobbyHome">回到大廳起點</button><button type="button" id="lobbyRetry" hidden>重新開啟 3D 大廳</button><a id="lobbyAdminLink" href="admin/">策展後台</a><a id="lobbyDownload" href="studio.zip" download>下載工作室</a></div>
+        <div class="lobby-directory-actions"><button type="button" id="lobbyHome">回到大廳起點</button><button type="button" id="lobbyReturnGrounds" hidden>回到美術館園區</button><button type="button" id="lobbyRetry" hidden>重新開啟 3D 大廳</button><a id="lobbyAdminLink" href="admin/">策展後台</a><a id="lobbyDownload" href="studio.zip" download>下載工作室</a></div>
       </dialog>
     </section>
     <section id="exhibits" hidden>
@@ -141,7 +142,7 @@
       }
       if(!preview && (!location.hash || location.hash==="#entrance")) {
         const preload=document.createElement("link");
-        preload.rel="modulepreload";preload.href="./lobby.js?v=lobby35";
+        preload.rel="modulepreload";preload.href="./lobby.js?v=grounds37";
         document.head.append(preload);
       }
       function captureEarlyNavigation(stage,surface) {
@@ -163,7 +164,7 @@
         });
         stage.addEventListener("lostpointercapture",()=>{touch=null});
         function capture(e) {
-          if(surface.hidden || stage.querySelector("canvas") || document.querySelector("dialog[open]") || e.altKey || e.ctrlKey || e.metaKey ||
+          if(surface.hidden || surface.inert || stage.querySelector("canvas") || document.querySelector("dialog[open]") || e.altKey || e.ctrlKey || e.metaKey ||
              e.target.closest?.("input,textarea,select,button,a,[contenteditable=true]") ||
              !["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyA","KeyS","KeyD","Space","KeyR"].includes(e.code)) return;
           e.preventDefault();
@@ -183,5 +184,5 @@
       captureEarlyNavigation(document.getElementById("lobbyStage"),document.getElementById("hallEntrance"));
     })();
   </script>
-  <script type="module" src="app.js?v=lobby35"></script>
+  <script type="module" src="app.js?v=grounds37"></script>
 </html>
