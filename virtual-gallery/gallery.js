@@ -1,7 +1,7 @@
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=wide6";
-export function gallery(host, works, onPick, onMove) {
+import { architecture } from "./architecture.js?v=scrollpan7";
+export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
       64,
@@ -219,6 +219,7 @@ export function gallery(host, works, onPick, onMove) {
     );
     face.position.z = d / 2 + 0.012;
     face.userData.a = a;
+    face.userData.picture = true;
     g.add(face);
     targets.push(face);
     function addSection(tile,index,count) {
@@ -281,6 +282,7 @@ export function gallery(host, works, onPick, onMove) {
     ray = new T.Raycaster(),
     drag,
     guide = -1;
+  let reading = null;
   function hit(e) {
     let r = canvas.getBoundingClientRect();
     ray.setFromCamera(
@@ -298,11 +300,18 @@ export function gallery(host, works, onPick, onMove) {
     if (guide < 0 || onMove) travel = null;
     canvas.focus({ preventScroll: true });
     let obj = hit(e);
+    const index = obj ? works.indexOf(obj.userData.a) : -1;
+    let gesture = "look";
+    if (!onMove && obj?.userData.picture) {
+      if (reading && index === guide) gesture = "pan";
+      else if (works[index].width < 4*works[index].height) gesture = "switch";
+    }
     drag = {
       pointer: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      inspecting: guide >= 0 && !onMove && e.pointerType !== "mouse",
+      gesture, index,
+      u: obj?.userData.picture ? ray.intersectObject(obj)[0]?.uv.x : undefined,
       x: e.clientX,
       y: e.clientY,
       dist: 0,
@@ -344,7 +353,9 @@ export function gallery(host, works, onPick, onMove) {
         );
         layout(drag.obj.parent, a);
       }
-    } else if (!drag.inspecting) {
+    } else if (drag.gesture === "pan" && reading) {
+      panTo(reading.x - dx * reading.fieldWidth / canvas.clientWidth);
+    } else if (drag.gesture === "look") {
       if (drag.dist > 5) { travel=null; stopInspection(); }
       cam.rotation.y -= dx * 0.005;
       cam.rotation.x = Math.max(
@@ -360,15 +371,15 @@ export function gallery(host, works, onPick, onMove) {
     const dx = e.clientX - drag.startX,
       dy = e.clientY - drag.startY;
     if (
-      drag.inspecting &&
+      drag.gesture === "switch" &&
       Math.abs(dx) > 42 &&
       Math.abs(dx) > Math.abs(dy) * 1.3
     )
-      changeWork(guide + (dx < 0 ? 1 : -1));
+      changeWork(drag.index + (dx < 0 ? 1 : -1));
     else if (drag.dist < 9 && drag.click) {
       const work = drag.click.userData.a;
       if (onMove) onPick(work);
-      else changeWork(works.indexOf(work));
+      else if (drag.gesture !== "pan") changeWork(works.indexOf(work), drag.u);
     } else if (drag.obj) onMove(drag.obj.userData.a);
     else if (drag.dist < 9 && !onMove) {
       hit(e);
@@ -546,7 +557,8 @@ export function gallery(host, works, onPick, onMove) {
     renderer.setSize(w, h, false);
     cam.aspect = w / h;
     cam.updateProjectionMatrix();
-    if (guide >= 0 && !onMove) focus(guide, false);
+    if (reading) startReading(reading.x, false);
+    else if (guide >= 0 && !onMove) focus(guide, false);
   });
   ro.observe(host);
   let last = performance.now();
@@ -568,8 +580,11 @@ export function gallery(host, works, onPick, onMove) {
           1,
         ),
         ease = t * t * (3 - 2 * t);
+      // Equal ratios of viewing distance feel like equal changes in magnification.
+      const ratio = travel.readDistanceRatio ?? 1;
+      const pathFraction = ratio > 1.02 ? (ratio - Math.pow(ratio,1-ease))/(ratio-1) : ease;
       if (travel.curve.curves.length)
-        cam.position.copy(travel.curve.getPoint(ease));
+        cam.position.copy(travel.curve.getPoint(pathFraction));
       else cam.position.copy(travel.end);
       if (travel.look) {
         const final = new T.Quaternion().setFromRotationMatrix(
@@ -577,6 +592,8 @@ export function gallery(host, works, onPick, onMove) {
         );
         cam.quaternion.slerpQuaternions(travel.rotation, final, ease);
       }
+      if (reading && travel.readStart !== undefined)
+        cam.position.addScaledVector(reading.axis,(reading.x-travel.readStart)*ease);
       if (t === 1) travel = null;
     } else {
       const yaw = cam.rotation.y,
@@ -627,33 +644,56 @@ export function gallery(host, works, onPick, onMove) {
   }
   function stopInspection() {
     if (guide >= 0 && !onMove) {
+      reading = null;
       guide = -1;
       onPick(null);
     }
   }
-  let panel=-1;
-  function readPanel(step) {
-    const a=works[guide], g=groups[guide];
-    if (!g || a.width < 4*a.height) return "";
-    const parts=Math.max(2,Math.ceil(a.width/Math.max(.35,a.height*cam.aspect*.84)));
-    panel=(panel+step+parts)%parts;
-    const at=new T.Vector3(a.width*(.5-(panel+.5)/parts),0,0).applyQuaternion(g.quaternion).add(g.position);
-    const dest=at.clone().addScaledVector(new T.Vector3(0,0,1).applyQuaternion(g.quaternion),
-      Math.max(.85,a.height*.65/Math.tan(T.MathUtils.degToRad(cam.fov/2))));
-    navigate(dest,at);
-    return (panel+1)+" / "+parts;
+  function startReading(x, animate) {
+    const g=groups[guide], a=works[guide];
+    // Keep the scroll at about 44% of the viewport height, with a stable wall above and below.
+    const distance=a.height/(.88*Math.tan(T.MathUtils.degToRad(cam.fov/2)));
+    const fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
+    const limit=Math.max(0,(a.width-fieldWidth*.88)/2);
+    x=T.MathUtils.clamp(x,-limit,limit);
+    const axis=new T.Vector3(1,0,0).applyQuaternion(g.quaternion);
+    const at=g.position.clone().addScaledVector(axis,x);
+    const dest=at.clone().addScaledVector(new T.Vector3(0,0,1).applyQuaternion(g.quaternion),distance);
+    reading={x,axis,fieldWidth,limit};
+    if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      navigate(dest,at);
+      travel.readStart=x;
+      travel.readDistanceRatio=cam.position.distanceTo(at)/distance;
+    } else {
+      travel=null;
+      cam.position.copy(dest);
+      cam.lookAt(at);
+    }
+    onRead(limit ? (x+limit)/(2*limit) : .5);
   }
-  function changeWork(i) {
-    panel=-1;
+  function panTo(value) {
+    if (!reading) return;
+    const {x,axis,limit}=reading;
+    reading.x=T.MathUtils.clamp(value,-limit,limit);
+    if (!travel) cam.position.addScaledVector(axis,reading.x-x);
+    onRead(limit ? (reading.x+limit)/(2*limit) : .5);
+  }
+  function changeWork(i,u) {
     if (!works.length) return;
+    reading=null;
     guide = (i + works.length) % works.length;
-    focus(guide, true);
-    if (!onMove) onPick(works[guide]);
-    return works[guide];
+    const a=works[guide];
+    if (!onMove) onPick(a);
+    if (!onMove && a.width >= 4*a.height) startReading(((u ?? 1)-.5)*a.width,true);
+    else focus(guide,true);
+    return a;
   }
   return {
-    readPanel,
-    turn() { travel=null; stopInspection(); },
+    seek(fraction) { if (reading) panTo((fraction*2-1)*reading.limit); },
+    overview() {
+      const i=guide;
+      if(i>=0){ stopInspection(); focus(i,true); }
+    },
     next(offset = 1) {
       return changeWork(
         guide < 0 ? (offset > 0 ? 0 : works.length - 1) : guide + offset,

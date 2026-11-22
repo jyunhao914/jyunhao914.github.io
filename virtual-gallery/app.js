@@ -176,12 +176,14 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=wide6");
+    let { gallery } = await import("./gallery.js?v=scrollpan7");
     if (n === seq)
       viewer = gallery(
         $("stage"),
         current.works.filter((a) => a.room === $("room").value),
         showFocus,
+        undefined,
+        fraction => { $("scrollPosition").value = Math.round(fraction*1000); },
       );
   } catch (e) {
     $("stage").textContent = "此裝置無法啟動 WebGL 2。可於展出作品區開啟展籤。";
@@ -213,22 +215,14 @@ $("homeView").onclick = () => {
   $("tour").value = "";
 };
 const visit = $("visit");
-$("orbit").onclick=()=>viewer?.turn();
-for(const [id,step] of [["panelNext",1],["panelPrev",-1]]) {
-  $(id).onclick=()=>{
-    $("viewHelp").textContent="局部近看　"+viewer.readPanel(step);
-    $("panelNext").textContent="下一段";
-    $("panelPrev").hidden=false;
-  };
-}
+$("scrollPosition").oninput = e => viewer?.seek(Number(e.target.value)/1000);
+$("overview").onclick = () => viewer?.overview();
 function showFocus(a) {
-  $("inspectControls").hidden=!a;
-  $("panelPrev").hidden=true;
-  $("panelNext").hidden=!a || a.width<4*a.height;
-  $("panelNext").textContent="逐段近看";
+  const wide = a && a.width >= 4*a.height;
+  $("inspectControls").hidden = !wide;
   $("focusTitle").textContent = a?.title || "";
   $("viewHelp").textContent = a
-    ? "左右滑動切換作品"
+    ? (wide ? "拖畫讀卷 · 拖牆轉身" : "滑作品換件 · 拖牆轉身")
     : "點作品走近觀賞 · 拖曳環顧";
   $("tour").value = a
     ? String(

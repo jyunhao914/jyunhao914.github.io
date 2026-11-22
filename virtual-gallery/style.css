@@ -502,3 +502,6 @@ body.visiting {
 #inspectControls { position:absolute; bottom:max(76px,env(safe-area-inset-bottom));right:12px; z-index:4;display:flex;gap:4px }
 #inspectControls[hidden],#inspectControls button[hidden]{display:none}
 #inspectControls button{background:#20302ee8;color:white;min-height:40px;border:1px solid #fff6;padding:5px 10px}
+
+#inspectControls {align-items:center;background:#20302ee8;border-radius:7px;padding:0 5px}
+#scrollPosition {width:clamp(70px,19vw,150px);margin:0 6px;accent-color:#e1d8bd;min-height:40px}
