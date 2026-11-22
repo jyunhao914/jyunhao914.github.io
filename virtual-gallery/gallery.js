@@ -1,7 +1,7 @@
 import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=space12";
+import { architecture } from "./architecture.js?v=pinch28";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -305,8 +305,88 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     );
     return ray.intersectObjects(targets)[0]?.object;
   }
+  const fingers=new Map();
+  let pinch=null, multiTouch=false, zoomed=false, editorSelection=0;
+  const roomBounds=new T.Box3(new T.Vector3(-halfWidth,0,-halfDepth),new T.Vector3(halfWidth,building.height,halfDepth));
+  const benchBounds=new T.Box3(new T.Vector3(-1.67,-1,-1.78),new T.Vector3(1.67,building.height,-.62));
+  function cancelDrag() {
+    if(drag?.move){drag.move(0,0);updatePlacement();rulers.select(editorSelection);}
+    drag=null;
+  }
+  function fingerPair() {
+    const [a,b]=fingers.values();
+    return {span:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+  }
+  function touchRay(pair,rect) {
+    ray.setFromCamera(new T.Vector2(2*(pair.x-rect.left)/rect.width-1,1-2*(pair.y-rect.top)/rect.height),cam);
+  }
+  function beginPinch() {
+    cancelDrag();
+    if(reading && travel)takeOverApproach();
+    travel=null;
+    const pair=fingerPair(),rect=canvas.getBoundingClientRect();
+    if(pair.span<4 || !rect.width || !rect.height){pinch=null;return;}
+    cam.updateMatrixWorld();
+    touchRay(pair,rect);
+    const forward=cam.getWorldDirection(new T.Vector3());
+    let anchor;
+    if(reading) {
+      const plane=new T.Plane().setFromNormalAndCoplanarPoint(reading.normal,reading.faceCenter);
+      anchor=ray.ray.intersectPlane(plane,new T.Vector3());
+    }
+    anchor ??= ray.intersectObjects(targets,false)[0]?.point
+      ?? ray.ray.intersectBox(roomBounds,new T.Vector3())
+      ?? ray.ray.at(2,new T.Vector3());
+    const depth=anchor.clone().sub(cam.position).dot(forward);
+    pinch={rect,span:pair.span,anchor,forward,depth:Math.max(.18,depth)};
+  }
+  function updatePinch() {
+    if(fingers.size!==2)return;
+    if(!pinch){beginPinch();return;}
+    const pair=fingerPair();
+    if(pair.span<4)return;
+    touchRay(pair,pinch.rect);
+    // Hold the touched detail under the midpoint as the distance changes.
+    const depth=T.MathUtils.clamp(pinch.depth*pinch.span/pair.span,.18,cam.far*.8);
+    const destination=ray.ray.direction.clone().multiplyScalar(-depth/ray.ray.direction.dot(pinch.forward)).add(pinch.anchor);
+    destination.x=T.MathUtils.clamp(destination.x,-halfWidth+.25,halfWidth-.25);
+    destination.y=T.MathUtils.clamp(destination.y,.18,building.height-.18);
+    destination.z=T.MathUtils.clamp(destination.z,-halfDepth+.25,halfDepth-.25);
+    if(hasBench) {
+      const delta=destination.clone().sub(cam.position);
+      const length=delta.length();
+      if(length>0 && !blocked(cam.position.x,cam.position.z)) {
+        const path=new T.Ray(cam.position,delta.normalize());
+        const edge=path.intersectBox(benchBounds,new T.Vector3());
+        if(edge && edge.distanceTo(cam.position)<=length)path.at(Math.max(0,edge.distanceTo(cam.position)-.01),destination);
+      }
+    }
+    zoomed=true;
+    cam.position.copy(destination);
+    if(reading)syncReadingTrack(destination);
+    cam.updateMatrixWorld();
+  }
+  function endTouch(e) {
+    if(!fingers.delete(e.pointerId) || !multiTouch)return false;
+    pinch=null;
+    if(fingers.size===2)beginPinch();
+    // Never turn the finger left on the glass into a tap, swipe or hanging operation.
+    if(!fingers.size)multiTouch=false;
+    return true;
+  }
   canvas.onpointerdown = (e) => {
-    if (drag) return;
+    if(e.pointerType==="touch") {
+      if(drag && !fingers.has(drag.pointer))return;
+      fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(fingers.size>1 || multiTouch) {
+        canvas.setPointerCapture(e.pointerId);
+        if(!multiTouch)host.dispatchEvent(new Event("gallerypinchstart"));
+        multiTouch=true;
+        if(fingers.size===2)beginPinch();
+        return;
+      }
+    }
+    if (drag || multiTouch) return;
     canvas.setPointerCapture(e.pointerId);
     if (guide < 0 || onMove) travel = null;
     canvas.focus({ preventScroll: true });
@@ -344,6 +424,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     }
   };
   canvas.onpointermove = (e) => {
+    const finger=fingers.get(e.pointerId);
+    if(finger) {
+      finger.x=e.clientX;finger.y=e.clientY;
+      if(multiTouch){updatePinch();return;}
+    }
     if (!drag || e.pointerId !== drag.pointer) return;
     let dx = e.clientX - drag.x,
       dy = e.clientY - drag.y;
@@ -391,10 +476,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     }
   };
   canvas.tabIndex = 0;
-  canvas.setAttribute("aria-label", "展廳視角，可拖曳環視或點地板前往");
+  canvas.setAttribute("aria-label", "展廳視角，可拖曳環視、雙指縮放或點地板前往");
   canvas.onpointerup = (e) => {
+    if(endTouch(e))return;
     if (e.defaultPrevented) { drag=null; return; }
     if (!drag || drag.pointer !== e.pointerId) return;
+    if(drag.obj)editorSelection=drag.index;
     const dx = e.clientX - drag.startX,
       dy = e.clientY - drag.startY;
     if (
@@ -424,9 +511,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     }
     drag = null;
   };
-  canvas.onpointercancel = () => {
-    if(drag?.move){ drag.move(0,0); updatePlacement(); }
-    drag=null;
+  canvas.onpointercancel = canvas.onlostpointercapture = (e) => {
+    if(!endTouch(e) && drag?.pointer===e.pointerId)cancelDrag();
   };
   let travel = null;
   function operate(action,dt) {
@@ -455,7 +541,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+pitch,-1.2,1.2);
   }
   const mobile = (!onMove || tools)
-    ? mobileControls(host,turn,()=>Boolean(travel || guide>=0 || drag)) : null;
+    ? mobileControls(host,turn,()=>Boolean(travel || guide>=0 || drag || multiTouch)) : null;
   const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
     ArrowUp:"前進",ArrowDown:"後退",ArrowLeft:"左移",ArrowRight:"右移"};
   const turning={ArrowUp:"抬頭",ArrowDown:"低頭",ArrowLeft:"左轉",ArrowRight:"右轉"};
@@ -538,8 +624,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   }
   function resetView() {
     blur();
-    if(drag?.move){drag.move(0,0);updatePlacement();}
-    drag=null;
+    zoomed=false;
     travel=null;
     marker.visible=false;
     stopInspection();
@@ -591,6 +676,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
   let blur = () => {
+    cancelDrag();
+    fingers.clear();multiTouch=false;pinch=null;
     keys.clear();
     tapTravel=[];
     mobile?.release();
@@ -603,8 +690,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     renderer.setSize(w, h, false);
     cam.aspect = w / h;
     cam.updateProjectionMatrix();
-    if (reading) startReading(reading.x, false);
-    else if (guide >= 0 && !onMove) focus(guide, false);
+    if(zoomed) {
+      if(reading)syncReadingTrack(cam.position);
+      if(fingers.size===2)beginPinch();
+    } else if(reading)startReading(reading.x,false);
+    else if(guide>=0 && !onMove)focus(guide,false);
   });
   ro.observe(host);
   const frameMeter=document.getElementById("frameMeter");
@@ -699,6 +789,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   function focus(i, animate = false) {
     const g = groups[i];
     if (!g) return;
+    zoomed=false;
+    if(onMove)editorSelection=i;
     rulers?.select(i);
     if(tools && onMove) {
       const art=works[i], box=tools.envelope(tools.members(works,art));
@@ -748,6 +840,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     }
   }
   function startReading(x, animate) {
+    zoomed=false;
     const g=groups[guide], a=works[guide];
     const angle=walls[a.wall || 0];
     const normal=new T.Vector3(Math.sin(angle),0,Math.cos(angle));
@@ -773,6 +866,17 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       cam.lookAt(at);
     }
     onRead(limit ? (x+limit)/(2*limit) : .5);
+  }
+  function syncReadingTrack(position) {
+    const relative=position.clone().sub(reading.faceCenter);
+    const distance=Math.max(.18,relative.dot(reading.normal));
+    reading.origin.copy(reading.faceCenter).addScaledVector(reading.normal,distance);
+    reading.origin.y=position.y;
+    reading.fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
+    reading.limit=Math.max(0,(works[guide].width-reading.fieldWidth)/2);
+    reading.x=T.MathUtils.clamp(relative.dot(reading.axis),-reading.limit,reading.limit);
+    cam.position.copy(reading.origin).addScaledVector(reading.axis,reading.x);
+    onRead(reading.limit ? (reading.x+reading.limit)/(2*reading.limit) : .5);
   }
   function placeOnTrack() {
     cam.position.copy(reading.origin).addScaledVector(reading.axis,reading.x);

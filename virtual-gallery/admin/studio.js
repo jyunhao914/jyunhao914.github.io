@@ -544,7 +544,8 @@ function layout(keepScene=false) {
     '<h1>布展編輯</h1><div class="bar"><label>展覽<select id="ex"></select></label><label>編輯作品<select id="sel"></select></label>' +
     btn("2D", "2D 展牆") +
     btn("3D", "實景布展") +
-    '</div><div class="hanging-desk"><section id="wall-preview" aria-label="即時展牆預覽"><div class="surface-tools"><strong>展牆預覽</strong>'+
+    '</div><div class="hanging-desk"><section id="wall-preview" aria-label="即時展牆預覽"><div class="surface-tools"><strong>展牆預覽'+
+    (mode==="3D" && a ? '<small class="pinch-tip"> · 雙指縮放</small>' : '')+'</strong>'+
     (mode==="3D" && a ? '<button id="ruler-toggle" aria-pressed="true">隱藏尺標</button>' : '')+
     btn("preview","參觀預覽")+'</div><div id="surface"></div>' +
     '<div id="position-pad" role="group" aria-label="作品位置微調"><div class="pad-caption"><strong id="adjusting-title"></strong><span>每次 5 公分</span></div><div class="nudge-keys">'+
@@ -635,7 +636,7 @@ function layout(keepScene=false) {
         toggle.setAttribute("aria-pressed",String(!readout.hidden));
       };
       let t = token;
-      import("../gallery.js?v=flow27")
+      import("../gallery.js?v=pinch28")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(

@@ -213,7 +213,7 @@ async function enter(workId) {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=flow27");
+    let { gallery } = await import("./gallery.js?v=pinch28");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -319,6 +319,10 @@ visit.addEventListener("pointermove", e=>{
     canvasPress=null;
   }
 },{passive:true});
+$("stage").addEventListener("gallerypinchstart",()=>{
+  canvasPress=null;
+  if(fullView())quietNavigation();
+});
 $("stage").addEventListener("galleryblanktap",e=>{
   if(fullView() && visit.classList.contains("controls-idle")) {
     e.preventDefault();
@@ -364,9 +368,8 @@ function showFocus(a) {
   const wide = a && a.width >= 4*a.height;
   $("inspectControls").hidden = !wide;
   $("focusTitle").textContent = a?.title || "";
-  $("viewHelp").textContent = a
-    ? (wide ? "拖長卷慢移，放手即停" : "左右滑作品換件 · 拖空牆轉身")
-    : "點作品靠近 · 拖空牆轉身";
+  const help=wide ? "拖長卷慢移，放手即停" : a ? "左右滑作品換件 · 拖空牆轉身" : "點作品靠近 · 拖空牆轉身";
+  $("viewHelp").textContent=navigator.maxTouchPoints ? help+" · 雙指縮放" : help;
   $("tour").value = a
     ? String(
         current.works

@@ -286,6 +286,8 @@
     #wall-preview{--preview-height:clamp(150px,calc(80dvh - 175px),710px)}
     #surface #stage{height:var(--preview-height);min-height:0}
     #surface .wall{width:min(100%,calc(var(--preview-height) * var(--wall-ratio)));box-sizing:border-box;margin:auto}
+    .pinch-tip{display:none;font-weight:normal;white-space:nowrap}
+    @media(any-pointer:coarse){.pinch-tip{display:inline}}
     .stage-loading{position:absolute;inset:0;display:grid;place-items:center;color:white}
     #surface .wall-readout:not([hidden]){max-height:3.4em;overflow:auto;padding:4px 8px;font-size:12px;line-height:1.5}
     #position-pad{padding:6px 8px 8px;border-top:1px solid #d2dcdf}.pad-caption{font-size:.85rem;margin-bottom:5px}
@@ -341,5 +343,5 @@
     <div class="preview-heading"><button id="closePreview">返回布展</button><strong id="previewTitle"></strong></div>
     <iframe title="草稿預覽" allowfullscreen></iframe>
   </dialog>
-  <script type="module" src="./login.js?v=studio27b"></script>
+  <script type="module" src="./login.js?v=pinch28"></script>
 </html>

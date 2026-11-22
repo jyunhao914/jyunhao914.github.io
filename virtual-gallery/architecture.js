@@ -127,7 +127,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     for(const child of scene.children)
       if(child.isMesh && child!==floor && child!==ceiling && !walls.includes(child) && !child.material.emissive?.getHex()) child.castShadow=true;
     scene.add(key);
-    return {floor, wood, textures, ready: Promise.all(loads)};
+    return {floor, height, wood, textures, ready: Promise.all(loads)};
   }
   const illumination = texture("daylight.webp");
   illumination.channel = 1;
@@ -383,5 +383,5 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
   });
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.normalBias = 0.012;
-  return { floor, textures, wood, ready: Promise.all(loads) };
+  return { floor, height:5.26, textures, wood, ready: Promise.all(loads) };
 }
