@@ -306,7 +306,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     return ray.intersectObjects(targets)[0]?.object;
   }
   const fingers=new Map();
-  let pinch=null, multiTouch=false, zoomed=false, editorSelection=0;
+  let pinch=null, wheelZoom=null, multiTouch=false, zoomed=false, editorSelection=0;
   const roomBounds=new T.Box3(new T.Vector3(-halfWidth,0,-halfDepth),new T.Vector3(halfWidth,building.height,halfDepth));
   const benchBounds=new T.Box3(new T.Vector3(-1.67,-1,-1.78),new T.Vector3(1.67,building.height,-.62));
   function cancelDrag() {
@@ -317,17 +317,14 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     const [a,b]=fingers.values();
     return {span:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2};
   }
-  function touchRay(pair,rect) {
-    ray.setFromCamera(new T.Vector2(2*(pair.x-rect.left)/rect.width-1,1-2*(pair.y-rect.top)/rect.height),cam);
+  function screenRay(point,rect) {
+    ray.setFromCamera(new T.Vector2(2*(point.x-rect.left)/rect.width-1,1-2*(point.y-rect.top)/rect.height),cam);
   }
-  function beginPinch() {
-    cancelDrag();
+  function zoomAnchor(point,rect) {
     if(reading && travel)takeOverApproach();
     travel=null;
-    const pair=fingerPair(),rect=canvas.getBoundingClientRect();
-    if(pair.span<4 || !rect.width || !rect.height){pinch=null;return;}
     cam.updateMatrixWorld();
-    touchRay(pair,rect);
+    screenRay(point,rect);
     const forward=cam.getWorldDirection(new T.Vector3());
     let anchor;
     if(reading) {
@@ -338,20 +335,37 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       ?? ray.ray.intersectBox(roomBounds,new T.Vector3())
       ?? ray.ray.at(2,new T.Vector3());
     const depth=anchor.clone().sub(cam.position).dot(forward);
-    pinch={rect,span:pair.span,anchor,forward,depth:Math.max(.18,depth)};
+    return {rect,anchor,forward,depth:Math.max(.18,depth)};
+  }
+  function beginPinch() {
+    cancelDrag();
+    const pair=fingerPair(),rect=canvas.getBoundingClientRect();
+    if(pair.span<4 || !rect.width || !rect.height){pinch=null;return;}
+    pinch={...zoomAnchor(pair,rect),span:pair.span};
   }
   function updatePinch() {
     if(fingers.size!==2)return;
     if(!pinch){beginPinch();return;}
     const pair=fingerPair();
-    if(pair.span<4)return;
-    touchRay(pair,pinch.rect);
-    // Hold the touched detail under the midpoint as the distance changes.
-    const depth=T.MathUtils.clamp(pinch.depth*pinch.span/pair.span,.18,cam.far*.8);
-    const destination=ray.ray.direction.clone().multiplyScalar(-depth/ray.ray.direction.dot(pinch.forward)).add(pinch.anchor);
-    destination.x=T.MathUtils.clamp(destination.x,-halfWidth+.25,halfWidth-.25);
-    destination.y=T.MathUtils.clamp(destination.y,.18,building.height-.18);
-    destination.z=T.MathUtils.clamp(destination.z,-halfDepth+.25,halfDepth-.25);
+    if(pair.span>=4)placeZoom(pinch,pair,pinch.depth*pinch.span/pair.span);
+  }
+  function fractionInside(start,end,low,high) {
+    if(end>high && end>start)return Math.max(0,(high-start)/(end-start));
+    if(end<low && end<start)return Math.max(0,(low-start)/(end-start));
+    return 1;
+  }
+  function placeZoom(view,point,distance) {
+    screenRay(point,view.rect);
+    // The anchor remains on the same screen ray while the eye moves in 3D.
+    const depth=T.MathUtils.clamp(distance,.18,cam.far*.8);
+    const destination=ray.ray.direction.clone().multiplyScalar(-depth/ray.ray.direction.dot(view.forward)).add(view.anchor);
+    // Stop on the line of sight at a wall, floor or ceiling. Sliding sideways
+    // along a boundary would shift the detail away from the cursor.
+    const eye=cam.position;
+    const fraction=Math.min(fractionInside(eye.x,destination.x,-halfWidth+.25,halfWidth-.25),
+      fractionInside(eye.y,destination.y,.18,building.height-.18),
+      fractionInside(eye.z,destination.z,-halfDepth+.25,halfDepth-.25));
+    destination.lerpVectors(eye,destination,fraction);
     if(hasBench) {
       const delta=destination.clone().sub(cam.position);
       const length=delta.length();
@@ -366,6 +380,39 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     if(reading)syncReadingTrack(destination);
     cam.updateMatrixWorld();
   }
+  const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)");
+  function handleWheel(e) {
+    if(e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || drag || fingers.size)return;
+    const mode=e.deltaMode;
+    if(!e.deltaY || Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
+    const rect=canvas.getBoundingClientRect();
+    if(!rect.width || !rect.height)return;
+    e.preventDefault();
+    const point={x:e.clientX,y:e.clientY};
+    const view=zoomAnchor(point,rect);
+    const unit=mode===1 ? 16 : mode===2 ? rect.height : 1;
+    const step=T.MathUtils.clamp(e.deltaY*unit,-240,240)*.00135;
+    // Carry unfinished notches forward only while aiming at the same detail.
+    const previous=wheelZoom;
+    const continueZoom=previous && previous.point.x===point.x && previous.point.y===point.y &&
+      Math.sign(previous.end-previous.view.depth)===Math.sign(step);
+    const base=continueZoom ? previous.end : view.depth;
+    const end=T.MathUtils.clamp(base*Math.exp(step),.18,cam.far*.8);
+    if(reducedMotion.matches) {
+      wheelZoom=null;
+      placeZoom(view,point,end);
+    } else {
+      wheelZoom={view,point,end,start:performance.now()};
+    }
+  }
+  canvas.addEventListener("wheel",handleWheel,{passive:false});
+  function advanceWheel(now) {
+    const {view,point,end,start}=wheelZoom;
+    const t=T.MathUtils.clamp((now-start)/96,0,1);
+    const eased=1-(1-t)**3;
+    placeZoom(view,point,view.depth*(end/view.depth)**eased);
+    if(t===1)wheelZoom=null;
+  }
   function endTouch(e) {
     if(!fingers.delete(e.pointerId) || !multiTouch)return false;
     pinch=null;
@@ -375,6 +422,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     return true;
   }
   canvas.onpointerdown = (e) => {
+    wheelZoom=null;
     if(e.pointerType==="touch") {
       if(drag && !fingers.has(drag.pointer))return;
       fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -516,6 +564,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   };
   let travel = null;
   function operate(action,dt) {
+    wheelZoom=null;
     if (reading && (action==="左移" || action==="右移")) {
       if (travel) { travel=null; placeOnTrack(); }
       panTo(reading.x+(action==="左移"?-1:1)*reading.fieldWidth*.35*dt);
@@ -541,7 +590,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+pitch,-1.2,1.2);
   }
   const mobile = (!onMove || tools)
-    ? mobileControls(host,turn,()=>Boolean(travel || guide>=0 || drag || multiTouch)) : null;
+    ? mobileControls(host,turn,()=>Boolean(travel || guide>=0 || drag || multiTouch || wheelZoom)) : null;
   const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
     ArrowUp:"前進",ArrowDown:"後退",ArrowLeft:"左移",ArrowRight:"右移"};
   const turning={ArrowUp:"抬頭",ArrowDown:"低頭",ArrowLeft:"左轉",ArrowRight:"右轉"};
@@ -677,7 +726,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   window.addEventListener("keyup", key);
   let blur = () => {
     cancelDrag();
-    fingers.clear();multiTouch=false;pinch=null;
+    fingers.clear();multiTouch=false;pinch=null;wheelZoom=null;
     keys.clear();
     tapTravel=[];
     mobile?.release();
@@ -685,6 +734,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   };
   window.addEventListener("blur", blur);
   let ro = new ResizeObserver(() => {
+    wheelZoom=null;
     let w = host.clientWidth,
       h = host.clientHeight;
     renderer.setSize(w, h, false);
@@ -781,6 +831,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
         tex.needsUpdate = true;
       }
     }
+    if(wheelZoom)advanceWheel(now);
     if (!travel) marker.visible = false;
     renderer.render(scene, cam);
     rulers?.draw();
@@ -789,7 +840,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   function focus(i, animate = false) {
     const g = groups[i];
     if (!g) return;
-    zoomed=false;
+    wheelZoom=null;zoomed=false;
     if(onMove)editorSelection=i;
     rulers?.select(i);
     if(tools && onMove) {
@@ -840,7 +891,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     }
   }
   function startReading(x, animate) {
-    zoomed=false;
+    wheelZoom=null;zoomed=false;
     const g=groups[guide], a=works[guide];
     const angle=walls[a.wall || 0];
     const normal=new T.Vector3(Math.sin(angle),0,Math.cos(angle));
@@ -873,8 +924,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     reading.origin.copy(reading.faceCenter).addScaledVector(reading.normal,distance);
     reading.origin.y=position.y;
     reading.fieldWidth=2*distance*Math.tan(T.MathUtils.degToRad(cam.fov/2))*cam.aspect;
-    reading.limit=Math.max(0,(works[guide].width-reading.fieldWidth)/2);
-    reading.x=T.MathUtils.clamp(relative.dot(reading.axis),-reading.limit,reading.limit);
+    // At the roll ends, the cursor can be over the last character. Keep that
+    // character anchored even when pulling back reveals a little bare wall.
+    reading.x=relative.dot(reading.axis);
+    reading.limit=Math.max(Math.abs(reading.x),(works[guide].width-reading.fieldWidth)/2);
     cam.position.copy(reading.origin).addScaledVector(reading.axis,reading.x);
     onRead(reading.limit ? (reading.x+reading.limit)/(2*reading.limit) : .5);
   }
@@ -895,7 +948,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   function panTo(value) {
     if (!reading) return;
     const {limit}=reading;
-    reading.x=T.MathUtils.clamp(value,-limit,limit);
+    const art=works[guide], halfWall=art.wall%2 ? halfDepth : halfWidth;
+    reading.x=T.MathUtils.clamp(value,Math.max(-limit,-halfWall+.25-art.x),Math.min(limit,halfWall-.25-art.x));
     if (!travel) placeOnTrack();
     onRead(limit ? (reading.x+limit)/(2*limit) : .5);
   }
@@ -915,7 +969,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     input.type==="entrylook" ? turn(-input.dx*.003,-input.dy*.003) : key({ ...input, target:canvas, preventDefault() {} })
   }));
   return {
-    seek(fraction) { if (reading) panTo((fraction*2-1)*reading.limit); },
+    seek(fraction) { wheelZoom=null; if (reading) panTo((fraction*2-1)*reading.limit); },
     overview() {
       const i=guide;
       if(i>=0){ stopInspection(); focus(i,true); }
@@ -957,6 +1011,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       scene.traverse((o) => o.shadow?.dispose());
       host.removeEventListener("entrylook",entryLook);
       mobile?.dispose();
+      canvas.removeEventListener("wheel",handleWheel);
       disposed = true;
       reflection?.dispose();
       renderer.setAnimationLoop(null);

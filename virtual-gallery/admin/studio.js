@@ -545,7 +545,7 @@ function layout(keepScene=false) {
     btn("2D", "2D 展牆") +
     btn("3D", "實景布展") +
     '</div><div class="hanging-desk"><section id="wall-preview" aria-label="即時展牆預覽"><div class="surface-tools"><strong>展牆預覽'+
-    (mode==="3D" && a ? '<small class="pinch-tip"> · 雙指縮放</small>' : '')+'</strong>'+
+    (mode==="3D" && a ? '<small class="pinch-tip"> · 雙指縮放</small><small class="wheel-tip"> · 對準細節滾輪縮放</small>' : '')+'</strong>'+
     (mode==="3D" && a ? '<button id="ruler-toggle" aria-pressed="true">隱藏尺標</button>' : '')+
     btn("preview","參觀預覽")+'</div><div id="surface"></div>' +
     '<div id="position-pad" role="group" aria-label="作品位置微調"><div class="pad-caption"><strong id="adjusting-title"></strong><span>每次 5 公分</span></div><div class="nudge-keys">'+
@@ -636,7 +636,7 @@ function layout(keepScene=false) {
         toggle.setAttribute("aria-pressed",String(!readout.hidden));
       };
       let t = token;
-      import("../gallery.js?v=pinch28")
+      import("../gallery.js?v=wheel29")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(

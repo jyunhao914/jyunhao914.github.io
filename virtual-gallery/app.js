@@ -213,7 +213,7 @@ async function enter(workId) {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=pinch28");
+    let { gallery } = await import("./gallery.js?v=wheel29");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -323,6 +323,9 @@ $("stage").addEventListener("gallerypinchstart",()=>{
   canvasPress=null;
   if(fullView())quietNavigation();
 });
+$("stage").addEventListener("wheel",e=>{
+  if(e.defaultPrevented && e.target.tagName==="CANVAS" && fullView())quietNavigation();
+},{passive:true});
 $("stage").addEventListener("galleryblanktap",e=>{
   if(fullView() && visit.classList.contains("controls-idle")) {
     e.preventDefault();
@@ -369,7 +372,8 @@ function showFocus(a) {
   $("inspectControls").hidden = !wide;
   $("focusTitle").textContent = a?.title || "";
   const help=wide ? "拖長卷慢移，放手即停" : a ? "左右滑作品換件 · 拖空牆轉身" : "點作品靠近 · 拖空牆轉身";
-  $("viewHelp").textContent=navigator.maxTouchPoints ? help+" · 雙指縮放" : help;
+  const zoomHint=matchMedia("(any-pointer:fine)").matches ? "游標對準細節，滾輪縮放" : "雙指縮放";
+  $("viewHelp").textContent=help+" · "+zoomHint;
   $("tour").value = a
     ? String(
         current.works
