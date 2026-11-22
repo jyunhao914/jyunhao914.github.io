@@ -277,7 +277,17 @@
 
 .camera-keys kbd{display:none}#stage .camera-keys button.key-down{background:#51695d;border-color:white}
 @media (hover:hover) and (pointer:fine){.camera-keys kbd{display:block;font:11px/1.2 system-ui;color:#d6e3db}}
-</style>
+#stage{height:clamp(340px,66dvh,820px);overflow:hidden;background:#26302e}
+    .wall-readout:not([hidden]){display:block;padding:.65rem .85rem;background:#eef2f0;color:#16352e;font:500 .9rem/1.7 system-ui;font-variant-numeric:tabular-nums}
+    .panel-members{display:flex;flex-wrap:wrap;gap:.2rem 1rem}.panel-members label{display:inline-flex;align-items:center;gap:.35rem;min-height:44px}.panel-members input{width:auto;min-height:0}
+    .hanging-desk{display:grid;grid-template-columns:minmax(205px,25%) minmax(0,1fr);gap:18px;align-items:start}
+    .inventory{padding:12px;background:#fff;border:1px solid #d3dbdd;border-radius:6px}.inventory h2{font-size:1.05rem;margin:0}
+    #wall-progress{font-size:.85rem;margin:.45rem 0;color:#425968}#surface{min-width:0}
+    #wall-list button{min-height:48px}#wall-list .art-thumb{object-fit:contain}
+    @media(max-width:760px){.hanging-desk{grid-template-columns:minmax(0,1fr);gap:5px}#wall-list{display:flex;gap:6px;overflow:auto}
+    #wall-list button{flex:0 0 140px;display:flex;padding:5px}#wall-list .art-thumb{width:38px;height:48px}
+    #wall-list small{font-size:10px}.inventory{padding:8px}#stage{height:56dvh}}
+    </style>
   <header>
     <strong>虛擬策展工作室</strong
     ><span id="status" role="status">尚未登入</span>
@@ -308,5 +318,5 @@
     <button id="closePreview">返回布展</button
     ><iframe title="草稿預覽"></iframe>
   </dialog>
-  <script type="module" src="./login.js?v=layout23"></script>
+  <script type="module" src="./login.js?v=wall24"></script>
 </html>

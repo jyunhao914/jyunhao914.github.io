@@ -4,7 +4,7 @@ const $ = (id) => document.getElementById(id);
 async function show(value) {
   await login(value);
   $("key").value = "";
-  await import("./studio.js?v=layout23");
+  await import("./studio.js?v=wall24");
   $("login").hidden = true;
   $("logout").hidden = false;
   $("status").textContent = "已連線至私人作品庫";

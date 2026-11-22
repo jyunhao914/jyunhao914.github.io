@@ -2,7 +2,7 @@ import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
 import { architecture } from "./architecture.js?v=space12";
-export function gallery(host, works, onPick, onMove, onRead = () => {}) {
+export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
       64,
@@ -272,6 +272,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     g.add(light);
     light.target = face;
   });
+  const rulers = onMove && tools?.makeRulers(T,host,works,groups,cam);
+  function updatePlacement() {
+    for (const art of drag.members) layout(groups[works.indexOf(art)],art);
+    rulers?.dirty();
+  }
   function setEntrance() {
     if (!groups.length) return;
     const a=works[0], g=groups[0], aspect=host.clientWidth/Math.max(1,host.clientHeight);
@@ -329,6 +334,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
         normal = new T.Vector3(0, 0, 1).applyQuaternion(obj.parent.quaternion);
       drag.plane = new T.Plane().setFromNormalAndCoplanarPoint(normal, center);
       drag.grab = ray.ray.intersectPlane(drag.plane, new T.Vector3());
+      if (tools) {
+        const art=works[index];
+        rulers.select(index);
+        drag.members=tools.members(works,art);
+        drag.move=tools.movement(drag.members,art.wall%2 ? halfDepth : halfWidth,tools.wallHeight(theme));
+      }
       drag.origin = { x: obj.userData.a.x, y: obj.userData.a.y };
     }
   };
@@ -347,6 +358,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
         let diff = point.sub(drag.grab),
           angle = walls[a.wall || 0],
           half = (a.wall % 2 ? halfDepth : halfWidth) - a.width / 2;
+        if (drag.move) {
+          drag.move(diff.x*Math.cos(angle)-diff.z*Math.sin(angle),diff.y);
+          updatePlacement();
+          return;
+        }
         a.x = T.MathUtils.clamp(
           drag.origin.x + diff.x * Math.cos(angle) - diff.z * Math.sin(angle),
           -half,
@@ -389,9 +405,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       changeWork(drag.index + (dx < 0 ? 1 : -1));
     else if (drag.dist < 9 && drag.click) {
       const work = drag.click.userData.a;
-      if (onMove) onPick(work);
+      if (onMove) {
+        if(drag.move){ drag.move(0,0); updatePlacement(); }
+        onPick(work);
+      }
       else if (drag.gesture !== "pan") changeWork(works.indexOf(work), drag.u);
-    } else if (drag.obj) onMove(drag.obj.userData.a);
+    } else if (drag.obj) onMove(drag.obj.userData.a,drag.members ?? [drag.obj.userData.a]);
     else if (drag.dist < 9 && !onMove) {
       if (!hit(e) && !host.dispatchEvent(new Event("galleryblanktap",{cancelable:true}))) {
         drag=null;
@@ -405,7 +424,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     }
     drag = null;
   };
-  canvas.onpointercancel = () => (drag = null);
+  canvas.onpointercancel = () => {
+    if(drag?.move){ drag.move(0,0); updatePlacement(); }
+    drag=null;
+  };
   let travel = null;
   function operate(action,dt) {
     if (reading && (action==="左移" || action==="右移")) {
@@ -432,7 +454,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     cam.rotation.y+=yaw;
     cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+pitch,-1.2,1.2);
   }
-  const mobile = !onMove
+  const mobile = (!onMove || tools)
     ? mobileControls(host,turn,()=>Boolean(travel || guide>=0 || drag)) : null;
   const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
     ArrowUp:"前進",ArrowDown:"後退",ArrowLeft:"左移",ArrowRight:"右移"};
@@ -516,6 +538,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   }
   function resetView() {
     blur();
+    if(drag?.move){drag.move(0,0);updatePlacement();}
     drag=null;
     travel=null;
     marker.visible=false;
@@ -670,10 +693,26 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     }
     if (!travel) marker.visible = false;
     renderer.render(scene, cam);
+    rulers?.draw();
   });
   function focus(i, animate = false) {
     const g = groups[i];
     if (!g) return;
+    rulers?.select(i);
+    if(tools && onMove) {
+      const art=works[i], box=tools.envelope(tools.members(works,art));
+      const angle=walls[art.wall], mid=(box.left+box.right)/2, center=g.position.clone();
+      center.x+=(mid-art.x)*Math.cos(angle);
+      center.z-=(mid-art.x)*Math.sin(angle);
+      center.y=box.top/2;
+      const tan=Math.tan(T.MathUtils.degToRad(cam.fov/2));
+      const aspect=host.clientWidth/Math.max(1,host.clientHeight);
+      const fit=Math.max((box.right-box.left+.85)/Math.max(.1,aspect),box.top+.65)/(2*tan);
+      const available=2*(art.wall%2 ? halfWidth : halfDepth)-.55-(art.z || 0);
+      cam.position.copy(center).addScaledVector(new T.Vector3(Math.sin(angle),0,Math.cos(angle)),Math.min(available,Math.max(2.4,fit)));
+      cam.lookAt(center); travel=null;
+      return;
+    }
     const halfFov = T.MathUtils.degToRad(cam.fov / 2);
     const distance = Math.min(
       cam.far*.8,

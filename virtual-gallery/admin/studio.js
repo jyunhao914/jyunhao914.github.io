@@ -1,6 +1,7 @@
 import { readDimensions } from "./dimensions.js";
+import * as wallTools from "./wall-tools.js?v=wall24";
 import {roomSize} from "../room-size.js";
-import { artworkList, artworkDetail } from "./art-preview.js";
+import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
 import { state, post, versions, exhibition } from "./storage.js?v=layout23";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
@@ -14,7 +15,7 @@ let db = await state(),
   timer,
   chain = Promise.resolve(),
   viewer,
-  mode = "2D",
+  mode = "3D",
   wall = 0,
   room = "",
   generation = 0,
@@ -430,7 +431,31 @@ function manage() {
     changed();
     render();
   };
-  action("preview", async () => {
+  action("preview",()=>previewShow(s));
+  for (let k of ["publish", "end"])
+    action(k, async () => {
+      if (
+        !confirm(
+          k === "end"
+            ? "從公開清單撤展並保留私人典藏？"
+            : "將本展所選作品與影音公開至 GitHub？",
+        )
+      )
+        return;
+      await flush();
+      status.textContent = "正在更新 GitHub…";
+      document.querySelector("main").inert = true;
+      try {
+        await post(k, { id: sid, rev: db.rev });
+      } finally {
+        document.querySelector("main").inert = false;
+      }
+      db = await state();
+      status.textContent = "GitHub 已更新，Pages 正在建置";
+      render();
+    });
+}
+async function previewShow(s) {
     const dialog = document.querySelector("#preview"),
       frame = dialog.querySelector("iframe");
     const data = exhibition(db, s);
@@ -456,31 +481,8 @@ function manage() {
     );
     dialog.showModal();
     frame.src = "../?studio-preview";
-  });
-  for (let k of ["publish", "end"])
-    action(k, async () => {
-      if (
-        !confirm(
-          k === "end"
-            ? "從公開清單撤展並保留私人典藏？"
-            : "將本展所選作品與影音公開至 GitHub？",
-        )
-      )
-        return;
-      await flush();
-      status.textContent = "正在更新 GitHub…";
-      document.querySelector("main").inert = true;
-      try {
-        await post(k, { id: sid, rev: db.rev });
-      } finally {
-        document.querySelector("main").inert = false;
-      }
-      db = await state();
-      status.textContent = "GitHub 已更新，Pages 正在建置";
-      render();
-    });
-}
-function layout() {
+  }
+function layout(keepScene=false) {
   let s = show();
   if (!s) {
     app.textContent = "請先建立展覽";
@@ -492,11 +494,11 @@ function layout() {
   }));
   if (!works.some((a) => a.id === aid)) aid = works[0]?.id;
   let a = works.find((a) => a.id === aid);
-  app.innerHTML =
+  if(!keepScene) app.innerHTML =
     '<h1>布展編輯</h1><div class="bar"><label>展覽<select id="ex"></select></label><label>編輯作品<select id="sel"></select></label>' +
     btn("2D", "2D 展牆") +
-    btn("3D", "3D 空間") +
-    '</div><div id="surface"></div><div id="form"></div>';
+    btn("3D", "實景布展") +
+    btn("preview","參觀預覽") + '</div><div class="hanging-desk"><section class="inventory"><h2>布展清單</h2><p id="wall-progress"></p><div id="wall-list"></div></section><section id="surface"></section></div><div id="form"></div>';
   function picker(el, items, current, fn) {
     el.replaceChildren(...items.map((x) => new Option(x.title, x.id)));
     el.value = current;
@@ -506,10 +508,21 @@ function layout() {
     sid = v;
     render();
   });
-  picker($("#sel"), works, aid, (v) => {
-    aid = v;
-    render();
-  });
+  function selectWork(chosen) {
+    const next=works.find(w=>w.id===chosen);
+    aid=chosen;
+    if(viewer && next?.room===a?.room) {
+      viewer.focus(works.filter(w=>w.room===next.room).indexOf(next));
+      layout(true);
+    } else render();
+  }
+  picker($("#sel"), works, aid, selectWork);
+  const reviewed=works.filter(w=>w.reviewed).length;
+  $("#wall-progress").textContent=s.status+"　·　掛位已確認 "+reviewed+" / "+works.length;
+  const wallNames=["北牆","西牆","南牆","東牆"];
+  artworkList($("#wall-list"),works,aid,selectWork,w=>[w.room,wallNames[w.wall],w.groupId?"連屏":"",w.reviewed?"掛位已確認":"待確認"].filter(Boolean).join(" · "));
+  action("preview",()=>previewShow(s));
+  for(const m of ["2D","3D"])app.querySelector('[data-act="'+m+'"]').setAttribute("aria-current",String(m===mode));
   for (let m of ["2D", "3D"])
     action(m, () => {
       mode = m;
@@ -524,29 +537,39 @@ function layout() {
   let nearby = works.filter((o) => o.room === room),
     same = nearby.filter((o) => o.wall === wall);
   function patch(i, obj) {
-    Object.assign((s.layout[i] ??= {}), obj);
+    Object.assign((s.layout[i] ??= {}), {reviewed:false},obj);
     changed();
   }
-  const span = 2*roomSize(nearby)[wall%2 ? "depth" : "width"];
+  const dimensions=roomSize(nearby);
+  const span=2*dimensions[wall%2 ? "depth" : "width"], height=wallTools.wallHeight(dimensions.theme);
   const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
-  function extent(work) {
-    const edge=(work.mat||0)+(work.frame==="無框"?0:work.frameWidth||0);
-    const w=work.width+2*edge, h=work.height+2*edge+(work.mount==="掛軸"?.48:0);
-    const theta=(work.rotate||0)*Math.PI/180;
-    return {w:Math.abs(w*Math.cos(theta))+Math.abs(h*Math.sin(theta)),
-      h:Math.abs(h*Math.cos(theta))+Math.abs(w*Math.sin(theta))};
-  }
-  const ordered=[...same].sort((left,right)=>left.x-right.x);
-  const total=ordered.reduce((sum,work)=>sum+extent(work).w,0);
-  const gaps=ordered.slice(1).map((work,i)=>work.x-ordered[i].x-(extent(work).w+extent(ordered[i]).w)/2);
+  const group=wallTools.members(same,a), ordered=wallTools.units(same);
+  const boxes=ordered.map(wallTools.envelope);
+  const total=boxes.reduce((sum,b)=>sum+b.right-b.left,0);
+  const gaps=boxes.slice(1).map((b,i)=>b.left-boxes[i].right);
   const currentGap=gaps.length?Math.max(0,Math.round(100*gaps.reduce((sum,x)=>sum+x,0)/gaps.length)):0;
+  function savePositions(list) {
+    for (const o of list)patch(o.id,{x:+o.x.toFixed(5),y:+o.y.toFixed(5)});
+  }
+  function shift(list,dx,dy) {
+    wallTools.movement(list,span/2,height)(dx,dy);
+    savePositions(list);
+  }
   function scene() {
     let surface = $("#surface");
     if (mode === "3D") {
       surface.innerHTML =
-        '<p>拖曳作品調整位置，拖曳空白處環顧展間。</p><div id="stage"></div>';
+         '<div class="bar"><span>拖作品掛畫，拖空白處轉身，推搖桿走動。</span><button id="ruler-toggle" aria-pressed="true">隱藏尺標</button></div><div id="stage"></div><output class="wall-readout" aria-label="展牆量測"></output>';
+      const toggle=$("#ruler-toggle"), readout=$(".wall-readout");
+      toggle.onclick=()=>{
+        readout.hidden=!readout.hidden;
+        const svg=surface.querySelector(".wall-rulers");
+        if(svg)svg.style.display=readout.hidden?"none":"";
+        toggle.textContent=readout.hidden?"顯示尺標":"隱藏尺標";
+        toggle.setAttribute("aria-pressed",String(!readout.hidden));
+      };
       let t = token;
-      import("../gallery.js?v=layout23")
+      import("../gallery.js?v=wall24")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
@@ -556,15 +579,13 @@ function layout() {
               tiles: work.tiles?.map(path => path.replace(/^media\//,"../media/")),
               src: work.src.replace(/^media\//, "../media/"),
             })),
-            (o) => {
-              aid = o.id;
-              render();
+            (o) => { aid=o.id; layout(true); },
+            (o,moved) => {
+              savePositions(moved);
+              aid=o.id;
+              layout(true);
             },
-            (o) => {
-              patch(o.id, { x: o.x, y: o.y });
-              aid = o.id;
-              render();
-            },
+            undefined,wallTools
           );
           viewer.focus(nearby.indexOf(a));
         })
@@ -579,18 +600,21 @@ function layout() {
       '　·　拖曳作品調整掛點</p><div class="wall"></div>';
     let w = $(".wall"),
       span = 2 * roomSize(nearby)[wall % 2 ? "depth" : "width"];
+    w.style.aspectRatio=span+"/"+height;
+    const pieces=new Map();
     for (let o of same) {
       let b = document.createElement("button");
+      pieces.set(o.id,b);
       b.className = "piece" + (o.id === aid ? " sel" : "");
       b.style.cssText =
         "left:" +
         (50 + (100 * o.x) / span) +
         "%;top:" +
-        (100 - (o.y / 4.5) * 100) +
+        (100 - (o.y / height) * 100) +
         "%;width:" +
         (100 * o.width) / span +
         "%;height:" +
-        (100 * o.height) / 4.5 +
+        (100 * o.height) / height +
         "%;rotate:" +
         -o.rotate +
         "deg";
@@ -604,33 +628,23 @@ function layout() {
       let d;
       b.onpointerdown = (e) => {
         b.setPointerCapture(e.pointerId);
-        d = [e.clientX, e.clientY, o.x, o.y];
+        const list=wallTools.members(same,o);
+        d={x:e.clientX,y:e.clientY,list,move:wallTools.movement(list,span/2,height)};
       };
       b.onpointermove = (e) => {
         if (!d) return;
-        let rect = w.getBoundingClientRect();
-        o.x = Math.max(
-          -span / 2 + o.width / 2,
-          Math.min(
-            span / 2 - o.width / 2,
-            d[2] + ((e.clientX - d[0]) * span) / rect.width,
-          ),
-        );
-        o.y = Math.max(
-          o.height / 2,
-          Math.min(
-            4.5 - o.height / 2,
-            d[3] - ((e.clientY - d[1]) * 4.5) / rect.height,
-          ),
-        );
-        b.style.left = 50 + (100 * o.x) / span + "%";
-        b.style.top = 100 - (o.y / 4.5) * 100 + "%";
+        const rect=w.getBoundingClientRect();
+        d.move((e.clientX-d.x)*span/rect.width,-(e.clientY-d.y)*height/rect.height);
+        for(const member of d.list) {
+          const node=pieces.get(member.id);
+          node.style.left=50+100*member.x/span+"%";
+          node.style.top=100-100*member.y/height+"%";
+        }
       };
       b.onpointerup = () => {
-        d = null;
-        aid = o.id;
-        patch(o.id, { x: +o.x.toFixed(3), y: +o.y.toFixed(3) });
-        render();
+        if(!d)return;
+        savePositions(d.list); d=null;
+        aid=o.id; render();
       };
       b.onpointercancel = () => {
         d = null;
@@ -640,14 +654,21 @@ function layout() {
   }
   const n = (k, l, lo, hi) => num(a, k, l, lo, hi);
   $("#form").innerHTML =
+    '<fieldset><legend>'+esc(a.title)+'</legend><div class="bar">'+
+    btn("review",a.reviewed?"重新標記待確認":"確認此作掛位")+
+    (works.some(w=>!group.includes(w))?'<label>交換掛位<select id="swap-target">'+works.filter(w=>!group.includes(w)).map(w=>'<option value="'+esc(w.id)+'">'+esc(w.title)+'　·　'+esc(w.room)+'</option>').join("")+'</select></label>'+btn("swap","互換位置"):"")+'</div></fieldset>'+
+    '<fieldset><legend>連屏組合</legend><div class="panel-members">'+
+    same.filter(o=>!o.groupId || o.groupId===a.groupId || o.id===aid).map(o=>
+      '<label><input type="checkbox" data-panel="'+esc(o.id)+'" '+(group.includes(o)?'checked ':'')+(o.id===aid?'disabled':'')+'>'+esc(o.title)+'</label>').join("")+
+    '</div><div class="bar">'+btn("group","儲存連屏組合")+(group.length>1?btn("ungroup","解散連屏")+'<label>屏間淨距（公分）<input id="panel-gap" type="number" min="0" step="any"></label>'+btn("spacePanels","套用屏間距"):"")+'</div></fieldset>'+
     '<fieldset><legend>位置微調</legend><div class="bar">' +
     btn("left","左移 5 公分")+btn("right","右移 5 公分")+btn("up","升高 5 公分")+btn("down","降低 5 公分")+
-    '</div>'+(same.length>1 ? '<label>同牆作品間距（公分）<input id="gap" type="number" min="0" step="any" value="'+currentGap+'"></label>'+btn("spacing","套用同牆間距") : '')+
+    '</div>'+(ordered.length>1 ? '<label>同牆作品間距（公分）<input id="gap" type="number" min="0" step="any" value="'+currentGap+'"></label>'+btn("spacing","套用同牆間距") : '')+
     '</fieldset><fieldset><legend>展牆與掛點</legend><div class="fields">' +
     field(a, "room", "展廳名稱", null, "text", "required") +
     field(a, "wall", "展牆（0 北、1 西、2 南、3 東）", [0, 1, 2, 3]) +
     n("x", "水平 X（公尺）", -100, 100) +
-    n("y", "高度 Y（公尺）", 0, 4.5) +
+    n("y", "掛點高度 Y（公尺）", 0, height) +
     n("z", "離牆 Z（公尺）", 0, 3) +
     n("rotate", "旋轉（度）", -180, 180) +
     n("width", "展出寬度（公尺）", 0.05, 100) +
@@ -673,57 +694,97 @@ function layout() {
     btn("warm", "暖光聚焦") +
     btn("day", "日光漫射") +
     "</div></fieldset>";
-  bind($("#form"), a, (k) => {
-    if (k === "wall") a.wall = Number(a.wall);
-    patch(a.id, { [k]: a[k] });
+  action("review",()=>{patch(a.id,{reviewed:!a.reviewed});layout(mode==="3D");});
+  action("swap",()=>{
+    const target=works.find(w=>w.id===$("#swap-target").value);
+    const other=wallTools.members(works,target);
+    const center=list=>({x:list.reduce((sum,w)=>sum+w.x,0)/list.length,y:list.reduce((sum,w)=>sum+w.y,0)/list.length,z:list.reduce((sum,w)=>sum+(w.z || 0),0)/list.length});
+    const here=center(group),there=center(other);
+    function transfer(list,from,to,dest) {
+      return list.map(w=>({...w,x:w.x+to.x-from.x,y:w.y+to.y-from.y,z:(w.z || 0)+to.z-from.z,room:dest.room,wall:dest.wall}));
+    }
+    const moves=[...transfer(group,here,there,target),...transfer(other,there,here,a)];
+    const after=works.map(w=>moves.find(m=>m.id===w.id) ?? w);
+    for(const w of moves) {
+      const size=roomSize(after.filter(o=>o.room===w.room)), half=w.wall%2?size.depth:size.width, b=wallTools.bounds(w);
+      if(w.z<-.00001 || w.z>3.00001 || b.left< -half-.00001 || b.right>half+.00001 || b.bottom<-.00001 || b.top>wallTools.wallHeight(size.theme)+.00001)
+        throw Error("互換後會超出展牆，請先調整掛位或選擇其他作品。");
+    }
+    moves.forEach(({id,x,y,z,room,wall})=>patch(id,{x:+x.toFixed(5),y:+y.toFixed(5),z:+z.toFixed(5),room,wall}));
+    render();
   });
-  $("#form").addEventListener("change", (e) => {
-    if(e.target.id==="gap")return;
-    setTimeout(() => {
-      if (tab === "布展編輯") render();
-    }, 0);
-  });
-  for(const [name,axis,step] of [["left","x",-.05],["right","x",.05],["up","y",.05],["down","y",-.05]]) {
-    action(name,()=>{
-      const size=extent(a), lower=axis==="x"?(-span+size.w)/2:size.h/2;
-      const upper=axis==="x"?(span-size.w)/2:4.5-size.h/2;
-      if(lower>upper) throw Error("作品含裝裱已超出展牆尺寸。");
-      patch(a.id,{[axis]:Number(clamp(a[axis]+step,lower,upper).toFixed(5))}); render();
+  if(group.length>1) {
+    const panels=group.map(w=>({w,b:wallTools.bounds(w)})).sort((a,b)=>a.b.left-b.b.left);
+    const width=panels.reduce((sum,p)=>sum+p.b.right-p.b.left,0);
+    const original=wallTools.envelope(group);
+    $("#panel-gap").value=Math.max(0,Math.round(1000*(original.right-original.left-width)/(group.length-1))/10);
+    action("spacePanels",()=>{
+      const input=$("#panel-gap");
+      if(!input.value.trim() || !input.reportValidity())return;
+      const gap=Number(input.value)/100, length=width+(group.length-1)*gap;
+      if(length>span)throw Error("屏間距超出展牆寬度。");
+      let left=clamp((original.left+original.right-length)/2,-span/2,span/2-length);
+      for(const {w,b} of panels) {
+        shift([w],left-b.left,0);
+        left+=b.right-b.left+gap;
+      }
+      render();
     });
+  }
+  action("group",()=>{
+    const ids=new Set(Array.from(document.querySelectorAll("[data-panel]:checked"),el=>el.dataset.panel));
+    if(ids.size<2)throw Error("請選取至少兩幅同牆作品。");
+    const key=a.groupId || id();
+    same.forEach(o=>{if(ids.has(o.id) || group.includes(o))patch(o.id,{groupId:ids.has(o.id)?key:null});});
+    render();
+  });
+  action("ungroup",()=>{group.forEach(o=>patch(o.id,{groupId:null}));render();});
+  bind($("#form"), a, (k) => {
+    if(k==="x" || k==="y") {
+      const value=a[k], old=(s.layout[a.id]?.[k] ?? db.arts.find(o=>o.id===a.id)[k]);
+      a[k]=old;
+      shift(group,k==="x"?value-old:0,k==="y"?value-old:0);
+    } else if(k==="wall" || k==="room") {
+      if(k==="wall")a.wall=Number(a.wall);
+      group.forEach(o=>patch(o.id,{[k]:a[k]}));
+    } else patch(a.id, { [k]: a[k] });
+  });
+  $("#form").onchange=(e)=>{
+    if(!e.target.closest("[data-key]"))return;
+    setTimeout(()=>{if(tab==="布展編輯")render();},0);
+  };
+  for(const [name,dx,dy] of [["left",-.05,0],["right",.05,0],["up",0,.05],["down",0,-.05]]) {
+    action(name,()=>{shift(group,dx,dy);render();});
+  }
+  function spaceRow(gap) {
+    const length=total+gap*(ordered.length-1);
+    if(length>span+.000001)throw Error("展牆寬度不足，請縮小間距或改掛其他展牆。");
+    const center=(boxes[0].left+boxes.at(-1).right)/2;
+    let left=clamp(center-length/2,-span/2,span/2-length);
+    ordered.forEach((list,i)=>{
+      shift(list,left-boxes[i].left,0);
+      left+=boxes[i].right-boxes[i].left+gap;
+    });
+    render();
   }
   action("spacing",()=>{
     const input=$("#gap");
-    if(!input.value.trim() || !input.reportValidity())return;
-    const gap=Number(input.value)/100, length=total+gap*(ordered.length-1);
-    if(length>span+.000001)throw Error("展牆寬度不足，請縮小間距或將部分作品移至另一面牆。");
-    const first=ordered[0], last=ordered[ordered.length-1];
-    const center=(first.x-extent(first).w/2+last.x+extent(last).w/2)/2;
-    let left=clamp(center-length/2,-span/2,span/2-length);
-    for(const work of ordered) {
-      const width=extent(work).w;
-      patch(work.id,{x:Number((left+width/2).toFixed(5))});
-      left+=width+gap;
-    }
-    render();
+    if(input.value.trim() && input.reportValidity())spaceRow(Number(input.value)/100);
   });
   action("actualSize",()=>{
     const placement=s.layout[a.id];
-    if(placement){delete placement.width;delete placement.height;changed();}
+    if(placement){delete placement.width;delete placement.height;patch(a.id,{reviewed:false});}
     render();
   });
   action("align", () => {
-    same.forEach((o) => patch(o.id, { y: a.y }));
+    const center=a.y;
+    ordered.filter(list=>!list.includes(a)).forEach(list=>{
+      const box=wallTools.envelope(list);
+      shift(list,0,center-(box.top+box.bottom)/2);
+    });
     render();
   });
-  action("distribute", () => {
-    let span = 2 * roomSize(nearby)[wall % 2 ? "depth" : "width"];
-    same
-      .sort((l, r) => l.x - r.x)
-      .forEach((o, i) =>
-        patch(o.id, { x: span * ((i + 0.5) / same.length - 0.5) }),
-      );
-    render();
-  });
+  action("distribute",()=>spaceRow(Math.max(0,(span-total)/(ordered.length+1))));
   for (let [k, v] of [
     ["warm", [3000, 28, 25]],
     ["day", [6200, 18, 55]],
@@ -732,7 +793,7 @@ function layout() {
       patch(a.id, { kelvin: v[0], power: v[1], angle: v[2] });
       render();
     });
-  scene();
+  if(!keepScene)scene();
 }
 async function refreshRestored() {
   db = await state();

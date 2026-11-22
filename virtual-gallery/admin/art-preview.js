@@ -40,7 +40,7 @@ function preview(a, large) {
   el.className = large ? "art-large" : "art-thumb";
   return el;
 }
-export function artworkList(host, items, selected, select) {
+export function artworkList(host, items, selected, select, describe) {
   host.className = "art-library";
   host.replaceChildren(
     ...items.map((a) => {
@@ -52,7 +52,7 @@ export function artworkList(host, items, selected, select) {
         title = document.createElement("strong"),
         meta = document.createElement("small");
       title.textContent = a.title;
-      meta.textContent = [a.type, a.category].filter(Boolean).join(" · ");
+      meta.textContent = describe ? describe(a) : [a.type, a.category].filter(Boolean).join(" · ");
       caption.append(title, meta);
       b.append(caption);
       b.onclick = () => select(a.id);
