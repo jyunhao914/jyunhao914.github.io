@@ -541,6 +541,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     reset.onclick=resetView;
     host.append(reset);
   }
+  const arrowTapMs=180, arrowStep=.12/.9, arrowPrecision=.18/.9;
   let tapTravel = [];
   function key(e) {
     const code=e.code || (e.key.length===1 ? "Key"+e.key.toUpperCase() : e.key);
@@ -548,8 +549,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if(e.type==="keyup") {
       if(code==="Space") spaceHeld=false;
       const motion=keys.get(code);
-      // A quick tap between two display frames still gets a short, visible nudge.
-      if(motion && !motion.moved) tapTravel.push({action:actionFor(code),remaining:.065});
+      if (motion && code.startsWith("Arrow")) {
+        if (performance.now()-motion.start < arrowTapMs && !motion.mixed)
+          operate(motion.action, Math.max(0,arrowStep-motion.applied));
+      } else if(motion && !motion.moved) {
+        tapTravel.push({action:actionFor(code),remaining:.065});
+      }
       keys.delete(code);
       return;
     }
@@ -561,9 +566,9 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if(code==="Space" && e.target.closest?.("button,a,summary")) return;
     e.preventDefault();
     if(code==="Space") { spaceHeld=true; return; }
-    if(keys.has(code)) return;
+    if(keys.has(code) || (code==="KeyR" && e.repeat)) return;
     if(code==="KeyR"){resetView();return;}
-    keys.set(code,{start:performance.now(),moved:false});
+    keys.set(code,{start:performance.now(),moved:false,applied:0,action:actionFor(code),mixed:false});
   }
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
@@ -614,7 +619,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     }
     for(const [code,motion] of keys) {
       const ramp=Math.max(0,Math.min(1,(now-motion.start)/180));
-      operate(actionFor(code), dt*(.3+.7*ramp*ramp*(3-2*ramp)));
+      const arrow=code.startsWith("Arrow"), action=actionFor(code);
+      const amount=dt*(.3+.7*ramp*ramp*(3-2*ramp))*(arrow ? arrowPrecision : 1);
+      operate(action,amount);
+      motion.applied+=amount;
+      if(action!==motion.action) motion.mixed=true;
       if (dt>0) motion.moved=true;
     }
     for(const tap of tapTravel) {
