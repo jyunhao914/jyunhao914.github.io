@@ -431,6 +431,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+(Number(action==="抬頭")-Number(action==="低頭"))*dt*.65,-1.2,1.2);
     }
   }
+  const keyButtons=new Map();
   function neutral() {
     if (held) held.button.classList.remove("pressed");
     held=null;
@@ -443,6 +444,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     const code=Object.keys(shortcuts).find(k=>shortcuts[k]===action);
     const shortcut=code.replace("Key","");
     button.textContent=action;
+    button.setAttribute("aria-label",action);
+    const hint=document.createElement("kbd");
+    hint.textContent=({ArrowUp:"↑",ArrowDown:"↓",ArrowLeft:"←",ArrowRight:"→"})[code] || shortcut;
+    hint.setAttribute("aria-hidden","true");
+    button.append(hint);
+    keyButtons.set(code,button);
     button.setAttribute("aria-keyshortcuts",shortcut);
     button.title=action+"（"+shortcut+"）";
     button.onpointerdown=e=>{
@@ -536,7 +543,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     const code=e.code || (e.key.length===1 ? "Key"+e.key.toUpperCase() : e.key);
     const action=shortcuts[code];
     if(!action) return;
-    if(e.type==="keyup") { keys.delete(code); return; }
+    if(e.type==="keyup") { keys.delete(code); keyButtons.get(code)?.classList.remove("key-down"); return; }
     if(e.altKey || e.metaKey || e.ctrlKey || document.querySelector("dialog[open]")) return;
     const field=e.target.closest?.("input,textarea,select,[contenteditable=true]");
     if(field && field.getClientRects().length &&
@@ -545,12 +552,14 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     e.preventDefault();
     if(keys.has(code) || e.repeat) return;
     keys.set(code,performance.now()+200);
+    keyButtons.get(code)?.classList.add("key-down");
     operate(action,.14);
   }
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
   let blur = () => {
     keys.clear();
+    keyButtons.forEach(button=>button.classList.remove("key-down"));
     neutral();
   };
   window.addEventListener("blur", blur);

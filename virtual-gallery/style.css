@@ -516,3 +516,6 @@ body.visiting {
  .view-caption{max-width:calc(100% - 212px);right:8px;padding:5px;overflow-wrap:anywhere}
  #inspectControls{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 98px)}
 }
+
+.camera-keys kbd{display:none}#stage .camera-keys button.key-down{background:#51695d;border-color:white}
+@media (hover:hover) and (pointer:fine){.camera-keys kbd{display:block;font:11px/1.2 system-ui;color:#d6e3db}}
