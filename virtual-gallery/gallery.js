@@ -1,9 +1,9 @@
-import {mountFields} from "./mount-fields.js?v=mount30";
+import {mountFields} from "./mount-fields.js?v=mount31";
 import {mobileControls} from "./mobile-controls.js?v=stickspace20";
-import {roomSize} from "./room-size.js?v=mount30";
+import {roomSize} from "./room-size.js?v=mount31";
 import * as T from "./vendor/three.module.js";
-import {mountRenderer, disposeMount} from "./mount-render.js?v=mount30";
-import { architecture } from "./architecture.js?v=mount30";
+import {mountRenderer, disposeMount} from "./mount-render.js?v=mount31";
+import { architecture } from "./architecture.js?v=mount31";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(

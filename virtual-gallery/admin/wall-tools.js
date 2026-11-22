@@ -1,4 +1,4 @@
-import { mountSpec } from "../mount-spec.js?v=mount30";
+import { mountSpec } from "../mount-spec.js?v=mount31";
 
 // Wall coordinates and physical artwork dimensions are expressed in metres.
 export function wallHeight(theme) {

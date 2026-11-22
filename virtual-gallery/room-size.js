@@ -1,4 +1,4 @@
-import { mountSpec } from "./mount-spec.js?v=mount30";
+import { mountSpec } from "./mount-spec.js?v=mount31";
 
 export function roomSize(works) {
   const room=works[0]?.room;

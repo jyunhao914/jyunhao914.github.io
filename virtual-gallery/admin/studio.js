@@ -1,10 +1,10 @@
-import { mountEditor, paintWallMount } from "./mount-editor.js?v=mount30";
-import { mountTemplates } from "./mount-templates.js?v=mount30";
+import { mountEditor, paintWallMount } from "./mount-editor.js?v=mount31";
+import { mountTemplates } from "./mount-templates.js?v=mount31";
 import { readDimensions } from "./dimensions.js";
-import * as wallTools from "./wall-tools.js?v=mount30";
-import {roomSize} from "../room-size.js?v=mount30";
+import * as wallTools from "./wall-tools.js?v=mount31";
+import {roomSize} from "../room-size.js?v=mount31";
 import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
-import { state, post, versions, exhibition } from "./storage.js?v=mount30";
+import { state, post, versions, exhibition } from "./storage.js?v=mount31";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
   status = $("#status");
@@ -610,7 +610,7 @@ function layout(keepScene=false) {
     changed();
   }
   let dimensions=roomSize(nearby);
-  let span=2*dimensions[wall%2 ? "depth" : "width"], height=wallTools.wallHeight(dimensions.theme);
+  let span=2*dimensions[wall%2 ? "depth" : "width"], height=dimensions.height;
   const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
   const group=wallTools.members(same,a), ordered=wallTools.units(same);
   function rowSize() {
@@ -647,7 +647,7 @@ function layout(keepScene=false) {
         toggle.setAttribute("aria-pressed",String(!readout.hidden));
       };
       let t = token;
-      import("../gallery.js?v=mount30")
+      import("../gallery.js?v=mount31")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
@@ -805,13 +805,14 @@ function layout(keepScene=false) {
     mountFrame=requestAnimationFrame(()=>{
       mountFrame=0;
       if(sceneToken!==token)return;
-      const required=roomSize(nearby), envelope=wallTools.bounds(a);
-      const exceedsWall=Math.max(Math.abs(envelope.left),Math.abs(envelope.right))>span/2;
-      const axis=wall%2 ? "depth" : "width";
-      if(required.theme!==dimensions.theme || (exceedsWall && required[axis]>dimensions[axis])) {
+      const required=roomSize(nearby), axis=wall%2 ? "depth" : "width";
+      if(required.height!==dimensions.height || required.theme!==dimensions.theme ||
+          required.width!==dimensions.width || required.depth!==dimensions.depth) {
         dimensions=required;
         span=2*dimensions[axis];
-        height=wallTools.wallHeight(dimensions.theme);
+        height=dimensions.height;
+        const hangingHeight=$('#form [data-key="y"] input');
+        if(hangingHeight)hangingHeight.max=height;
         token++;
         viewer?.dispose();
         viewer=null;
@@ -844,7 +845,7 @@ function layout(keepScene=false) {
     const after=works.map(w=>moves.find(m=>m.id===w.id) ?? w);
     for(const w of moves) {
       const size=roomSize(after.filter(o=>o.room===w.room)), half=w.wall%2?size.depth:size.width, b=wallTools.bounds(w);
-      if(w.z<-.00001 || w.z>3.00001 || b.left< -half-.00001 || b.right>half+.00001 || b.bottom<-.00001 || b.top>wallTools.wallHeight(size.theme)+.00001)
+      if(w.z<-.00001 || w.z>3.00001 || b.left< -half-.00001 || b.right>half+.00001 || b.bottom<-.00001 || b.top>size.height+.00001)
         throw Error("互換後會超出展牆，請先調整掛位或選擇其他作品。");
     }
     moves.forEach(({id,x,y,z,room,wall})=>patch(id,{x:+x.toFixed(5),y:+y.toFixed(5),z:+z.toFixed(5),room,wall}));

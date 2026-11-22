@@ -1,5 +1,5 @@
-import { mountChoices } from "../mount-fields.js?v=mount30";
-import { mountSpec, frameProfiles, scrollBands, handscrollBands, albumPanels, mirrorBands } from "../mount-spec.js?v=mount30";
+import { mountChoices } from "../mount-fields.js?v=mount31";
+import { mountSpec, frameProfiles, scrollBands, handscrollBands, albumPanels, mirrorBands } from "../mount-spec.js?v=mount31";
 
 const framePalettes = [
   ["胡桃與暖白", { frameColor: "#624532", matColor: "#f3ebd9" }],

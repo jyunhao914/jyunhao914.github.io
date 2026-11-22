@@ -1,5 +1,5 @@
 import * as T from "./vendor/three.module.js";
-import {mountSpec,scrollBands,handscrollBands,albumPanels,mirrorBands,frameProfiles} from "./mount-spec.js?v=mount30";
+import {mountSpec,scrollBands,handscrollBands,albumPanels,mirrorBands,frameProfiles} from "./mount-spec.js?v=mount31";
 
 const woodMaps={"白橡木":"oak","胡桃木":"walnut","梣木":"ash","柚木":"teak"};
 const weaveMaps={"織錦":"brocade","素絹":"plain-silk","細麻":"linen"};
@@ -228,6 +228,7 @@ export function mountRenderer(renderer) {
     const binding=putMesh(g,"album-cover",new T.BoxGeometry(c.w,c.h,coverStock),clothCover);
     binding.position.set(c.x,c.y,s.backZ+coverStock/2);
     const edges=paper.clone();
+    paper.vertexColors=true;
     // Individual folded leaves leave fine, optically filtered horizontal lines in the exposed edge.
     edges.onBeforeCompile=shader=>{
       shader.vertexShader="varying float bookZ;varying float bookEdge;\n"+shader.vertexShader.replace("#include <begin_vertex>",
@@ -241,8 +242,8 @@ export function mountRenderer(renderer) {
       const blockBase=s.backZ+coverStock,blockHeight=Math.max(.0005,paperZ-blockBase-.0011);
       const block=putMesh(g,"album-block",new T.BoxGeometry(p.w,p.h,blockHeight),edges);
       block.position.set(p.x,p.y,blockBase+blockHeight/2);
-      const geom=new T.PlaneGeometry(p.w,p.h,12,10);
-      const {position,uv}=geom.attributes;
+      const geom=new T.PlaneGeometry(p.w,p.h,28,24);
+      const {position,uv}=geom.attributes,tones=[];
       for(let i=0;i<position.count;i++) {
         const x=position.getX(i), y=position.getY(i);
         let elevation=0;
@@ -254,9 +255,15 @@ export function mountRenderer(renderer) {
           const t=s.albumStyle==="蝴蝶裝" ? x/p.w+.5 : y/p.h+.5;
           elevation=-Math.min(.003,s.depth*.08)*(1-t)**4+.006*Math.sin(Math.PI*t);
         }
+        const seamDistance=s.albumStyle==="經摺裝" ?
+          (p.kind==="wing" ? p.w/2+p.side*x : p.w/2-Math.abs(x)) :
+          s.albumStyle==="蝴蝶裝" ? p.w/2+(p.kind==="art" ? -x : x) : p.h/2+(p.kind==="art" ? -y : y);
+        const tone=1-.23*Math.exp(-seamDistance/.021);
+        tones.push(tone,tone,tone);
         position.setXYZ(i,p.x+x,p.y+y,paperZ+elevation);
         uv.setXY(i,(x+p.x+.03)/period.cotton[0],(y+p.y)/period.cotton[1]);
       }
+      geom.setAttribute("color",new T.Float32BufferAttribute(tones,3));
       geom.computeVertexNormals();
       putMesh(g,p.kind==="wing" ? "album-fold" : "album-leaf",geom,paper);
     }
@@ -265,7 +272,7 @@ export function mountRenderer(renderer) {
       const horizontal=s.albumStyle==="推篷裝";
       const r=s.albumGap*.47;
       const joint=putMesh(g,"album-hinge",new T.CylinderGeometry(r,r,horizontal ? w : h,16),
-        new T.MeshStandardMaterial({...surface("linen",.4),color:new T.Color(s.albumCoverColor).multiplyScalar(.70),roughness:.91}));
+        new T.MeshStandardMaterial({...surface("linen",.4),color:new T.Color(s.albumCoverColor).lerp(new T.Color(s.albumLeafColor),.42),roughness:.91}));
       if(horizontal)joint.rotation.z=Math.PI/2;
       joint.position.set(x,y,paperZ-r*1.3);
     });
