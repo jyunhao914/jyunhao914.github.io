@@ -1,6 +1,6 @@
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=keys10";
+import { architecture } from "./architecture.js?v=reset11";
 export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -268,7 +268,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     g.add(light);
     light.target = face;
   });
-  if (groups.length) {
+  function setEntrance() {
+    if (!groups.length) return;
     const a=works[0], g=groups[0], aspect=host.clientWidth/Math.max(1,host.clientHeight);
     entranceLook.copy(g.position);
     const retreat=Math.max(3.3,(a.width+2*(a.mat+a.frameWidth))*.61/(Math.tan(T.MathUtils.degToRad(cam.fov/2))*aspect));
@@ -276,6 +277,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     station.x=T.MathUtils.clamp(station.x,-halfWidth+.4,halfWidth-.4);
     station.z=T.MathUtils.clamp(station.z,-halfDepth+.4,halfDepth-.4);
   }
+  setEntrance();
   cam.position.copy(station);
   cam.lookAt(entranceLook);
   let keys = new Map(),
@@ -539,10 +541,32 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       rotation: cam.quaternion.clone(),
     };
   }
+  function resetView() {
+    blur();
+    drag=null;
+    travel=null;
+    marker.visible=false;
+    stopInspection();
+    setEntrance();
+    cam.position.copy(station);
+    cam.lookAt(entranceLook);
+    cam.updateMatrixWorld();
+    canvas.focus({preventScroll:true});
+    host.dispatchEvent(new Event("viewreset"));
+  }
+  if (onMove) {
+    const reset=document.createElement("button");
+    reset.type="button";
+    reset.textContent="回到預設";
+    reset.setAttribute("aria-keyshortcuts","R");
+    reset.style.cssText="position:absolute;right:8px;top:8px;z-index:2";
+    reset.onclick=resetView;
+    host.append(reset);
+  }
   function key(e) {
     const code=e.code || (e.key.length===1 ? "Key"+e.key.toUpperCase() : e.key);
     const action=shortcuts[code];
-    if(!action) return;
+    if(!action && code!=="KeyR") return;
     if(e.type==="keyup") { keys.delete(code); keyButtons.get(code)?.classList.remove("key-down"); return; }
     if(e.altKey || e.metaKey || e.ctrlKey || document.querySelector("dialog[open]")) return;
     const field=e.target.closest?.("input,textarea,select,[contenteditable=true]");
@@ -551,6 +575,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if(host.getBoundingClientRect().bottom<40 || host.getBoundingClientRect().top>innerHeight) return;
     e.preventDefault();
     if(keys.has(code) || e.repeat) return;
+    if(code==="KeyR"){resetView();return;}
     keys.set(code,performance.now()+200);
     keyButtons.get(code)?.classList.add("key-down");
     operate(action,.14);
@@ -713,10 +738,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     select(i) {
       return changeWork(i);
     },
-    home() {
-      stopInspection();
-      navigate(station, entranceLook);
-    },
+    home:resetView,
     focus,
     dispose() {
       building.dispose?.();

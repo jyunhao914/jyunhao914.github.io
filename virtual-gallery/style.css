@@ -519,3 +519,7 @@ body.visiting {
 
 .camera-keys kbd{display:none}#stage .camera-keys button.key-down{background:#51695d;border-color:white}
 @media (hover:hover) and (pointer:fine){.camera-keys kbd{display:block;font:11px/1.2 system-ui;color:#d6e3db}}
+
+.museum-head #visitTitle {min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.museum-head button {flex:none}
+@media(max-width:420px){.museum-head{gap:4px}.museum-head button{padding-inline:7px}.museum-head #visitTitle{padding-inline:6px}}

@@ -176,7 +176,7 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=keys10");
+    let { gallery } = await import("./gallery.js?v=reset11");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -215,10 +215,11 @@ for (const [name, step] of [
 $("tour").onchange = () => {
   if ($("tour").value !== "") viewer?.select(Number($("tour").value));
 };
-$("homeView").onclick = () => {
-  viewer?.home();
-  $("tour").value = "";
-};
+$("homeView").onclick = () => viewer?.home();
+$("stage").addEventListener("viewreset", () => {
+  showFocus(null);
+  menu(false);
+});
 const visit = $("visit");
 $("scrollPosition").oninput = e => viewer?.seek(Number(e.target.value)/1000);
 $("overview").onclick = () => viewer?.overview();
