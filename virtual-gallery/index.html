@@ -5,7 +5,7 @@
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>水墨畫展廳｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=surface5" />
+  ><link rel="stylesheet" href="style.css?v=wide6" />
   <header>
     <strong>虛擬策展工作室</strong>
     <nav><a href="#exhibits">展覽</a><a href="#works">典藏作品</a></nav>
@@ -41,6 +41,9 @@
       <div class="view-caption">
         <strong id="focusTitle" aria-live="polite"></strong
         ><span id="viewHelp">點作品走近觀賞 · 拖曳環顧</span>
+      </div>
+      <div id="inspectControls" hidden>
+        <button id="orbit">自由環顧</button><button id="panelPrev" hidden>上一段</button><button id="panelNext" hidden>逐段近看</button>
       </div>
       <div id="visitMenu" hidden>
         <label>切換展覽<select id="visitShows"></select></label>
@@ -84,5 +87,5 @@
     <button id="close">關閉展籤</button>
     <section id="content"></section>
   </dialog>
-  <script type="module" src="app.js?v=surface5"></script>
+  <script type="module" src="app.js?v=wide6"></script>
 </html>

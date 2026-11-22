@@ -1,3 +1,4 @@
+import {roomSize} from "../room-size.js";
 import { artworkList, artworkDetail } from "./art-preview.js";
 import { state, post, versions, exhibition } from "./storage.js";
 const $ = (s) => document.querySelector(s),
@@ -238,6 +239,7 @@ function library() {
         db.arts.push({
           ...defaults,
           id: aid,
+          ...await landscapeDimensions(src,type),
           title: f.name.replace(/\.[^.]+$/, ""),
           src,
           type,
@@ -258,7 +260,7 @@ function library() {
     field(a, "type", "作品類型", ["圖片", "影片", "動態", "文字", "語音"]) +
     field(a, "description", "作品說明／文字內容", null, "textarea") +
     field(a, "subtitle", "字幕說明") +
-    num(a, "width", "原作寬度（公尺）", 0.05, 10) +
+    num(a, "width", "原作寬度（公尺）", 0.05, 100) +
     num(a, "height", "原作高度（公尺）", 0.05, 4.4) +
     ["src", "voice", "captions"]
       .map(
@@ -286,6 +288,8 @@ function library() {
       if (f) {
         a[k] = await fileData(f, k === "captions" ? "text/vtt" : null);
         if (k === "src") {
+          Object.assign(a,await landscapeDimensions(a.src,a.type));
+          render();
           list();
           refreshPreview();
         }
@@ -303,6 +307,16 @@ function library() {
     changed();
     render();
   });
+}
+async function landscapeDimensions(src, type) {
+  if(type !== "圖片") return {};
+  const image=new Image();
+  image.src=src;
+  await image.decode();
+  const ratio=image.naturalWidth/image.naturalHeight;
+  if (ratio<4) return {};
+  const width=Math.min(100,defaults.height*ratio);
+  return {width, height:width/ratio};
 }
 function num(o, k, l, min, max) {
   return field(
@@ -523,7 +537,7 @@ function layout() {
       surface.innerHTML =
         '<p>拖曳作品調整位置，拖曳空白處環顧展間。</p><div id="stage"></div>';
       let t = token;
-      import("../gallery.js?v=surface5")
+      import("../gallery.js?v=wide6")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
@@ -554,7 +568,7 @@ function layout() {
       ["北牆", "西牆", "南牆", "東牆"][wall] +
       '　·　拖曳作品調整掛點</p><div class="wall"></div>';
     let w = $(".wall"),
-      span = wall % 2 ? 14 : 12;
+      span = 2 * roomSize(nearby)[wall % 2 ? "depth" : "width"];
     for (let o of same) {
       let b = document.createElement("button");
       b.className = "piece" + (o.id === aid ? " sel" : "");
@@ -619,11 +633,11 @@ function layout() {
     '<fieldset><legend>展牆與掛點</legend><div class="fields">' +
     field(a, "room", "展廳名稱", null, "text", "required") +
     field(a, "wall", "展牆（0 北、1 西、2 南、3 東）", [0, 1, 2, 3]) +
-    n("x", "水平 X（公尺）", -7, 7) +
+    n("x", "水平 X（公尺）", -100, 100) +
     n("y", "高度 Y（公尺）", 0, 4.5) +
     n("z", "離牆 Z（公尺）", 0, 3) +
     n("rotate", "旋轉（度）", -180, 180) +
-    n("width", "展出寬度（公尺）", 0.05, 11) +
+    n("width", "展出寬度（公尺）", 0.05, 100) +
     n("height", "展出高度（公尺）", 0.05, 4.4) +
     '</div><div class="bar">' +
     btn("align", "同牆作品對齊高度") +
@@ -659,7 +673,7 @@ function layout() {
     render();
   });
   action("distribute", () => {
-    let span = wall % 2 ? 14 : 12;
+    let span = 2 * roomSize(nearby)[wall % 2 ? "depth" : "width"];
     same
       .sort((l, r) => l.x - r.x)
       .forEach((o, i) =>

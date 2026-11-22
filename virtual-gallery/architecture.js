@@ -42,7 +42,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
       props.roughnessMap = texture(type + "-rough.webp", false, x, y);
     return props;
   }
-  if (["calligraphy", "projection", "main"].includes(theme)) {
+  if (["calligraphy", "projection", "main","panorama"].includes(theme)) {
     const study = theme === "calligraphy";
     const theater = theme === "projection";
     const height = study ? 3.65 : theater ? 3.35 : 5.8;

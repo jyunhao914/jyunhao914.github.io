@@ -1,5 +1,6 @@
+import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=surface5";
+import { architecture } from "./architecture.js?v=wide6";
 export function gallery(host, works, onPick, onMove) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -30,14 +31,12 @@ export function gallery(host, works, onPick, onMove) {
   renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFShadowMap;
-  const room = works[0]?.room;
-  const theme = room === "書法展廳" ? "calligraphy" : room === "映像廳" ? "projection" : room === "主展廳" ? "main" : room === "水墨畫展廳" ? "ink" : "";
+  const {theme,width:halfWidth,depth:halfDepth}=roomSize(works);
   const dark = theme === "calligraphy";
-  const [halfWidth, halfDepth] = ({calligraphy:[3.1,9], projection:[5.2,4.4], main:[8,5.5]})[theme] || [6,7];
   const hasBench = theme === "ink" || !theme;
+  cam.far = Math.max(80,4*(halfWidth+halfDepth));
   cam.rotation.order = "YXZ";
-  const station = dark ? new T.Vector3(-1.9,1.85,7.2) : theme === "ink" ? new T.Vector3(-2,1.85,-2.9) : new T.Vector3(3.8,1.65,3.25);
-  const entranceLook = dark ? new T.Vector3(2.97,1.85,2.5) : theme === "ink" ? new T.Vector3(-2,1.85,-7) : new T.Vector3(-1.7,1.46,-4.9);
+  const station=new T.Vector3(0,1.65,2), entranceLook=new T.Vector3(0,1.65,-5);
   const building = architecture(scene, box, renderer, theme, halfWidth, halfDepth);
   let reflection,
     disposed = false;
@@ -190,7 +189,20 @@ export function gallery(host, works, onPick, onMove) {
       img.src = a.src;
       tex = new T.CanvasTexture(c);
       animated.push({ img, ctx: c.getContext("2d"), tex });
-    } else if (a.type === "圖片") tex = new T.TextureLoader().load(a.src);
+    } else if (a.type === "圖片") tex = new T.TextureLoader().load(a.src,(loaded)=>{
+      const image=loaded.image;
+      if(disposed || a.tiles?.length || w < 4*h || image.width<=4096) return;
+      const count=Math.ceil(image.width/2048);
+      for(let i=0;i<count;i++){
+        const left=Math.round(image.width*i/count), right=Math.round(image.width*(i+1)/count);
+        const scale=Math.min(1,2048/image.height);
+        const crop=document.createElement("canvas");
+        crop.width=Math.max(1,Math.round((right-left)*scale));
+        crop.height=Math.max(1,Math.round(image.height*scale));
+        crop.getContext("2d").drawImage(image,left,0,right-left,image.height,0,0,crop.width,crop.height);
+        addSection(new T.CanvasTexture(crop),i,count);
+      }
+    });
     else tex = labelTexture(a);
     tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     tex.colorSpace = T.SRGBColorSpace;
@@ -209,6 +221,17 @@ export function gallery(host, works, onPick, onMove) {
     face.userData.a = a;
     g.add(face);
     targets.push(face);
+    function addSection(tile,index,count) {
+      tile.colorSpace=T.SRGBColorSpace;
+      tile.anisotropy=tex.anisotropy;
+      textures.push(tile);
+      const section=new T.Mesh(new T.PlaneGeometry(w/count,h),face.material.clone());
+      section.material.map=section.material.emissiveMap=tile;
+      section.position.set(w*((index+.5)/count-.5),0,face.position.z+.001);
+      g.add(section);
+    }
+    if (Array.isArray(a.tiles))
+      a.tiles.forEach((url,index)=>addSection(new T.TextureLoader().load(url),index,a.tiles.length));
     const tag = document.createElement("canvas");
     tag.width = 512;
     tag.height = 190;
@@ -244,6 +267,14 @@ export function gallery(host, works, onPick, onMove) {
     g.add(light);
     light.target = face;
   });
+  if (groups.length) {
+    const a=works[0], g=groups[0], aspect=host.clientWidth/Math.max(1,host.clientHeight);
+    entranceLook.copy(g.position);
+    const retreat=Math.max(3.3,(a.width+2*(a.mat+a.frameWidth))*.61/(Math.tan(T.MathUtils.degToRad(cam.fov/2))*aspect));
+    station.copy(entranceLook).addScaledVector(new T.Vector3(0,0,1).applyQuaternion(g.quaternion),retreat);
+    station.x=T.MathUtils.clamp(station.x,-halfWidth+.4,halfWidth-.4);
+    station.z=T.MathUtils.clamp(station.z,-halfDepth+.4,halfDepth-.4);
+  }
   cam.position.copy(station);
   cam.lookAt(entranceLook);
   let keys = new Set(),
@@ -271,7 +302,7 @@ export function gallery(host, works, onPick, onMove) {
       pointer: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      inspecting: guide >= 0 && !onMove,
+      inspecting: guide >= 0 && !onMove && e.pointerType !== "mouse",
       x: e.clientX,
       y: e.clientY,
       dist: 0,
@@ -314,6 +345,7 @@ export function gallery(host, works, onPick, onMove) {
         layout(drag.obj.parent, a);
       }
     } else if (!drag.inspecting) {
+      if (drag.dist > 5) { travel=null; stopInspection(); }
       cam.rotation.y -= dx * 0.005;
       cam.rotation.x = Math.max(
         -1.2,
@@ -569,11 +601,11 @@ export function gallery(host, works, onPick, onMove) {
     if (!g) return;
     const halfFov = T.MathUtils.degToRad(cam.fov / 2);
     const distance = Math.min(
-      11,
+      cam.far*.8,
       Math.max(
         0.85,
         ((works[i].width + 2 * (works[i].mat + works[i].frameWidth)) * 0.57) /
-          (Math.tan(halfFov) * Math.max(0.38, cam.aspect)),
+          (Math.tan(halfFov) * Math.max(0.1, cam.aspect)),
         ((works[i].height + 2 * (works[i].mat + works[i].frameWidth)) * 0.6) /
           Math.tan(halfFov),
       ),
@@ -599,7 +631,20 @@ export function gallery(host, works, onPick, onMove) {
       onPick(null);
     }
   }
+  let panel=-1;
+  function readPanel(step) {
+    const a=works[guide], g=groups[guide];
+    if (!g || a.width < 4*a.height) return "";
+    const parts=Math.max(2,Math.ceil(a.width/Math.max(.35,a.height*cam.aspect*.84)));
+    panel=(panel+step+parts)%parts;
+    const at=new T.Vector3(a.width*(.5-(panel+.5)/parts),0,0).applyQuaternion(g.quaternion).add(g.position);
+    const dest=at.clone().addScaledVector(new T.Vector3(0,0,1).applyQuaternion(g.quaternion),
+      Math.max(.85,a.height*.65/Math.tan(T.MathUtils.degToRad(cam.fov/2))));
+    navigate(dest,at);
+    return (panel+1)+" / "+parts;
+  }
   function changeWork(i) {
+    panel=-1;
     if (!works.length) return;
     guide = (i + works.length) % works.length;
     focus(guide, true);
@@ -607,6 +652,8 @@ export function gallery(host, works, onPick, onMove) {
     return works[guide];
   }
   return {
+    readPanel,
+    turn() { travel=null; stopInspection(); },
     next(offset = 1) {
       return changeWork(
         guide < 0 ? (offset > 0 ? 0 : works.length - 1) : guide + offset,

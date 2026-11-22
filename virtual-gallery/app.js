@@ -176,7 +176,7 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=surface5");
+    let { gallery } = await import("./gallery.js?v=wide6");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -213,7 +213,19 @@ $("homeView").onclick = () => {
   $("tour").value = "";
 };
 const visit = $("visit");
+$("orbit").onclick=()=>viewer?.turn();
+for(const [id,step] of [["panelNext",1],["panelPrev",-1]]) {
+  $(id).onclick=()=>{
+    $("viewHelp").textContent="局部近看　"+viewer.readPanel(step);
+    $("panelNext").textContent="下一段";
+    $("panelPrev").hidden=false;
+  };
+}
 function showFocus(a) {
+  $("inspectControls").hidden=!a;
+  $("panelPrev").hidden=true;
+  $("panelNext").hidden=!a || a.width<4*a.height;
+  $("panelNext").textContent="逐段近看";
   $("focusTitle").textContent = a?.title || "";
   $("viewHelp").textContent = a
     ? "左右滑動切換作品"
