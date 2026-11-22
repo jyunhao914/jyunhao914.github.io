@@ -1,5 +1,5 @@
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=scroll3";
+import { architecture } from "./architecture.js?v=plans4";
 export function gallery(host, works, onPick, onMove) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -30,12 +30,15 @@ export function gallery(host, works, onPick, onMove) {
   renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFShadowMap;
-  const hasScroll = works.some(a => a.mount === "掛軸");
-  const dark = works.some(a => a.room === "書法展廳");
+  const room = works[0]?.room;
+  const theme = room === "書法展廳" ? "calligraphy" : room === "映像廳" ? "projection" : room === "主展廳" ? "main" : room === "水墨畫展廳" ? "ink" : "";
+  const dark = theme === "calligraphy";
+  const [halfWidth, halfDepth] = ({calligraphy:[3.1,9], projection:[5.2,4.4], main:[8,5.5]})[theme] || [6,7];
+  const hasBench = theme === "ink" || !theme;
   cam.rotation.order = "YXZ";
-  const station = hasScroll ? new T.Vector3(dark ? 0 : -2, 1.85, dark ? -2.5 : -2.9) : new T.Vector3(3.8, 1.65, 3.25);
-  const entranceLook = hasScroll ? new T.Vector3(station.x, station.y, -7) : new T.Vector3(-1.7, 1.46, -4.9);
-  const building = architecture(scene, box, renderer, dark ? "calligraphy" : hasScroll ? "ink" : "");
+  const station = dark ? new T.Vector3(-1.9,1.85,7.2) : theme === "ink" ? new T.Vector3(-2,1.85,-2.9) : new T.Vector3(3.8,1.65,3.25);
+  const entranceLook = dark ? new T.Vector3(2.97,1.85,2.5) : theme === "ink" ? new T.Vector3(-2,1.85,-7) : new T.Vector3(-1.7,1.46,-4.9);
+  const building = architecture(scene, box, renderer, theme, halfWidth, halfDepth);
   let reflection,
     disposed = false;
   building.ready
@@ -63,7 +66,7 @@ export function gallery(host, works, onPick, onMove) {
     let ang = walls[a.wall || 0];
     g.rotation.set(0, ang, 0);
     g.rotateZ(((a.rotate || 0) * Math.PI) / 180);
-    let depth = (a.wall % 2 ? 5.87 : 6.87) - (a.z || 0);
+    let depth = ((a.wall % 2 ? halfWidth : halfDepth) - .13) - (a.z || 0);
     g.position.set(
       Math.cos(ang) * a.x - Math.sin(ang) * depth,
       a.y,
@@ -290,7 +293,7 @@ export function gallery(host, works, onPick, onMove) {
       if (point && drag.grab) {
         let diff = point.sub(drag.grab),
           angle = walls[a.wall || 0],
-          half = (a.wall % 2 ? 7 : 6) - a.width / 2;
+          half = (a.wall % 2 ? halfDepth : halfWidth) - a.width / 2;
         a.x = T.MathUtils.clamp(
           drag.origin.x + diff.x * Math.cos(angle) - diff.z * Math.sin(angle),
           -half,
@@ -383,11 +386,11 @@ export function gallery(host, works, onPick, onMove) {
   }
   stick.onlostpointercapture = neutral;
   function blocked(x, z) {
-    return Math.abs(x) < 1.67 && z > -1.78 && z < -0.62;
+    return hasBench && Math.abs(x) < 1.67 && z > -1.78 && z < -0.62;
   }
   function move(x, z) {
-    x = T.MathUtils.clamp(x, -5.6, 5.6);
-    z = T.MathUtils.clamp(z, -6.6, 6.6);
+    x = T.MathUtils.clamp(x, -halfWidth + .4, halfWidth - .4);
+    z = T.MathUtils.clamp(z, -halfDepth + .4, halfDepth - .4);
     if (!blocked(x, cam.position.z)) cam.position.x = x;
     if (!blocked(cam.position.x, z)) cam.position.z = z;
   }
@@ -405,9 +408,9 @@ export function gallery(host, works, onPick, onMove) {
   scene.add(marker);
   function navigate(point, look = null) {
     const end = new T.Vector3(
-      T.MathUtils.clamp(point.x, -5.6, 5.6),
+      T.MathUtils.clamp(point.x, -halfWidth + .4, halfWidth - .4),
       look ? point.y : 1.65,
-      T.MathUtils.clamp(point.z, -6.6, 6.6),
+      T.MathUtils.clamp(point.z, -halfDepth + .4, halfDepth - .4),
     );
     if (blocked(end.x, end.z)) end.z = cam.position.z > -1.2 ? -0.54 : -1.86;
     marker.position.set(end.x, 0.014, end.z);

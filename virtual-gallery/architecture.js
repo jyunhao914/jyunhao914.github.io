@@ -2,7 +2,7 @@ import * as T from "./vendor/three.module.js";
 
 // The atlas contains diffuse interreflection from the garden window and roof apertures.
 // UV sets are independent: scanned textures tile in metres, irradiance spans the whole room.
-export function architecture(scene, box, renderer, theme = "") {
+export function architecture(scene, box, renderer, theme = "", halfWidth = 6, halfDepth = 7) {
   // Front, rear, window and opposite wall share a plaster finish.
   const palettes = {
     calligraphy: [0x253441, 0x343039, 0x303e39, 0x38404a],
@@ -10,7 +10,7 @@ export function architecture(scene, box, renderer, theme = "") {
   };
   const colors = palettes[theme];
   const dark = Boolean(colors);
-  const study = theme === "calligraphy";
+
   const textures = [],
     loads = [];
   const loader = new T.TextureLoader();
@@ -41,6 +41,51 @@ export function architecture(scene, box, renderer, theme = "") {
     if (type !== "plaster")
       props.roughnessMap = texture(type + "-rough.webp", false, x, y);
     return props;
+  }
+  if (["calligraphy", "projection", "main"].includes(theme)) {
+    const study = theme === "calligraphy";
+    const theater = theme === "projection";
+    const height = study ? 3.65 : theater ? 3.35 : 5.8;
+    const w = halfWidth, l = halfDepth;
+    const tones = colors || (theater ? [0x20232f, 0x29212d, 0x233231, 0x313541] :
+      [0x424a50, 0x47423f, 0x394641, 0x46404a]);
+    const plaster = {...surface("plaster", 5, 2), roughness: .96, normalScale: new T.Vector2(.18,.18)};
+    const wood = surface("wood", 3, 1);
+    const timber = {...wood, roughness: .75};
+    const floor = box(scene, w*2, .14, l*2, study ? 0x947960 : 0x777878, 0, -.07, 0,
+      study ? timber : surface("stone", 4, 3));
+    box(scene, w*2, height, .12, tones[0], 0, height/2, -l, plaster);
+    box(scene, w*2, height, .12, tones[1], 0, height/2, l, plaster);
+    box(scene, .12, height, l*2, tones[2], -w, height/2, 0, plaster);
+    box(scene, .12, height, l*2, tones[3], w, height/2, 0, plaster);
+    box(scene, w*2, .12, l*2, study ? 0x89816e : 0x444749, 0, height, 0, plaster);
+    const diffuser = {emissive: 0xffe2ad, emissiveIntensity: .7, roughness: .95};
+    if (study) {
+      // A sequence of timber portals and luminous lattice bays defines the promenade.
+      for (const z of [-8.7,-5.8,-2.9,0,2.9,5.8,8.7]) {
+        box(scene, w*2, .21, .14, 0x735638, 0, height-.15, z, timber);
+        for (const side of [-1,1])
+          box(scene, .08, height-.25, .13, 0x694e39, side*(w-.10), (height-.25)/2, z, timber);
+      }
+      for (const z of [-7.25,-4.35,-1.45,1.45,4.35,7.25]) {
+        box(scene,.055,1.77,1.85,0xffedcc,-w+.09,1.98,z,diffuser);
+        for (const offset of [-.93,-.62,-.31,0,.31,.62,.93])
+          box(scene,.06,1.82,.024,0x594935,-w+.14,1.98,z+offset,timber);
+        for (const y of [1.09,1.68,2.27,2.87])
+          box(scene,.06,.035,1.90,0x594935,-w+.14,y,z,timber);
+      }
+    } else if (theater) {
+      for (const side of [-1,1])
+        box(scene,.05,.035,l*2-.4,0xbcb9cf,side*(w-.09),.20,0,diffuser);
+    } else {
+      for (const x of [-w*.55,0,w*.55])
+        box(scene,.36,.08,l*2-.4,0xf4e8d1,x,height-.12,0,diffuser);
+    }
+    scene.add(new T.HemisphereLight(0xfff0d9,0x939291,study ? 1.05 : .85));
+    const key = new T.DirectionalLight(0xffedcf,1.25);
+    key.position.set(-w, height, l*.45);
+    scene.add(key);
+    return {floor, wood, textures, ready: Promise.all(loads)};
   }
   const illumination = texture("daylight.webp");
   illumination.channel = 1;
@@ -92,7 +137,7 @@ export function architecture(scene, box, renderer, theme = "") {
   const floor = new T.Mesh(
     new T.PlaneGeometry(12, 14),
     new T.MeshStandardMaterial({
-      ...(study ? wood : stone),
+      ...stone,
       color: dark ? 0x696963 : 0xc4c3b9,
       roughness: 0.63,
       normalScale: new T.Vector2(0.14, 0.14),
@@ -153,88 +198,68 @@ export function architecture(scene, box, renderer, theme = "") {
     });
     pier.receiveShadow = true;
   }
-  if (study) {
-    const timber = { ...wood, roughness: .78 };
-    box(scene, 12, .12, 14, 0x7d7567, 0, 3.96, 0, { roughness: .96 });
-    for (const z of [-6.8, -4.5, -2.2, .1, 2.4, 4.7, 6.8])
-      box(scene, 12, .19, .13, 0x594536, 0, 3.82, z, timber);
-    for (const x of [-5.75, -3, 0, 3, 5.75])
-      box(scene, .095, .10, 14, 0x635040, x, 3.86, 0, timber);
-    // Timber battens frame the hanging wall and filter light at the garden window.
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 9; i++)
-        box(scene, .035, 3.65, .06, 0x664b36, side * (3.4 + .13 * i), 1.83, -6.89, timber);
-    }
-    for (let z = start + .20; z < end; z += .34)
-      box(scene, .07, 3.1, .023, 0x644c38, -5.94, 1.98, z, timber);
-    for (const y of [1.05, 1.98, 2.91])
-      box(scene, .07, .03, end - start, 0x644c38, -5.94, y, mid, timber);
-    box(scene, 11.8, .04, .06, 0xf1cc91, 0, 3.62, -6.88,
-      { emissive: 0xffce88, emissiveIntensity: .55 });
-  } else {
-    // Two continuously curved, limewashed vaults are separated from the walls by a shadow reveal.
-    const vaultFinish = {
-      ...surface("plaster", 4, 10),
-      color: dark ? 0x7b8281 : 0xf2e7d7,
-      roughness: 0.96,
-      normalScale: new T.Vector2(0.12, 0.12),
-      side: T.DoubleSide,
-    };
-    for (const [center, face] of [
-      [-3, 5],
-      [3, 6],
+  // Two continuously curved, limewashed vaults are separated from the walls by a shadow reveal.
+  const vaultFinish = {
+    ...surface("plaster", 4, 10),
+    color: dark ? 0x7b8281 : 0xf2e7d7,
+    roughness: 0.96,
+    normalScale: new T.Vector2(0.12, 0.12),
+    side: T.DoubleSide,
+  };
+  for (const [center, face] of [
+    [-3, 5],
+    [3, 6],
+  ]) {
+    for (const [low, high] of [
+      [-3, -0.29],
+      [0.29, 3],
     ]) {
-      for (const [low, high] of [
-        [-3, -0.29],
-        [0.29, 3],
-      ]) {
-        const geom = new T.PlaneGeometry(high - low, 14, 40, 1),
-          pos = geom.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          const x = pos.getX(i) + (low + high) / 2,
-            z = pos.getY(i);
-          pos.setXYZ(i, center + x, 5.18 - 1.33 * (x / 3) ** 2, z);
-        }
-        geom.computeVertexNormals();
-        const roof = new T.Mesh(geom, new T.MeshStandardMaterial(vaultFinish));
-        scene.add(roof);
-        bake(roof, face);
+      const geom = new T.PlaneGeometry(high - low, 14, 40, 1),
+        pos = geom.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i) + (low + high) / 2,
+          z = pos.getY(i);
+        pos.setXYZ(i, center + x, 5.18 - 1.33 * (x / 3) ** 2, z);
       }
-      box(scene, 0.65, 0.025, 14, 0xf7f7ef, center, 5.29, 0, {
-        emissive: 0xfff5dc,
-        emissiveIntensity: 1.1,
-      });
-      for (const delta of [-0.29, 0.29])
-        box(scene, 0.045, 0.16, 14, 0x897f70, center + delta, 5.22, 0);
-      for (const z of [-5, -1.5, 2, 5.5])
-        box(scene, 0.58, 0.05, 0.035, 0x969184, center, 5.22, z);
+      geom.computeVertexNormals();
+      const roof = new T.Mesh(geom, new T.MeshStandardMaterial(vaultFinish));
+      scene.add(roof);
+      bake(roof, face);
     }
-    // Thin suspended picture-light rails follow the line of the vault, with recessed lamp lenses.
-    for (const x of [-4.65, 4.65]) {
-      const h = 3.77;
-      box(scene, 0.042, 0.045, 13.3, 0x323330, x, h, 0);
-      for (const z of [-5.5, -1.85, 1.85, 5.5]) {
-        const hanger = 5.18 - 1.33 * ((Math.abs(x) - 3) / 3) ** 2 - h;
-        box(scene, 0.016, hanger, 0.016, 0x817d73, x, h + hanger / 2, z);
-        const lamp = new T.Mesh(
-          new T.CylinderGeometry(0.069, 0.064, 0.2, 24),
-          new T.MeshStandardMaterial({
-            color: 0x343432,
-            metalness: 0.52,
-            roughness: 0.32,
-          }),
-        );
-        lamp.position.set(x, h - 0.12, z);
-        lamp.rotation.z = x > 0 ? 0.52 : -0.52;
-        scene.add(lamp);
-        const lens = new T.Mesh(
-          new T.CircleGeometry(0.056, 24),
-          new T.MeshBasicMaterial({ color: 0xffe2b6 }),
-        );
-        lens.rotation.x = Math.PI / 2;
-        lens.position.y = -0.101;
-        lamp.add(lens);
-      }
+    box(scene, 0.65, 0.025, 14, 0xf7f7ef, center, 5.29, 0, {
+      emissive: 0xfff5dc,
+      emissiveIntensity: 1.1,
+    });
+    for (const delta of [-0.29, 0.29])
+      box(scene, 0.045, 0.16, 14, 0x897f70, center + delta, 5.22, 0);
+    for (const z of [-5, -1.5, 2, 5.5])
+      box(scene, 0.58, 0.05, 0.035, 0x969184, center, 5.22, z);
+  }
+  // Thin suspended picture-light rails follow the line of the vault, with recessed lamp lenses.
+  for (const x of [-4.65, 4.65]) {
+    const h = 3.77;
+    box(scene, 0.042, 0.045, 13.3, 0x323330, x, h, 0);
+    for (const z of [-5.5, -1.85, 1.85, 5.5]) {
+      const hanger = 5.18 - 1.33 * ((Math.abs(x) - 3) / 3) ** 2 - h;
+      box(scene, 0.016, hanger, 0.016, 0x817d73, x, h + hanger / 2, z);
+      const lamp = new T.Mesh(
+        new T.CylinderGeometry(0.069, 0.064, 0.2, 24),
+        new T.MeshStandardMaterial({
+          color: 0x343432,
+          metalness: 0.52,
+          roughness: 0.32,
+        }),
+      );
+      lamp.position.set(x, h - 0.12, z);
+      lamp.rotation.z = x > 0 ? 0.52 : -0.52;
+      scene.add(lamp);
+      const lens = new T.Mesh(
+        new T.CircleGeometry(0.056, 24),
+        new T.MeshBasicMaterial({ color: 0xffe2b6 }),
+      );
+      lens.rotation.x = Math.PI / 2;
+      lens.position.y = -0.101;
+      lamp.add(lens);
     }
   }
   for (const side of [-1, 1]) {
