@@ -731,10 +731,57 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const sky=new T.HemisphereLight(0xf5f7ff,0xc6b496,1.40);root.add(sky);
   const sun=new T.DirectionalLight(0xffedcc,1.32);sun.position.set(1.7,10,-2.84);root.add(sun);
   const bounce=new T.DirectionalLight(0xdbe6eb,.52);bounce.position.set(1,3,d);root.add(bounce);
+  // The plaques sit on the public face of the left stone pier. Their dimensions
+  // and air gap are in metres, so they retain their scale as the visitor approaches.
+  const signHits=[],signRows=[];
+  if(doors.length){
+    const pier=piers[0],front=pier.z+pier.depth/2,rows=doors.slice(0,5).map((door,i)=>({
+      title:door.title||door.room||"展廳",action:"sign:"+i
+    }));
+    if(doors.length>rows.length)rows.push({title:"完整名錄",action:"directory"});
+    const font=getComputedStyle(document.documentElement).getPropertyValue("--gallery-font-family").trim()||"sans-serif";
+    const width=.96,height=.205,pitch=.222,top=2.22;
+    const backing=new T.Mesh(new T.BoxGeometry(width-.045,rows.length*pitch-.014,.018),recess);
+    backing.position.set(pier.x,top-(rows.length-1)*pitch/2,front+.009);
+    root.add(backing);
+    const hitMat=material(T.MeshBasicMaterial,{visible:false});
+    rows.forEach(({title,action},i)=>{
+      const y=top-i*pitch;
+      const face=standard({color:0x594938,roughness:.47,metalness:.38});
+      const plate=new T.Mesh(new T.BoxGeometry(width,height,.020),face);
+      plate.position.set(pier.x,y,front+.028);root.add(plate);
+      const c=document.createElement("canvas");c.width=960;c.height=205;
+      const ctx=c.getContext("2d");ctx.textBaseline="middle";
+      const text=title,available=748;
+      let size=97;
+      ctx.font="550 "+size+"px "+font;
+      while(size>51 && ctx.measureText(text).width>available)ctx.font="550 "+(--size)+"px "+font;
+      let label=text;
+      while(label.length>1 && ctx.measureText(label+"…").width>available)label=Array.from(label).slice(0,-1).join("");
+      if(label!==text)label+="…";
+      ctx.shadowColor="#21180e";ctx.shadowBlur=3;ctx.shadowOffsetY=4;
+      ctx.fillStyle="#f0dfbc";ctx.fillText(label,44,103);
+      ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle="#e3d1a8";ctx.lineWidth=5;
+      ctx.beginPath();ctx.moveTo(834,103);ctx.lineTo(902,103);ctx.moveTo(878,80);ctx.lineTo(902,103);ctx.lineTo(878,126);ctx.stroke();
+      const map=new T.CanvasTexture(c);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;textures.push(map);
+      const lettering=new T.Mesh(new T.PlaneGeometry(width,height),standard({map,transparent:true,depthWrite:false,metalness:.16,roughness:.45}));
+      lettering.position.set(pier.x,y,front+.041);root.add(lettering);
+      const hit=new T.Mesh(new T.PlaneGeometry(width,pitch),hitMat);
+      hit.name="lobby-pier-sign-"+i;hit.userData.signAction=action;
+      hit.position.set(pier.x,y,front+.042);root.add(hit);signHits.push(hit);
+      signRows.push({action,face});
+    });
+    const endHit=new T.Mesh(new T.PlaneGeometry(rearWidth-.16,3.08),hitMat);
+    endHit.name="lobby-first-hall-screen";endHit.userData.signAction="first-hall";
+    endHit.position.set(rearX,1.58,wallNorth+.234);root.add(endHit);signHits.push(endHit);
+  }
+  function highlightSign(action){
+    for(const row of signRows)row.face.emissive.setHex(row.action===action?0x22180c:0);
+  }
   const deskHits=buildReception(T,root,{texture,materials,stoneMap,stoneNormal});
   const updateWaypoints=buildWaypoints(T,root,doors,{materials,textures,hits,halfDepth:d});
   root.updateMatrixWorld(true);
-  return {hits,deskHits,reflectionFloor,floorMaterial:stone,panorama,updateWaypoints,constrainLobbyStep:partition.constrainLobbyStep,lobbyRoute:partition.lobbyRoute,shiftMenu:updateWaypoints.shiftMenu,menuIndex:updateWaypoints.menuIndex,menuPoint:updateWaypoints.menuPoint,dispose(){
+  return {hits,deskHits,signHits,highlightSign,reflectionFloor,floorMaterial:stone,panorama,updateWaypoints,constrainLobbyStep:partition.constrainLobbyStep,lobbyRoute:partition.lobbyRoute,shiftMenu:updateWaypoints.shiftMenu,menuIndex:updateWaypoints.menuIndex,menuPoint:updateWaypoints.menuPoint,dispose(){
     disposed=true;root.removeFromParent();
     root.traverse(node=>node.geometry?.dispose());
     materials.forEach(mat=>mat.dispose());textures.forEach(tex=>tex.dispose());

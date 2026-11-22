@@ -2,7 +2,7 @@ import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=atrium40";
 import {createFloorReflection} from "./lobby-floor-reflection.js?v=reception41b";
-import { buildLobby } from "./lobby-interior.js?v=directory42";
+import { buildLobby } from "./lobby-interior.js?v=pier44";
 
 const eyeHeight = 1.60;
 const walkInRadius = .90;
@@ -61,7 +61,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
   let drag = null, nearest, dirty = true, frame = 0, last = 0;
   let approach = null, hoverPosition=null, hovered=null;
   let mouseHighlight=false,cardsAnimating=false,cardsExpanded=false;
-  let receptionTargets=[];
+  let receptionTargets=[],expandedTargets=[];
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
   function invalidate() {
@@ -475,13 +475,14 @@ export function createLobby(host, doors, onEnter, options = {}) {
     point.set(2 * (e.clientX - bounds.left) / bounds.width - 1, 1 - 2 * (e.clientY - bounds.top) / bounds.height);
     camera.updateMatrixWorld();
     raycaster.setFromCamera(point, camera);
-    const targets=zone==="grounds" ? grounds.hits : (cardsExpanded ? interior.hits : receptionTargets);
+    const targets=zone==="grounds" ? grounds.hits : (cardsExpanded ? expandedTargets : receptionTargets);
     for(const target of targets)target.updateWorldMatrix(true,false);
     const hit=raycaster.intersectObjects(targets,true).find(({object})=>object.userData.pickable!==false);
     if(!hit || blockedAt(hit.distance))return null;
     if(zone==="grounds")return "entrance";
     let object = hit.object;
     while (object) {
+      if(object.userData.signAction)return object.userData.signAction;
       if(object.userData.receptionDesk)return "reception";
       if (Number.isInteger(object.userData.doorIndex)) return object.userData.doorIndex;
       object = object.parent;
@@ -491,6 +492,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
   function updateHover(hit) {
     if(hit===hovered)return;
     hovered=hit;
+    interior?.highlightSign(hit);
     canvas.style.cursor=hit==null ? "grab" : "pointer";
     invalidate();
   }
@@ -552,6 +554,9 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const index=zone==="lobby" ? card : pick(e);
     if (index == null) host.dispatchEvent(new Event("lobbyblanktap"));
     else if(index==="entrance") { if(zone==="grounds")enterMuseum(); else exitMuseum(); }
+    else if(index==="first-hall")enter(0);
+    else if(index==="directory")options.onDirectory?.();
+    else if(typeof index==="string" && index.startsWith("sign:"))enter(Number(index.slice(5)));
     else if(index==="reception")setMenuOpen(true);
     else if(cardsExpanded)enter(index);
   }
@@ -584,7 +589,8 @@ export function createLobby(host, doors, onEnter, options = {}) {
     interior = buildLobby(T, scene, plan.doors, {...plan, invalidate});
     floorReflection=createFloorReflection(T,renderer,scene,interior.reflectionFloor,invalidate);
     grounds = buildMuseumGrounds(T,scene,{halfWidth:plan.halfWidth,halfDepth:plan.halfDepth,panorama:interior.panorama,invalidate});
-    receptionTargets=interior.deskHits || [];
+    receptionTargets=[...interior.deskHits,...interior.signHits];
+    expandedTargets=[...interior.hits,...interior.signHits];
     scene.updateMatrixWorld(true);
     scene.traverseVisible(mesh=>{
       if(!mesh.isMesh || !mesh.geometry || !camera.layers.test(mesh.layers))return;

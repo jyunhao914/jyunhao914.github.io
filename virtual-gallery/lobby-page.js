@@ -168,13 +168,13 @@ export function lobbyPage(enterRoom,prepareRoom) {
     message.textContent=startZone==="lobby" ? "正在開啟展場大廳…" : "正在載入空間…";message.hidden=false;
     el("lobbyHint").hidden=true;
     try {
-      const {createLobby}=await import("./lobby.js?v=entry43");
+      const {createLobby}=await import("./lobby.js?v=pier44");
       if(!active || version!==generation)return;
       const signs=rooms.map(({title,subtitle,room,show})=>({title,subtitle,room,show:{id:show.id,title:show.title}}));
       scene=createLobby(stage,signs,index=>{
         if(active && !panel.open && rooms[index])enterRoom(rooms[index]);
       },{
-        startZone,returnDoorIndex:returnIndex,onNearest:near,onZone:setZone,
+        startZone,returnDoorIndex:returnIndex,onNearest:near,onZone:setZone,onDirectory:showDirectory,
         onMenuOpen(open){cardsOpen=open;if(open)prepareRoom();near(null);},
         onTravel:walking=>entrance.classList.toggle("portal-walking",walking)
       });
