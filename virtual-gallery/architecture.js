@@ -2,7 +2,15 @@ import * as T from "./vendor/three.module.js";
 
 // The atlas contains diffuse interreflection from the garden window and roof apertures.
 // UV sets are independent: scanned textures tile in metres, irradiance spans the whole room.
-export function architecture(scene, box, renderer) {
+export function architecture(scene, box, renderer, theme = "") {
+  // Front, rear, window and opposite wall share a plaster finish.
+  const palettes = {
+    calligraphy: [0x253441, 0x343039, 0x303e39, 0x38404a],
+    ink: [0x34433f, 0x383746, 0x2c3b49, 0x464443],
+  };
+  const colors = palettes[theme];
+  const dark = Boolean(colors);
+  const study = theme === "calligraphy";
   const textures = [],
     loads = [];
   const loader = new T.TextureLoader();
@@ -84,8 +92,8 @@ export function architecture(scene, box, renderer) {
   const floor = new T.Mesh(
     new T.PlaneGeometry(12, 14),
     new T.MeshStandardMaterial({
-      ...stone,
-      color: 0xc4c3b9,
+      ...(study ? wood : stone),
+      color: dark ? 0x696963 : 0xc4c3b9,
       roughness: 0.63,
       normalScale: new T.Vector2(0.14, 0.14),
     }),
@@ -100,7 +108,7 @@ export function architecture(scene, box, renderer) {
     roughness: 0.95,
   };
   function wall(x, y, z, w, h, d, face) {
-    return bake(box(scene, w, h, d, 0xfffcf0, x, y, z, cream), face);
+    return bake(box(scene, w, h, d, colors?.[face - 1] ?? 0xfffcf0, x, y, z, cream), face);
   }
   wall(0, 2.63, -7, 12, 5.26, 0.12, 1);
   wall(0, 2.63, 7, 12, 5.26, 0.12, 2);
@@ -145,68 +153,88 @@ export function architecture(scene, box, renderer) {
     });
     pier.receiveShadow = true;
   }
-  // Two continuously curved, limewashed vaults are separated from the walls by a shadow reveal.
-  const vaultFinish = {
-    ...surface("plaster", 4, 10),
-    color: 0xf2e7d7,
-    roughness: 0.96,
-    normalScale: new T.Vector2(0.12, 0.12),
-    side: T.DoubleSide,
-  };
-  for (const [center, face] of [
-    [-3, 5],
-    [3, 6],
-  ]) {
-    for (const [low, high] of [
-      [-3, -0.29],
-      [0.29, 3],
-    ]) {
-      const geom = new T.PlaneGeometry(high - low, 14, 40, 1),
-        pos = geom.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i) + (low + high) / 2,
-          z = pos.getY(i);
-        pos.setXYZ(i, center + x, 5.18 - 1.33 * (x / 3) ** 2, z);
-      }
-      geom.computeVertexNormals();
-      const roof = new T.Mesh(geom, new T.MeshStandardMaterial(vaultFinish));
-      scene.add(roof);
-      bake(roof, face);
+  if (study) {
+    const timber = { ...wood, roughness: .78 };
+    box(scene, 12, .12, 14, 0x7d7567, 0, 3.96, 0, { roughness: .96 });
+    for (const z of [-6.8, -4.5, -2.2, .1, 2.4, 4.7, 6.8])
+      box(scene, 12, .19, .13, 0x594536, 0, 3.82, z, timber);
+    for (const x of [-5.75, -3, 0, 3, 5.75])
+      box(scene, .095, .10, 14, 0x635040, x, 3.86, 0, timber);
+    // Timber battens frame the hanging wall and filter light at the garden window.
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 9; i++)
+        box(scene, .035, 3.65, .06, 0x664b36, side * (3.4 + .13 * i), 1.83, -6.89, timber);
     }
-    box(scene, 0.65, 0.025, 14, 0xf7f7ef, center, 5.29, 0, {
-      emissive: 0xfff5dc,
-      emissiveIntensity: 1.1,
-    });
-    for (const delta of [-0.29, 0.29])
-      box(scene, 0.045, 0.16, 14, 0x897f70, center + delta, 5.22, 0);
-    for (const z of [-5, -1.5, 2, 5.5])
-      box(scene, 0.58, 0.05, 0.035, 0x969184, center, 5.22, z);
-  }
-  // Thin suspended picture-light rails follow the line of the vault, with recessed lamp lenses.
-  for (const x of [-4.65, 4.65]) {
-    const h = 3.77;
-    box(scene, 0.042, 0.045, 13.3, 0x323330, x, h, 0);
-    for (const z of [-5.5, -1.85, 1.85, 5.5]) {
-      const hanger = 5.18 - 1.33 * ((Math.abs(x) - 3) / 3) ** 2 - h;
-      box(scene, 0.016, hanger, 0.016, 0x817d73, x, h + hanger / 2, z);
-      const lamp = new T.Mesh(
-        new T.CylinderGeometry(0.069, 0.064, 0.2, 24),
-        new T.MeshStandardMaterial({
-          color: 0x343432,
-          metalness: 0.52,
-          roughness: 0.32,
-        }),
-      );
-      lamp.position.set(x, h - 0.12, z);
-      lamp.rotation.z = x > 0 ? 0.52 : -0.52;
-      scene.add(lamp);
-      const lens = new T.Mesh(
-        new T.CircleGeometry(0.056, 24),
-        new T.MeshBasicMaterial({ color: 0xffe2b6 }),
-      );
-      lens.rotation.x = Math.PI / 2;
-      lens.position.y = -0.101;
-      lamp.add(lens);
+    for (let z = start + .20; z < end; z += .34)
+      box(scene, .07, 3.1, .023, 0x644c38, -5.94, 1.98, z, timber);
+    for (const y of [1.05, 1.98, 2.91])
+      box(scene, .07, .03, end - start, 0x644c38, -5.94, y, mid, timber);
+    box(scene, 11.8, .04, .06, 0xf1cc91, 0, 3.62, -6.88,
+      { emissive: 0xffce88, emissiveIntensity: .55 });
+  } else {
+    // Two continuously curved, limewashed vaults are separated from the walls by a shadow reveal.
+    const vaultFinish = {
+      ...surface("plaster", 4, 10),
+      color: dark ? 0x7b8281 : 0xf2e7d7,
+      roughness: 0.96,
+      normalScale: new T.Vector2(0.12, 0.12),
+      side: T.DoubleSide,
+    };
+    for (const [center, face] of [
+      [-3, 5],
+      [3, 6],
+    ]) {
+      for (const [low, high] of [
+        [-3, -0.29],
+        [0.29, 3],
+      ]) {
+        const geom = new T.PlaneGeometry(high - low, 14, 40, 1),
+          pos = geom.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i) + (low + high) / 2,
+            z = pos.getY(i);
+          pos.setXYZ(i, center + x, 5.18 - 1.33 * (x / 3) ** 2, z);
+        }
+        geom.computeVertexNormals();
+        const roof = new T.Mesh(geom, new T.MeshStandardMaterial(vaultFinish));
+        scene.add(roof);
+        bake(roof, face);
+      }
+      box(scene, 0.65, 0.025, 14, 0xf7f7ef, center, 5.29, 0, {
+        emissive: 0xfff5dc,
+        emissiveIntensity: 1.1,
+      });
+      for (const delta of [-0.29, 0.29])
+        box(scene, 0.045, 0.16, 14, 0x897f70, center + delta, 5.22, 0);
+      for (const z of [-5, -1.5, 2, 5.5])
+        box(scene, 0.58, 0.05, 0.035, 0x969184, center, 5.22, z);
+    }
+    // Thin suspended picture-light rails follow the line of the vault, with recessed lamp lenses.
+    for (const x of [-4.65, 4.65]) {
+      const h = 3.77;
+      box(scene, 0.042, 0.045, 13.3, 0x323330, x, h, 0);
+      for (const z of [-5.5, -1.85, 1.85, 5.5]) {
+        const hanger = 5.18 - 1.33 * ((Math.abs(x) - 3) / 3) ** 2 - h;
+        box(scene, 0.016, hanger, 0.016, 0x817d73, x, h + hanger / 2, z);
+        const lamp = new T.Mesh(
+          new T.CylinderGeometry(0.069, 0.064, 0.2, 24),
+          new T.MeshStandardMaterial({
+            color: 0x343432,
+            metalness: 0.52,
+            roughness: 0.32,
+          }),
+        );
+        lamp.position.set(x, h - 0.12, z);
+        lamp.rotation.z = x > 0 ? 0.52 : -0.52;
+        scene.add(lamp);
+        const lens = new T.Mesh(
+          new T.CircleGeometry(0.056, 24),
+          new T.MeshBasicMaterial({ color: 0xffe2b6 }),
+        );
+        lens.rotation.x = Math.PI / 2;
+        lens.position.y = -0.101;
+        lamp.add(lens);
+      }
     }
   }
   for (const side of [-1, 1]) {

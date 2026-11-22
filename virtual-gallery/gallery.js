@@ -1,5 +1,5 @@
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=vault1";
+import { architecture } from "./architecture.js?v=scroll3";
 export function gallery(host, works, onPick, onMove) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -30,9 +30,12 @@ export function gallery(host, works, onPick, onMove) {
   renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFShadowMap;
-  const station = new T.Vector3(3.8, 1.65, 3.25);
-  const entranceLook = new T.Vector3(-1.7, 1.46, -4.9);
-  const building = architecture(scene, box, renderer);
+  const hasScroll = works.some(a => a.mount === "掛軸");
+  const dark = works.some(a => a.room === "書法展廳");
+  cam.rotation.order = "YXZ";
+  const station = hasScroll ? new T.Vector3(dark ? 0 : -2, 1.85, dark ? -2.5 : -2.9) : new T.Vector3(3.8, 1.65, 3.25);
+  const entranceLook = hasScroll ? new T.Vector3(station.x, station.y, -7) : new T.Vector3(-1.7, 1.46, -4.9);
+  const building = architecture(scene, box, renderer, dark ? "calligraphy" : hasScroll ? "ink" : "");
   let reflection,
     disposed = false;
   building.ready
@@ -120,11 +123,18 @@ export function gallery(host, works, onPick, onMove) {
     if (a.mount === "掛軸") {
       const silkWidth = w + 2 * m;
       const silkHeight = h + .48;
-      box(g, silkWidth, silkHeight, .018, 0xb8ac91, 0, .05, d / 2 - .012);
-      for (const height of [-silkHeight / 2 + .05, silkHeight / 2 + .05]) {
+      const weave = new T.TextureLoader().load(new URL("./materials/silk-weave.png", import.meta.url).href);
+      textures.push(weave);
+      weave.wrapS = weave.wrapT = T.RepeatWrapping;
+      weave.repeat.set(silkWidth * 9, silkHeight * 9);
+      box(g, silkWidth, silkHeight, .012, dark ? 0xa49c80 : 0xb9ae94, 0, .05, d / 2 - .006,
+        { bumpMap: weave, bumpScale: .0007, roughness: .91 });
+      box(g, silkWidth, .014, .018, 0x504639, 0, silkHeight / 2 + .05, d / 2);
+      {
+        const height = -silkHeight / 2 + .05;
         const roller = new T.Mesh(
           new T.CylinderGeometry(.027, .027, silkWidth + .10, 16),
-          new T.MeshStandardMaterial({color: 0x47392c, roughness: .55})
+          new T.MeshStandardMaterial({...building.wood, color: 0x624636, roughness: .62})
         );
         roller.rotation.z = Math.PI / 2;
         roller.position.set(0, height, d / 2);
@@ -149,7 +159,7 @@ export function gallery(host, works, onPick, onMove) {
           ...(a.frame === "木框" ? building.wood : {}),
         },
       );
-    if (m) box(g, w + 2 * m, h + 2 * m, 0.012, 0xf7f2e5, 0, 0, d / 2);
+    if (m && a.mount !== "掛軸") box(g, w + 2 * m, h + 2 * m, 0.012, 0xf7f2e5, 0, 0, d / 2);
     let tex;
     if (
       a.type === "影片" ||
@@ -226,7 +236,6 @@ export function gallery(host, works, onPick, onMove) {
   });
   cam.position.copy(station);
   cam.lookAt(entranceLook);
-  cam.rotation.order = "YXZ";
   let keys = new Set(),
     ray = new T.Raycaster(),
     drag,

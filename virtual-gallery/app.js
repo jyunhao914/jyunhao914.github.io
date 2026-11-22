@@ -99,7 +99,7 @@ function leave() {
   $("music").pause();
 }
 function draw() {
-  leave();
+  $("music").pause();
   $("title").textContent = $("visitTitle").textContent = current.title;
   const cover = current.works.find((work) => work.type === "圖片");
   const heroImage = document.querySelector(".hero img");
@@ -176,7 +176,7 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=inkhall1");
+    let { gallery } = await import("./gallery.js?v=scroll3");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -279,16 +279,21 @@ try {
     : (
         await (await fetch("exhibitions.json", { cache: "no-store" })).json()
       ).filter(valid);
-  $("shows").replaceChildren(...shows.map((s, i) => new Option(s.title, i)));
-  $("shows").onchange = () => {
-    current = shows[Number($("shows").value)];
+  function selectShow(index) {
+    current = shows[index];
+    $("shows").value = $("visitShows").value = String(index);
     draw();
     enter();
-  };
+  }
+  for (const control of [$("shows"), $("visitShows")]) {
+    control.replaceChildren(...shows.map((s, i) => new Option(s.title, i)));
+    control.onchange = () => {
+      selectShow(Number(control.value));
+      if (!preview) history.replaceState(null, "", "#" + encodeURIComponent(current.id));
+    };
+  }
   if (shows.length) {
-    current = shows[0];
-    draw();
-    enter();
+    selectShow(Math.max(0, shows.findIndex(s => "#" + encodeURIComponent(s.id) === location.hash)));
   } else {
     leave();
     $("title").textContent = "目前休展";
