@@ -56,6 +56,11 @@ function detail(a) {
     ),
     node("p", a.description),
   );
+  if (typeof a.source === "string" && a.source.startsWith("https://www.clevelandart.org/art/")) {
+    const source = node("a", "克里夫蘭藝術博物館・館藏原頁（CC0）");
+    source.href = a.source;
+    c.append(source);
+  }
   if (a.subtitle) c.append(node("p", a.subtitle));
   if (a.voice) {
     let v = node("audio");
@@ -96,6 +101,10 @@ function leave() {
 function draw() {
   leave();
   $("title").textContent = $("visitTitle").textContent = current.title;
+  const cover = current.works.find((work) => work.type === "圖片");
+  const heroImage = document.querySelector(".hero img");
+  heroImage.src = cover?.src || "media/hero.webp";
+  heroImage.alt = cover?.title || current.title;
   $("desc").textContent = current.description;
   $("dates").textContent =
     current.start || current.end
@@ -157,7 +166,6 @@ async function enter() {
   document.body.classList.add("visiting");
   $("visit").classList.add("immersive");
   menu(false);
-  $("photoCredit").hidden = $("environment").value !== "photo";
   showFocus(null);
   syncExpand();
   const roomWorks = current.works.filter((a) => a.room === $("room").value);
@@ -168,14 +176,12 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=photohall2");
+    let { gallery } = await import("./gallery.js?v=inkhall1");
     if (n === seq)
       viewer = gallery(
         $("stage"),
         current.works.filter((a) => a.room === $("room").value),
         showFocus,
-        undefined,
-        $("environment").value === "photo",
       );
   } catch (e) {
     $("stage").textContent = "此裝置無法啟動 WebGL 2。可於展出作品區開啟展籤。";
@@ -184,13 +190,6 @@ async function enter() {
 }
 $("enter").onclick = enter;
 $("room").onchange = enter;
-$("environment").onchange = enter;
-$("stage").addEventListener("photofailed", () => {
-  if ($("environment").value === "photo") {
-    $("environment").value = "built";
-    enter();
-  }
-});
 $("leave").onclick = leave;
 for (const [name, step] of [
   ["prev", -1],

@@ -4,22 +4,8 @@
   <meta charset="utf-8" /><meta
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
-  /><title>虛擬策展工作室｜線上美術館</title
-  ><link rel="stylesheet" href="style.css?v=photohall2" />
-  <link
-    rel="preload"
-    as="image"
-    media="(min-width:600px)"
-    href="media/photography/doorway.webp"
-    fetchpriority="high"
-  />
-  <link
-    rel="preload"
-    as="image"
-    media="(max-width:599px)"
-    href="media/photography/doorway-mobile.webp"
-    fetchpriority="high"
-  />
+  /><title>水墨畫展廳｜虛擬策展工作室</title
+  ><link rel="stylesheet" href="style.css?v=inkhall1" />
   <header>
     <strong>虛擬策展工作室</strong>
     <nav><a href="#exhibits">展覽</a><a href="#works">典藏作品</a></nav>
@@ -42,7 +28,7 @@
     <section id="visit" class="immersive" aria-label="3D 展廳">
       <div id="stage" aria-label="可行走的 3D 展廳">正在開啟 3D 展廳…</div>
       <div class="museum-head">
-        <h1 id="visitTitle">3D 展廳</h1>
+        <h1 id="visitTitle">水墨畫展廳</h1>
         <button id="expand">全螢幕</button
         ><button
           id="menuButton"
@@ -57,22 +43,7 @@
         ><span id="viewHelp">點作品走近觀賞 · 拖曳環顧</span>
       </div>
       <div id="visitMenu" hidden>
-        <label
-          >空間呈現<select id="environment">
-            <option value="photo">實景攝影展間</option>
-            <option value="built">拱頂建築展間</option>
-          </select></label
-        >
         <label>展廳<select id="room"></select></label>
-        <small id="photoCredit"
-          >展間攝影　Oliksiy Yakovlyev ·
-          <a
-            href="https://polyhaven.com/a/sculpture_exhibition"
-            target="_blank"
-            rel="noopener noreferrer"
-            >Sculpture Exhibition</a
-          ></small
-        >
         <div class="tour-tools">
           <button id="prev">上一件</button
           ><select id="tour" aria-label="選擇導覽作品"></select
@@ -112,5 +83,5 @@
     <button id="close">關閉展籤</button>
     <section id="content"></section>
   </dialog>
-  <script type="module" src="app.js?v=photohall2"></script>
+  <script type="module" src="app.js?v=inkhall1"></script>
 </html>

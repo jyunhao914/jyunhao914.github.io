@@ -1,10 +1,9 @@
 import * as T from "./vendor/three.module.js";
 import { architecture } from "./architecture.js?v=vault1";
-import { photographicRoom } from "./photographic-room.js";
-export function gallery(host, works, onPick, onMove, photographic = false) {
+export function gallery(host, works, onPick, onMove) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
-      photographic && host.clientWidth < 600 ? 88 : 64,
+      64,
       1,
       0.06,
       80,
@@ -31,19 +30,9 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
   renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFShadowMap;
-  const station = photographic
-    ? new T.Vector3(0, 1.65, -2.4)
-    : new T.Vector3(3.8, 1.65, 3.25);
-  const entranceLook = photographic
-    ? new T.Vector3(
-        host.clientWidth < 600 ? 5.3 : 3.18,
-        host.clientWidth < 600 ? 1.92 : 1.72,
-        -6.87,
-      )
-    : new T.Vector3(-1.7, 1.46, -4.9);
-  const building = photographic
-    ? photographicRoom(scene, renderer, station)
-    : architecture(scene, box, renderer);
+  const station = new T.Vector3(3.8, 1.65, 3.25);
+  const entranceLook = new T.Vector3(-1.7, 1.46, -4.9);
+  const building = architecture(scene, box, renderer);
   let reflection,
     disposed = false;
   building.ready
@@ -51,7 +40,7 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
       if (disposed) return;
       const cube = new T.WebGLCubeRenderTarget(128, { type: T.HalfFloatType });
       const probe = new T.CubeCamera(0.08, 78, cube);
-      probe.position.copy(photographic ? station : new T.Vector3(0, 1.7, 0));
+      probe.position.copy(new T.Vector3(0, 1.7, 0));
       probe.update(renderer, scene);
       const pmrem = new T.PMREMGenerator(renderer);
       reflection = pmrem.fromCubemap(cube.texture);
@@ -60,9 +49,7 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
       cube.dispose();
       pmrem.dispose();
     })
-    .catch(() => {
-      if (!disposed) host.dispatchEvent(new Event("photofailed"));
-    });
+    .catch((error) => console.warn("展廳環境反射無法載入", error));
   let groups = [],
     targets = [],
     videos = [],
@@ -108,7 +95,7 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
       f = a.frame === "無框" ? 0 : a.frameWidth,
       m = a.mat,
       d = a.depth;
-    if (photographic) {
+    if (a.mount === "掛軸") {
       const contactCanvas = document.createElement("canvas");
       contactCanvas.width = 256;
       contactCanvas.height = 192;
@@ -129,6 +116,21 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
       );
       shadow.position.set(0.018, -0.027, -0.055);
       g.add(shadow);
+    }
+    if (a.mount === "掛軸") {
+      const silkWidth = w + 2 * m;
+      const silkHeight = h + .48;
+      box(g, silkWidth, silkHeight, .018, 0xb8ac91, 0, .05, d / 2 - .012);
+      for (const height of [-silkHeight / 2 + .05, silkHeight / 2 + .05]) {
+        const roller = new T.Mesh(
+          new T.CylinderGeometry(.027, .027, silkWidth + .10, 16),
+          new T.MeshStandardMaterial({color: 0x47392c, roughness: .55})
+        );
+        roller.rotation.z = Math.PI / 2;
+        roller.position.set(0, height, d / 2);
+        roller.castShadow = true;
+        g.add(roller);
+      }
     }
     if (f)
       box(
@@ -372,7 +374,6 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
   }
   stick.onlostpointercapture = neutral;
   function blocked(x, z) {
-    if (photographic) return false;
     return Math.abs(x) < 1.67 && z > -1.78 && z < -0.62;
   }
   function move(x, z) {
@@ -493,7 +494,6 @@ export function gallery(host, works, onPick, onMove, photographic = false) {
       h = host.clientHeight;
     renderer.setSize(w, h, false);
     cam.aspect = w / h;
-    if (photographic) cam.fov = w < 600 ? 88 : 64;
     cam.updateProjectionMatrix();
     if (guide >= 0 && !onMove) focus(guide, false);
   });
