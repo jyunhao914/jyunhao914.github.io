@@ -5,7 +5,8 @@
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>水墨畫展廳｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=clean13" />
+  ><link rel="stylesheet" href="style.css?v=smooth14" />
+  <link rel="modulepreload" href="gallery.js?v=smooth14">
   <header>
     <strong>虛擬策展工作室</strong>
     <nav><a href="#exhibits">展覽</a><a href="#works">典藏作品</a></nav>
@@ -26,7 +27,7 @@
       </div>
     </article>
     <section id="visit" class="immersive" aria-label="3D 展廳">
-      <div id="stage" aria-label="可行走的 3D 展廳">正在開啟 3D 展廳…</div>
+      <div id="stage" tabindex="-1" aria-label="可行走的 3D 展廳">正在開啟 3D 展廳…</div>
       <div class="museum-head">
         <h1 id="visitTitle">水墨畫展廳</h1>
         <button id="homeView" title="回到本廳預設視角（R）" aria-keyshortcuts="R">回到預設</button>
@@ -95,5 +96,27 @@
     <button id="close">關閉展籤</button>
     <section id="content"></section>
   </dialog>
-  <script type="module" src="app.js?v=clean13"></script>
+  <script>
+    // Capture the first navigation gesture while the exhibition data and WebGL module load.
+    (() => {
+      const stage=document.getElementById("stage"), visit=document.getElementById("visit");
+      let pending=[];
+      function capture(e) {
+        if(visit.hidden || stage.querySelector("canvas") || e.altKey || e.ctrlKey || e.metaKey ||
+           e.target.closest?.("input,textarea,select,button,a,[contenteditable=true]") ||
+           !["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyA","KeyS","KeyD","Space","KeyR"].includes(e.code)) return;
+        e.preventDefault();
+        if(!e.repeat && pending.length<64) pending.push({code:e.code,type:e.type});
+      }
+      window.addEventListener("keydown",capture);
+      window.addEventListener("keyup",capture);
+      window.addEventListener("blur",()=>{pending=[]});
+      stage.addEventListener("viewerready", e=>{
+        for(const event of pending) e.detail(event);
+        pending=[];
+      });
+      stage.focus({preventScroll:true});
+    })();
+  </script>
+  <script type="module" src="app.js?v=smooth14"></script>
 </html>

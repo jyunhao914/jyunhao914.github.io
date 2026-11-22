@@ -10,7 +10,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       80,
     ),
     renderer = new T.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
   renderer.outputColorSpace = T.SRGBColorSpace;
   host.replaceChildren(renderer.domElement);
   const canvas = renderer.domElement;
@@ -30,6 +30,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
   renderer.shadowMap.type = T.PCFShadowMap;
   const {theme,width:halfWidth,depth:halfDepth}=roomSize(works);
   const dark = theme === "calligraphy";
@@ -43,7 +45,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   building.ready
     .then(() => {
       if (disposed) return;
-      const cube = new T.WebGLCubeRenderTarget(128, { type: T.HalfFloatType });
+      const cube = new T.WebGLCubeRenderTarget(64, { type: T.HalfFloatType });
       const probe = new T.CubeCamera(0.08, 78, cube);
       probe.position.copy(new T.Vector3(0, 1.7, 0));
       probe.update(renderer, scene);
@@ -62,6 +64,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     animated = [];
   const walls = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
   function layout(g, a) {
+    renderer.shadowMap.needsUpdate = true;
     let ang = walls[a.wall || 0];
     g.rotation.set(0, ang, 0);
     g.rotateZ(((a.rotate || 0) * Math.PI) / 180);
@@ -372,10 +375,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       panTo(reading.x - 0.35 * dx * panWidth / canvas.clientWidth);
     } else if (drag.gesture === "look") {
       if (drag.dist > 5) { travel=null; stopInspection(); }
-      cam.rotation.y -= dx * 0.005;
+      cam.rotation.y -= dx * 0.003;
       cam.rotation.x = Math.max(
         -1.2,
-        Math.min(1.2, cam.rotation.x - dy * 0.005),
+        Math.min(1.2, cam.rotation.x - dy * 0.003),
       );
     }
   };
@@ -420,12 +423,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     const forward=Number(action==="前進")-Number(action==="後退");
     const side=Number(action==="右移")-Number(action==="左移");
     if (forward || side) {
-      const step=dt*1.65;
+      const step=dt*.9;
       move(cam.position.x+step*(side*Math.cos(yaw)-forward*Math.sin(yaw)),
            cam.position.z-step*(side*Math.sin(yaw)+forward*Math.cos(yaw)));
     } else {
-      cam.rotation.y+=(Number(action==="左轉")-Number(action==="右轉"))*dt*.85;
-      cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+(Number(action==="抬頭")-Number(action==="低頭"))*dt*.65,-1.2,1.2);
+      cam.rotation.y+=(Number(action==="左轉")-Number(action==="右轉"))*dt*.48;
+      cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+(Number(action==="抬頭")-Number(action==="低頭"))*dt*.40,-1.2,1.2);
     }
   }
   let spaceHeld=false;
@@ -503,7 +506,9 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       end,
       look,
       started: performance.now(),
-      duration: Math.min(2100, Math.max(550, (curve.getLength() || 0) * 180)),
+      duration: look
+        ? Math.min(2800, Math.max(750, curve.getLength()*250))
+        : Math.max(450, curve.getLength()*1550),
       rotation: cam.quaternion.clone(),
     };
   }
@@ -529,11 +534,15 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     reset.onclick=resetView;
     host.append(reset);
   }
+  let tapTravel = [];
   function key(e) {
     const code=e.code || (e.key.length===1 ? "Key"+e.key.toUpperCase() : e.key);
     if(!shortcuts[code] && code!=="KeyR" && code!=="Space") return;
     if(e.type==="keyup") {
       if(code==="Space") spaceHeld=false;
+      const motion=keys.get(code);
+      // A quick tap between two display frames still gets a short, visible nudge.
+      if(motion && !motion.moved) tapTravel.push({action:actionFor(code),remaining:.065});
       keys.delete(code);
       return;
     }
@@ -545,15 +554,15 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if(code==="Space" && e.target.closest?.("button,a,summary")) return;
     e.preventDefault();
     if(code==="Space") { spaceHeld=true; return; }
-    if(keys.has(code) || e.repeat) return;
+    if(keys.has(code)) return;
     if(code==="KeyR"){resetView();return;}
-    keys.set(code,performance.now()+200);
-    operate(actionFor(code),.14);
+    keys.set(code,{start:performance.now(),moved:false});
   }
   window.addEventListener("keydown", key);
   window.addEventListener("keyup", key);
   let blur = () => {
     keys.clear();
+    tapTravel=[];
     spaceHeld=false;
   };
   window.addEventListener("blur", blur);
@@ -569,10 +578,19 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   ro.observe(host);
   let last = performance.now();
   renderer.setAnimationLoop((now) => {
-    let dt = Math.min(0.085, Math.max(0, (now - last) / 1000));
+    let dt = Math.min(0.040, Math.max(0, (now - last) / 1000));
     last = now;
-    for(const [code,repeatAt] of keys)
-      if(now>=repeatAt) operate(actionFor(code),dt);
+    for(const [code,motion] of keys) {
+      const ramp=Math.max(0,Math.min(1,(now-motion.start)/180));
+      operate(actionFor(code), dt*(.3+.7*ramp*ramp*(3-2*ramp)));
+      if (dt>0) motion.moved=true;
+    }
+    for(const tap of tapTravel) {
+      const step=Math.min(tap.remaining,dt);
+      operate(tap.action,step);
+      tap.remaining-=step;
+    }
+    if(tapTravel.length) tapTravel=tapTravel.filter(tap=>tap.remaining>0);
     if (travel) {
       const t = T.MathUtils.clamp(
           (now - travel.started) / travel.duration,
@@ -692,6 +710,9 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     else focus(guide,true);
     return a;
   }
+  host.dispatchEvent(new CustomEvent("viewerready",{detail: input =>
+    key({ ...input, target:canvas, preventDefault() {} })
+  }));
   return {
     seek(fraction) { if (reading) panTo((fraction*2-1)*reading.limit); },
     overview() {
