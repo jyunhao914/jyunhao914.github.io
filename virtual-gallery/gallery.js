@@ -1,4 +1,4 @@
-import {mobileControls} from "./mobile-controls.js?v=stick17";
+import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js";
 import * as T from "./vendor/three.module.js";
 import { architecture } from "./architecture.js?v=space12";
@@ -555,7 +555,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     if(field && field.getClientRects().length &&
        !(field.type==="range" && code.startsWith("Key"))) return;
     if(host.getBoundingClientRect().bottom<40 || host.getBoundingClientRect().top>innerHeight) return;
-    if(code==="Space" && e.target.closest?.("button,a,summary")) return;
+    if(code==="Space" && e.target.closest?.("button,a,summary") && !e.target.closest(".walk-stick")) return;
     e.preventDefault();
     if(code==="Space") { spaceHeld=true; return; }
     if(keys.has(code) || (code==="KeyR" && e.repeat)) return;
@@ -603,7 +603,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     } else {elapsed=frames=fastFrames=0;}
     if(mobile && mobile.vector.lengthSq()>0) {
       const {x,y}=mobile.vector;
-      if (reading) {
+      if (spaceHeld) {
+        if(x) operate(x>0?"右轉":"左轉",dt*Math.abs(x));
+        if(y) operate(y>0?"低頭":"抬頭",dt*Math.abs(y));
+      } else if (reading) {
         const axis=mobile.readingAxis;
         if (axis) {
           takeOverApproach();

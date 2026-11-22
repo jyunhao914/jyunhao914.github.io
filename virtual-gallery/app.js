@@ -177,7 +177,7 @@ async function enter() {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=hud19");
+    let { gallery } = await import("./gallery.js?v=stickspace20");
     if (n === seq)
       viewer = gallery(
         $("stage"),

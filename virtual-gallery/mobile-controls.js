@@ -31,6 +31,7 @@ export function mobileControls(host, turn, suspended) {
   stick.onpointerdown = e => {
     if(pointer!==null)return;
     e.preventDefault();
+    host.querySelector("canvas")?.focus({preventScroll:true});
     pointer=e.pointerId;
     stick.setPointerCapture(pointer);
     steer(e);
