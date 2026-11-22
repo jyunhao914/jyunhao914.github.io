@@ -549,9 +549,56 @@ body.visiting {
 @media(hover:hover){#visit.controls-idle .walk-pad:has(.walk-stick:hover){opacity:1}}
 
 /* Public entrance and individual room doors */
+body.in-lobby {overflow:hidden}
+body.in-lobby > :is(header,footer) {display:none}
+#hallEntrance {
+  position:fixed;inset:0;z-index:12;width:100%;height:100dvh;margin:0;overflow:hidden;
+  background:#343d3e;color:#f9f8f2;
+}
+#lobbyStage,#lobbyStage canvas {position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
+#lobbyStage canvas {outline:none;cursor:grab}
+#lobbyStage canvas:active {cursor:grabbing}
+#lobbyStage .walk-pad {bottom:max(18px,env(safe-area-inset-bottom));left:max(16px,env(safe-area-inset-left));z-index:2}
+.lobby-head {
+  position:absolute;top:max(14px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));
+  display:flex;align-items:center;gap:7px;pointer-events:none;
+}
+.lobby-head h1,.lobby-head button,#lobbyMessage,.lobby-wayfinding :is(p,button) {
+  margin:0;padding:8px 13px;background:#20302de8;color:#faf9f3;border:1px solid #ffffff44;border-radius:5px;
+}
+.lobby-head h1 {margin-right:auto}
+.lobby-head button,.lobby-wayfinding button {min-height:44px;pointer-events:auto}
+.lobby-head button:hover,.lobby-wayfinding button:hover {background:#31433d}
+#lobbyMessage {position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+.lobby-wayfinding {
+  position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));
+  display:grid;justify-items:end;gap:6px;max-width:calc(100% - 112px);pointer-events:none;
+}
+.lobby-wayfinding p {line-height:1.4}
+.lobby-quiet .lobby-head,.lobby-quiet .lobby-wayfinding {visibility:hidden;opacity:0}
+.lobby-quiet .walk-pad {opacity:0}
+.lobby-quiet.stick-active .walk-pad,.lobby-quiet .walk-pad:focus-within {opacity:1}
+#lobbyDirectoryPanel {
+  width:min(680px,calc(100% - 20px));max-height:calc(100dvh - 32px);overscroll-behavior:contain;
+  background:#f5f6f5;color:#1b3242;padding:clamp(12px,2vw,24px);
+}
+#lobbyDirectoryPanel::backdrop {background:#111e26a6}
+#lobbyDirectoryPanel .entrance-heading {margin:0;align-items:center;padding-bottom:10px}
+#lobbyDirectoryPanel h2,#lobbyDirectoryPanel #hallStatus {margin:0}
+#lobbyDirectoryPanel #hallStatus {padding:12px 0}
+#lobbyDirectoryPanel #hallList {grid-template-columns:1fr;gap:8px}
+#lobbyDirectoryPanel .hall-door {grid-template-columns:clamp(64px,15vw,94px) minmax(0,1fr) auto;align-content:stretch;min-height:66px}
+#lobbyDirectoryPanel .hall-picture {grid-column:auto;position:relative;align-self:stretch;aspect-ratio:auto}
+#lobbyDirectoryPanel .hall-picture img {position:absolute;inset:0}
+#lobbyDirectoryPanel .hall-caption {padding:8px}
+.lobby-directory-actions {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:14px}
+.lobby-directory-actions :is(a,button),#lobbyDirectoryClose {min-height:44px;align-content:center}
+@media(max-width:420px) {
+  .lobby-head {gap:4px;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right))}
+  .lobby-head :is(h1,button),.lobby-wayfinding p {padding-inline:8px}
+}
 header nav a {display:inline-flex;align-items:center;min-height:44px;text-decoration:none}
 header nav a[aria-current="page"] {box-shadow:inset 0 -2px #26445a;font-weight:650}
-#hallEntrance {margin:clamp(18px,4.5vw,70px) 0 clamp(40px,6vw,90px)}
 .entrance-heading {display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:clamp(18px,3vw,34px);border-bottom:1px solid #b6c3c8}
 .entrance-heading h1 {margin:0 0 18px;font-size:clamp(2.1rem,4.8vw,4.25rem);font-weight:750;line-height:1.1;letter-spacing:.012em}
 .entrance-heading p {font-size:.9rem;color:#415664;white-space:nowrap}
@@ -569,7 +616,6 @@ header nav a[aria-current="page"] {box-shadow:inset 0 -2px #26445a;font-weight:6
 @media(max-width:960px) {#hallList {grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:550px) {
   #hallList {grid-template-columns:1fr;gap:12px}
-  #hallEntrance {margin-top:20px}
   .hall-door {grid-template-columns:clamp(77px,23vw,120px) minmax(0,1fr) auto;align-content:stretch;min-height:96px}
   .hall-picture {grid-column:auto;align-self:stretch;min-height:100%;aspect-ratio:auto;position:relative}
   .hall-picture img {position:absolute;inset:0}

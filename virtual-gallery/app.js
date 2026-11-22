@@ -1,3 +1,5 @@
+import {lobbyPage} from "./lobby-page.js?v=lobby35";
+
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
     let n = document.createElement(tag);
@@ -87,11 +89,12 @@ function detail(a) {
 }
 $("close").onclick = () => $("detail").close();
 $("detail").onclose = () => $("content").replaceChildren();
-function leave() {
+function leave(entireFullscreen=false) {
+  $("stage").dispatchEvent(new Event("discardnavigation"));
   $("visit").classList.remove("immersive", "expanded");
   document.body.classList.remove("visiting");
   menu(false);
-  const exit=document.fullscreenElement === $("visit") ? document.exitFullscreen().catch(()=>{}) : null;
+  const exit=document.fullscreenElement && (entireFullscreen || document.fullscreenElement===$("visit")) ? document.exitFullscreen().catch(()=>{}) : null;
   $("expand").textContent = "放大展廳";
   seq++;
   viewer?.dispose();
@@ -282,7 +285,7 @@ const visit = $("visit");
 const activePointers = new Set();
 let idleTimer, canvasPress, stickPointer, keyboardFocus=false;
 function fullView() {
-  return document.fullscreenElement === visit || visit.classList.contains("expanded");
+  return !visit.hidden && (document.fullscreenElement === visit || document.fullscreenElement === document.documentElement || visit.classList.contains("expanded"));
 }
 function revealControls() {
   clearTimeout(idleTimer);
@@ -397,13 +400,13 @@ $("tour").addEventListener("change", () => menu(false));
 function syncExpand() {
   resetControls();
   $("expand").textContent =
-    document.fullscreenElement === visit || visit.classList.contains("expanded")
+    fullView()
       ? "退出全螢幕"
       : "全螢幕";
 }
 document.addEventListener("fullscreenchange", syncExpand);
 $("expand").onclick = async () => {
-  if (document.fullscreenElement === visit) await document.exitFullscreen();
+  if (document.fullscreenElement) await document.exitFullscreen();
   else if (visit.classList.contains("expanded"))
     visit.classList.remove("expanded");
   else {
@@ -457,14 +460,16 @@ function showCatalogue(visible) {
   for(const el of [document.querySelector(".hero"),$("exhibits"),$("works"),$("cards"),$("worksLink")])el.hidden=!visible;
 }
 let lastRoute, lastDoor;
+const doors=[];
+const lobby=lobbyPage(door=>openRoom(door.show,door.room));
 function showEntrance() {
-  const returning=$("hallEntrance").hidden;
+  const expanded=visit.classList.contains("expanded");
   const exit=leave();
   showCatalogue(false);
   $("hallEntrance").hidden=false;
-  document.title="展廳入口｜虛擬策展工作室";
+  document.title="展場大廳｜虛擬策展工作室";
   $("entranceLink").setAttribute("aria-current","page");
-  if(returning)restorePageFocus(lastDoor?.isConnected ? lastDoor : $("entranceTitle"),exit);
+  lobby.open(doors,Array.from($("hallList").children).indexOf(lastDoor),exit,expanded);
 }
 function restorePageFocus(target,exit) {
   const focus=()=>{if(target.getClientRects().length)target.focus({preventScroll:true});};
@@ -472,6 +477,7 @@ function restorePageFocus(target,exit) {
   else focus();
 }
 function displayShow(show,room,work,catalogue) {
+  const expanded=lobby.close();
   $("hallEntrance").hidden=true;
   $("entranceLink").removeAttribute("aria-current");
   if(current!==show) {
@@ -483,12 +489,13 @@ function displayShow(show,room,work,catalogue) {
   else $("room").selectedIndex=0;
   document.title=show.title+"｜虛擬策展工作室";
   if(catalogue) {
-    const exit=leave();
+    const exit=leave(true);
     showCatalogue(true);
     restorePageFocus($("enter"),exit);
     window.scrollTo(0,0);
   } else {
     showCatalogue(false);
+    if(expanded)visit.classList.add("expanded");
     enter(work);
   }
 }
@@ -523,6 +530,7 @@ function linkAction(event,action) {
 function drawEntrance() {
   const list=$("hallList");
   list.replaceChildren();
+  doors.length=0;
   for(const show of shows) {
     const rooms=new Map();
     for(const work of show.works) {
@@ -531,6 +539,9 @@ function drawEntrance() {
     }
     for(const [room,works] of rooms) {
       const name=room || show.title;
+      const subtitle=[show.title!==name ? show.title : "",works.length+" 件作品"].filter(Boolean).join(" · ");
+      const cover=works.find(a=>a.type==="圖片" && a.src);
+      doors.push({show,room,title:name,subtitle,cover:cover && {src:cover.src,width:cover.width,height:cover.height}});
       const card=node("a"), picture=node("div"), caption=node("div");
       card.className="hall-door";card.dataset.show=show.id;card.dataset.room=room || "";
       card.href=visitUrl(show,room);
@@ -538,7 +549,6 @@ function drawEntrance() {
       card.onclick=e=>linkAction(e,()=>openRoom(show,room));
       picture.className="hall-picture";
       picture.setAttribute("aria-hidden","true");
-      const cover=works.find(a=>a.type==="圖片" && a.src);
       if(cover) {
         const img=node("img");
         img.alt="";img.decoding="async";img.loading=list.children.length<2 ? "eager" : "lazy";
@@ -546,7 +556,7 @@ function drawEntrance() {
         picture.append(img);
       }
       caption.className="hall-caption";
-      caption.append(node("h2",name),node("p",[show.title!==name ? show.title : "",works.length+" 件作品"].filter(Boolean).join(" · ")));
+      caption.append(node("h2",name),node("p",subtitle));
       const enterText=node("span","進入展廳 →");enterText.className="door-action";
       card.append(picture,caption,enterText);list.append(card);
     }
@@ -561,7 +571,7 @@ window.addEventListener("popstate",applyRoute);
 window.addEventListener("hashchange",applyRoute);
 
 function collectionStatus(message, retry) {
-  leave();
+  lobby.close();leave(true);
   showCatalogue(false);
   $("hallEntrance").hidden=true;
   const panel=$("collection-status") || node("section");

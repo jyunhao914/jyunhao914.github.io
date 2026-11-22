@@ -4,17 +4,38 @@
   <meta charset="utf-8" /><meta
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
-  /><title>展廳入口｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=hall34" />
+  /><title>展場大廳｜虛擬策展工作室</title
+  ><link rel="stylesheet" href="style.css?v=lobby35" />
   <link rel="stylesheet" href="typography.css?v=hall34">
   <header>
     <strong>虛擬策展工作室</strong>
-    <nav aria-label="參觀導覽"><a id="entranceLink" href="./">展廳入口</a><a id="worksLink" href="#works" hidden>展出作品</a></nav>
+    <nav aria-label="參觀導覽"><a id="entranceLink" href="./">展場大廳</a><a id="worksLink" href="#works" hidden>展出作品</a></nav>
   </header>
   <main>
     <section id="hallEntrance" aria-labelledby="entranceTitle">
-      <div class="entrance-heading"><h1 id="entranceTitle" tabindex="-1">展廳入口</h1><p id="hallStatus" role="status">正在讀取展廳…</p></div>
-      <div id="hallList"></div>
+      <div id="lobbyStage" aria-label="可步行的 3D 展場大廳"></div>
+      <div class="lobby-head">
+        <h1 id="entranceTitle">展場大廳</h1>
+        <button type="button" id="lobbyExpand">全螢幕</button>
+        <button type="button" id="lobbyDirectory" aria-haspopup="dialog" aria-controls="lobbyDirectoryPanel" disabled>展廳名錄</button>
+      </div>
+      <p id="lobbyMessage" role="status">正在開啟展場大廳…</p>
+      <div class="lobby-wayfinding">
+        <button type="button" id="lobbyEnterDoor" hidden></button>
+        <p id="lobbyHint" hidden>拖曳環顧 · 點門或走進展廳</p>
+      </div>
+      <dialog id="lobbyDirectoryPanel" aria-labelledby="directoryTitle">
+        <div class="entrance-heading"><h2 id="directoryTitle">展廳名錄</h2><button type="button" id="lobbyDirectoryClose" autofocus>返回大廳</button></div>
+        <p id="hallStatus" role="status"></p>
+        <div id="hallList"></div>
+        <details id="lobbyGuide" class="gesture-guide">
+          <summary>大廳操作指引</summary>
+          <p>拖曳畫面轉身。輕推左下角搖桿慢走，推遠加快，放手即停。點門或走過門檻即可進場。</p>
+          <p>方向鍵或 WASD 移動。按住空白鍵配合方向鍵轉頭，走近門口按 Enter 進場，按 R 回到起點。</p>
+          <div class="touch-motion"><button type="button" id="lobbyGyro" aria-pressed="false">陀螺儀轉向</button> <span id="lobbyGyroStatus" role="status"></span></div>
+        </details>
+        <div class="lobby-directory-actions"><button type="button" id="lobbyHome">回到大廳起點</button><button type="button" id="lobbyRetry" hidden>重新開啟 3D 大廳</button><a id="lobbyAdminLink" href="admin/">策展後台</a><a id="lobbyDownload" href="studio.zip" download>下載工作室</a></div>
+      </dialog>
     </section>
     <section id="exhibits" hidden>
       <div class="row">
@@ -56,7 +77,7 @@
       </div>
       </div>
       <div id="visitMenu" hidden>
-        <button type="button" id="backToEntrance">返回展廳入口</button>
+        <button type="button" id="backToEntrance">返回展場大廳</button>
         <div class="touch-motion"><button type="button" id="gyroTurn" aria-pressed="false">陀螺儀轉向</button> <span id="gyroStatus" role="status"></span></div>
         <small>即時畫面更新率　<output id="frameMeter">量測中</output></small>
         <details class="gesture-guide">
@@ -118,38 +139,49 @@
         visit.hidden=false;
         stage.focus({preventScroll:true});
       }
-      let pending=[];
-      let touch=null;
-      stage.addEventListener("pointerdown",e=>{
-        if(e.pointerType==="touch" && !e.isPrimary){touch=null;return;}
-        if(e.target!==stage || stage.querySelector("canvas"))return;
-        touch={id:e.pointerId,x:e.clientX,y:e.clientY};
-        stage.setPointerCapture(e.pointerId);
-      });
-      stage.addEventListener("pointermove",e=>{
-        if(touch?.id!==e.pointerId)return;
-        const motion={type:"entrylook",dx:e.clientX-touch.x,dy:e.clientY-touch.y};
-        touch.x=e.clientX;touch.y=e.clientY;
-        if(stage.querySelector("canvas"))stage.dispatchEvent(new CustomEvent("entrylook",{detail:motion}));
-        else if(pending.at(-1)?.type==="entrylook"){pending.at(-1).dx+=motion.dx;pending.at(-1).dy+=motion.dy;}
-        else pending.push(motion);
-      });
-      stage.addEventListener("lostpointercapture",()=>{touch=null});
-      function capture(e) {
-        if(visit.hidden || stage.querySelector("canvas") || e.altKey || e.ctrlKey || e.metaKey ||
-           e.target.closest?.("input,textarea,select,button,a,[contenteditable=true]") ||
-           !["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyA","KeyS","KeyD","Space","KeyR"].includes(e.code)) return;
-        e.preventDefault();
-        if(!e.repeat && pending.length<64) pending.push({code:e.code,type:e.type});
+      if(!preview && (!location.hash || location.hash==="#entrance")) {
+        const preload=document.createElement("link");
+        preload.rel="modulepreload";preload.href="./lobby.js?v=lobby35";
+        document.head.append(preload);
       }
-      window.addEventListener("keydown",capture);
-      window.addEventListener("keyup",capture);
-      window.addEventListener("blur",()=>{pending=[]});
-      stage.addEventListener("viewerready", e=>{
-        for(const event of pending) e.detail(event);
-        pending=[];
-      });
+      function captureEarlyNavigation(stage,surface) {
+        let pending=[];
+        let touch=null;
+        stage.addEventListener("pointerdown",e=>{
+          if(e.pointerType==="touch" && !e.isPrimary){touch=null;return;}
+          if(surface.hidden || e.target!==stage || stage.querySelector("canvas"))return;
+          touch={id:e.pointerId,x:e.clientX,y:e.clientY};
+          stage.setPointerCapture(e.pointerId);
+        });
+        stage.addEventListener("pointermove",e=>{
+          if(touch?.id!==e.pointerId)return;
+          const motion={type:"entrylook",dx:e.clientX-touch.x,dy:e.clientY-touch.y};
+          touch.x=e.clientX;touch.y=e.clientY;
+          if(stage.querySelector("canvas"))stage.dispatchEvent(new CustomEvent("entrylook",{detail:motion}));
+          else if(pending.at(-1)?.type==="entrylook"){pending.at(-1).dx+=motion.dx;pending.at(-1).dy+=motion.dy;}
+          else if(pending.length<64)pending.push(motion);
+        });
+        stage.addEventListener("lostpointercapture",()=>{touch=null});
+        function capture(e) {
+          if(surface.hidden || stage.querySelector("canvas") || document.querySelector("dialog[open]") || e.altKey || e.ctrlKey || e.metaKey ||
+             e.target.closest?.("input,textarea,select,button,a,[contenteditable=true]") ||
+             !["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyA","KeyS","KeyD","Space","KeyR"].includes(e.code)) return;
+          e.preventDefault();
+          if(!e.repeat && pending.length<64) pending.push({code:e.code,type:e.type});
+        }
+        window.addEventListener("keydown",capture);
+        window.addEventListener("keyup",capture);
+        function discard(){pending=[];touch=null;}
+        window.addEventListener("blur",discard);
+        stage.addEventListener("discardnavigation",discard);
+        stage.addEventListener("viewerready", e=>{
+          for(const event of pending) e.detail(event);
+          pending=[];
+        });
+      }
+      captureEarlyNavigation(stage,visit);
+      captureEarlyNavigation(document.getElementById("lobbyStage"),document.getElementById("hallEntrance"));
     })();
   </script>
-  <script type="module" src="app.js?v=hall34"></script>
+  <script type="module" src="app.js?v=lobby35"></script>
 </html>

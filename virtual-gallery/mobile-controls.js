@@ -1,6 +1,6 @@
 import * as T from "./vendor/three.module.js";
 
-export function mobileControls(host, turn, suspended) {
+export function mobileControls(host, turn, suspended, gyro = {}) {
   const pad = document.createElement("div");
   pad.className = "pad walk-pad";
   pad.innerHTML = '<button class="walk-stick" type="button" aria-label="移動搖桿"><span class="walk-knob"></span></button>';
@@ -39,7 +39,7 @@ export function mobileControls(host, turn, suspended) {
   stick.onpointermove=e=>{if(pointer===e.pointerId) steer(e)};
   stick.onlostpointercapture=stick.onpointercancel=stick.onpointerup=e=>{if(pointer===e.pointerId) release()};
 
-  const toggle=document.getElementById("gyroTurn"), status=document.getElementById("gyroStatus");
+  const {toggle=document.getElementById("gyroTurn"), status=document.getElementById("gyroStatus")}=gyro;
   const direction=new T.Vector3(), rotation=new T.Euler();
   function sample(e) {
     if(![e.alpha,e.beta,e.gamma].every(Number.isFinite)) return;
