@@ -1,3 +1,4 @@
+import {remember,recall,forget} from "./device-session.js?v=session25";
 export const home = "https://jyunhao914.github.io/virtual-gallery/admin/";
 const service =
   "https://script.google.com/macros/s/AKfycbyT4AE49CDT2ue2SYGo0ENtEzpx-IQoHI7mFRD3WLNoiUpaL_sLp4rdTHSWixh7BsKQcQ/exec";
@@ -36,12 +37,11 @@ export async function broker(op, data = {}) {
     throw Error("登入服務尚未就緒，請檢查擁有者的 Apps Script 部署授權。");
   }
   if (!r.ok) {
-    if (r.expired) sessionStorage.removeItem(keys.ticket);
-    throw Error(r.error || "GitHub 登入失敗");
+    throw Object.assign(Error(r.error || "GitHub 登入失敗"),{expired:r.expired===true});
   }
   return r;
 }
-export async function authorize() {
+export async function authorize(keep=false) {
   const { app } = await broker();
   if (!app.id) {
     location.assign("./register.html");
@@ -59,7 +59,7 @@ export async function authorize() {
     .replace(/=+$/, "");
   sessionStorage.setItem(
     keys.flow,
-    JSON.stringify({ state, verifier, layout:new URLSearchParams(location.search).get("layout"), time: Date.now() }),
+    JSON.stringify({ state, verifier, keep, layout:new URLSearchParams(location.search).get("layout"), time: Date.now() }),
   );
   const params = new URLSearchParams({
     client_id: app.id,
@@ -68,8 +68,40 @@ export async function authorize() {
     code_challenge: challenge,
     code_challenge_method: "S256",
     allow_signup: "false",
+    ...(keep ? {scope:"offline_access"} : {}),
   });
   location.assign("https://github.com/login/oauth/authorize?" + params);
+}
+let active, pending;
+export let deviceSaveFailed=false;
+function accept(ticket,result) {
+  active={ticket,token:result.token,until:result.accessUntil || result.expire};
+  return active.token;
+}
+async function resume(ticket) {
+  try {
+    return accept(ticket,await broker("resume",{ticket}));
+  } catch(error) {
+    if(error.expired) {
+      if(sessionStorage.getItem(keys.ticket)===ticket)sessionStorage.removeItem(keys.ticket);
+      if(await recall().catch(()=>null)===ticket)await forget();
+      active=null;
+    }
+    throw error;
+  }
+}
+export async function accessToken() {
+  if(!active)throw Error("請重新登入 GitHub。");
+  if(Date.now()<active.until-30000)return active.token;
+  if(!pending)pending=resume(active.ticket).finally(()=>{pending=null});
+  return pending;
+}
+export async function signOut() {
+  const ticket=active?.ticket || sessionStorage.getItem(keys.ticket) || await recall().catch(()=>null);
+  active=null;
+  sessionStorage.removeItem(keys.ticket);
+  await forget().catch(()=>{});
+  if(ticket)await broker("logout",{ticket});
 }
 export async function restore() {
   const query = new URLSearchParams(location.search);
@@ -88,10 +120,22 @@ export async function restore() {
     const result = await broker("exchange", {
       code: query.get("code"),
       verifier: flow.verifier,
+      remember:flow.keep===true,
     });
-    sessionStorage.setItem(keys.ticket, result.ticket);
-    return result.token;
+    if(flow.keep) {
+      try {
+        await remember(result.ticket,result.expire);
+        sessionStorage.removeItem(keys.ticket);
+      } catch {
+        deviceSaveFailed=true;
+        sessionStorage.setItem(keys.ticket,result.ticket);
+      }
+    } else {
+      await forget().catch(()=>{});
+      sessionStorage.setItem(keys.ticket,result.ticket);
+    }
+    return accept(result.ticket,result);
   }
-  const ticket = sessionStorage.getItem(keys.ticket);
-  if (ticket) return (await broker("resume", { ticket })).token;
+  const ticket = sessionStorage.getItem(keys.ticket) || await recall().catch(()=>null);
+  if(ticket)return resume(ticket);
 }

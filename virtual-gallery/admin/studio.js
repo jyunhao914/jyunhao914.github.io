@@ -2,7 +2,7 @@ import { readDimensions } from "./dimensions.js";
 import * as wallTools from "./wall-tools.js?v=wall24";
 import {roomSize} from "../room-size.js";
 import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
-import { state, post, versions, exhibition } from "./storage.js?v=layout23";
+import { state, post, versions, exhibition } from "./storage.js?v=session25";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
   status = $("#status");

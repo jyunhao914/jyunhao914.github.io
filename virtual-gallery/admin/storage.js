@@ -3,7 +3,7 @@ const owner = "jyunhao914",
   publicRepo = "jyunhao914.github.io";
 const privatePath = "studio.json",
   publicPath = "virtual-gallery/exhibitions.json";
-let credential = "",
+let tokenProvider, credential = "",
   stateSha = "",
   loadedRevision;
 const endpoint = (repo, path = "") => "/repos/" + owner + "/" + repo + path;
@@ -11,6 +11,7 @@ async function api(
   path,
   { method = "GET", body, accept = "application/vnd.github+json" } = {},
 ) {
+  if(tokenProvider) credential=await tokenProvider();
   if (!credential) throw Error("請先登入 GitHub。");
   let response = await fetch("https://api.github.com" + path, {
     method,
@@ -42,7 +43,8 @@ async function guard() {
   if (repo.private !== true || !repo.permissions?.push)
     throw Error("草稿庫必須為私人，且登入者須具備寫入權限。");
 }
-export async function login(value) {
+export async function login(value,provider) {
+  tokenProvider=provider;
   credential = value;
   try {
     let user = await api("/user");
@@ -53,6 +55,7 @@ export async function login(value) {
     if (!pub.permissions?.push) throw Error("缺少展廳發布權限。");
   } catch (e) {
     credential = "";
+    tokenProvider=undefined;
     throw e;
   }
 }
