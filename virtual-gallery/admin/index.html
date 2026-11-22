@@ -312,7 +312,7 @@
     </style>
   <header>
     <strong>虛擬策展工作室</strong
-    ><span id="status" role="status">尚未登入</span><button data-save-retry hidden>重試儲存</button>
+    ><span id="status" role="status">正在開啟策展後台…</span><button data-save-retry hidden>重試儲存</button>
     <button id="logout" hidden>登出</button>
   </header>
   <main>
@@ -320,7 +320,7 @@
       <h1>線上策展工作室</h1>
       <p>使用策展帳號登入，管理私人作品與展覽。</p>
       <label class="remember-choice"><input id="remember-device" type="checkbox" checked>在這台裝置保持登入 30 天</label>
-      <button id="account" class="action">使用 GitHub 帳號登入</button>
+      <button id="account" class="action" disabled>使用 GitHub 帳號登入</button>
       <p>個人手機可勾選保持登入。共用裝置請取消勾選，關閉分頁即結束本機登入。</p>
       <details>
         <summary>擁有者設定與備援登入</summary>
@@ -331,7 +331,7 @@
             type="password"
             autocomplete="off"
             spellcheck="false" /></label
-        ><button id="signin">使用既有憑證登入</button>
+        ><button id="signin" disabled>使用既有憑證登入</button>
       </details>
     </div>
     <nav id="tabs"></nav>
@@ -341,5 +341,5 @@
     <div class="preview-heading"><button id="closePreview">返回布展</button><strong id="previewTitle"></strong></div>
     <iframe title="草稿預覽" allowfullscreen></iframe>
   </dialog>
-  <script type="module" src="./login.js?v=studio27"></script>
+  <script type="module" src="./login.js?v=studio27b"></script>
 </html>

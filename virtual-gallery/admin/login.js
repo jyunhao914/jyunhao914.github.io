@@ -49,6 +49,8 @@ if(channel)channel.onmessage=event=>{
   }
 };
 run(async () => {
+  $("status").textContent="正在確認登入狀態…";
   const token = await restore();
   if (token) await show(token,accessToken);
+  else $("status").textContent="尚未登入";
 });
