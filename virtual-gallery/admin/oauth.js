@@ -60,7 +60,7 @@ export async function authorize(keep=false) {
   const entry=new URLSearchParams(location.search);
   sessionStorage.setItem(
     keys.flow,
-    JSON.stringify({ state, verifier, keep, layout:entry.get("layout"),work:entry.get("work"), panel:entry.get("panel"), time: Date.now() }),
+    JSON.stringify({ state, verifier, keep, layout:entry.get("layout"),work:entry.get("work"), panel:entry.get("panel"), view:entry.get("view"), time: Date.now() }),
   );
   const params = new URLSearchParams({
     client_id: app.id,
@@ -120,8 +120,10 @@ export async function restore() {
     if(flow.layout) {
       const entry=new URLSearchParams({layout:flow.layout});
       if(flow.work)entry.set("work",flow.work);
-      if(flow.panel==="mount")entry.set("panel","mount");
+      if(["inventory","position","mount","light"].includes(flow.panel))entry.set("panel",flow.panel);
       history.replaceState(null,"",location.pathname+"?"+entry);
+    } else if (["library","backup","desk"].includes(flow.view)) {
+      history.replaceState(null,"",location.pathname+"?view="+flow.view);
     }
     const result = await broker("exchange", {
       code: query.get("code"),

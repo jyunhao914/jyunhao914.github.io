@@ -213,7 +213,7 @@ async function enter(workId) {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=mount32");
+    let { gallery } = await import("./gallery.js?v=desk33");
     if (n === seq)
       viewer = gallery(
         $("stage"),

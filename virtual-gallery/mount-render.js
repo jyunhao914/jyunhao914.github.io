@@ -1,5 +1,5 @@
 import * as T from "./vendor/three.module.js";
-import {mountSpec,scrollBands,handscrollBands,albumPanels,mirrorBands,frameProfiles} from "./mount-spec.js?v=mount32";
+import {mountSpec,scrollBands,handscrollBands,albumPanels,mirrorBands,frameProfiles} from "./mount-spec.js?v=desk33";
 
 const woodMaps={"白橡木":"oak","胡桃木":"walnut","梣木":"ash","柚木":"teak"};
 const weaveMaps={"織錦":"brocade","素絹":"plain-silk","花綾":"floral-twill","細麻":"linen"};
@@ -128,6 +128,59 @@ export function mountRenderer(renderer) {
     const cover=putMesh(g,"frame-glazing",panel(s.innerW,s.innerH,s.glassZ,[1,1]),glass);
     cover.renderOrder=2; cover.castShadow=cover.receiveShadow=false;
     cover.raycast=()=>{};
+  }
+  function board(g,s) {
+    const t=s.boardThickness, metal=s.boardMaterial==="鋁複合板", ply=s.boardMaterial==="木質板";
+    if(s.wallStandoff>0) {
+      const inset=Math.min(.065,s.w*.16,s.h*.16);
+      const cleat=putMesh(g,"board-cleat",new T.BoxGeometry(s.w-2*inset,s.h-2*inset,s.wallStandoff),
+        new T.MeshStandardMaterial({color:0x383b3a,metalness:.42,roughness:.74}));
+      cleat.position.z=s.panelWallZ+s.wallStandoff/2;
+    }
+    const geo=new T.BoxGeometry(s.w,s.h,t);
+    // The image itself closes the front face. Omitting the coincident solid face keeps thin panels clear at a distance.
+    const front=geo.groups.find(group=>group.materialIndex===4);
+    const indices=geo.index.array;
+    geo.setIndex([...indices.slice(0,front.start),...indices.slice(front.start+front.count)]);
+    geo.clearGroups();
+    const edge=new T.MeshStandardMaterial({color:s.boardEdgeColor,roughness:metal ? .56 : ply ? .80 : .97,metalness:metal ? .19 : 0});
+    if(metal || ply) {
+      const uniforms={panelThickness:{value:t},panelSkin:{value:Math.min(.0003,t*.12)}};
+      edge.onBeforeCompile=shader=>{
+        Object.assign(shader.uniforms,uniforms);
+        shader.vertexShader="varying float edgeZ;\n"+shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nedgeZ=position.z;");
+        shader.fragmentShader="varying float edgeZ;uniform float panelThickness;uniform float panelSkin;\n"+shader.fragmentShader.replace("#include <color_fragment>",
+          metal ? `#include <color_fragment>
+            float d=panelThickness*.5-abs(edgeZ),aa=max(.00001,fwidth(edgeZ));
+            float skin=1.-smoothstep(panelSkin-aa,panelSkin+aa,d);
+            diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.54,.56,.57),skin*.82);` :
+          `#include <color_fragment>
+            float z=edgeZ/.0013,coverage=1.-smoothstep(.15,.65,fwidth(z));
+            diffuseColor.rgb*=1.-coverage*(.08+.075*cos(6.283185*z));`);
+      };
+      edge.customProgramCacheKey=()=>metal ? "acm-cut" : "ply-cut";
+    }
+    const support=putMesh(g,"board-support",geo,edge);
+    support.position.z=s.backZ+t/2;
+    if(!s.isAcrylic)return;
+    const gloss=s.surfaceSheen, rough=.35-.315*gloss;
+    const acrylic={metalness:0,ior:1.49,roughness:rough,clearcoat:1,
+      clearcoatRoughness:rough*.7,envMapIntensity:.8+1.4*gloss,transparent:true,depthWrite:false};
+    const polish=new T.MeshPhysicalMaterial({...acrylic,color:0xd1e2e1,opacity:.55,side:T.DoubleSide});
+    const bevel=Math.min(.0004,s.acrylicThickness*.085);
+    const edges=putMesh(g,"acrylic-edges",mitredRing(s.w,s.h,bevel,s.acrylicThickness,s.faceZ,
+      [[0,0],[0,1-bevel/s.acrylicThickness],[1,1]],[1,1]),polish);
+    edges.renderOrder=1;
+    const cover=new T.MeshPhysicalMaterial({...acrylic,color:0xdce6e5,opacity:.006+.023*gloss});
+    // One reflection pass uses the same room probe as the frames. A directly viewed print stays clear.
+    cover.onBeforeCompile=shader=>{
+      shader.fragmentShader=shader.fragmentShader.replace("#include <opaque_fragment>",`
+        diffuseColor.a+=.16*pow(1.-clamp(dot(normal,normalize(vViewPosition)),0.,1.),3.);
+        #include <opaque_fragment>`);
+    };
+    const face=putMesh(g,"acrylic-face",panel(s.w,s.h,s.frontZ,[1,1]),cover);
+    face.renderOrder=2;
+    for(const clear of [edges,face]){clear.castShadow=clear.receiveShadow=false;clear.raycast=()=>{};}
   }
   function frame(g,s) {
     const {w,h,mat,frameWidth:f,faceZ,backZ,depth}=s;
@@ -332,8 +385,10 @@ export function mountRenderer(renderer) {
   function contact(g,s,a) {
     const w=s.isScroll ? s.scrollWidth : s.width, h=s.isScroll ? s.scrollHeight : s.height;
     const depth=s.isScroll ? Math.min(s.depth,s.rodDiameter) : s.depth;
-    const spread=.016+Math.min(depth,.22)*.24;
-    const shadow=softShadow(g,"mount-contact",w,h,spread,.33,-.067-(a.z||0),spread*.21);
+    const spread=s.isBoard ? .0015+s.wallStandoff*.42+depth*.15 : .016+Math.min(depth,.22)*.24;
+    const wallZ=s.isBoard ? s.panelWallZ+.00018 : -.067;
+    const shadow=softShadow(g,"mount-contact",w,h,spread,.33,wallZ-(a.z||0),spread*.21);
+    shadow.userData.wallZ=wallZ;
     if(s.isHandscroll || s.isAlbum)shadow.position.x+=(s.left+s.right)/2;
     if(s.isAlbum)shadow.position.y+=(s.top+s.bottom)/2;
     if(s.isScroll)shadow.position.y+=(s.head+s.foot)/2;
@@ -342,7 +397,8 @@ export function mountRenderer(renderer) {
   function build(a) {
     const s=mountSpec(a), group=new T.Group();
     group.name="mount"; group.userData.spec=s;
-    if(s.isAlbum)album(group,s);
+    if(s.isBoard)board(group,s);
+    else if(s.isAlbum)album(group,s);
     else if(s.isHandscroll)handscroll(group,s);
     else if(s.isScroll)scroll(group,s);
     else frame(group,s);

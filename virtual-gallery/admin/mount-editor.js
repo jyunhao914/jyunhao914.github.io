@@ -1,5 +1,5 @@
-import { mountChoices } from "../mount-fields.js?v=mount32";
-import { mountSpec, frameProfiles, scrollBands, handscrollBands, albumPanels, mirrorBands } from "../mount-spec.js?v=mount32";
+import { mountChoices } from "../mount-fields.js?v=desk33";
+import { mountSpec, frameProfiles, scrollBands, handscrollBands, albumPanels, mirrorBands } from "../mount-spec.js?v=desk33";
 
 const framePalettes = [
   ["胡桃與暖白", { frameColor: "#624532", matColor: "#f3ebd9" }],
@@ -33,6 +33,8 @@ function elem(tag, text, className) {
   return el;
 }
 
+const openSections = new Set();
+
 export function mountEditor(host, art, save, addTemplates) {
   const title = host.querySelector("legend");
   host.onkeydown = e => {
@@ -55,10 +57,11 @@ export function mountEditor(host, art, save, addTemplates) {
     if(imageSize.textContent!==imageText)imageSize.textContent=imageText;
     if(outerSize.textContent!==outerText)outerSize.textContent=outerText;
     const isScroll=spec.isScroll, isHand=spec.isHandscroll, textile=isScroll || isHand;
-    const album=spec.isAlbum, mirror=spec.isMirror, frameMount=!textile && !album;
+    const album=spec.isAlbum, mirror=spec.isMirror, board=spec.isBoard, frameMount=!textile && !album && !board;
     const isFramed = frameMount && art.frame !== "無框";
     const visibility = {
-      scroll:isScroll, hand:isHand, textile, album, mirror, silk:textile || mirror,
+      scroll:isScroll, hand:isHand, textile, album, mirror, silk:textile || mirror, board,
+      acrylic:spec.isAcrylic, trim:!board, finishable:isFramed || board,
       picture:frameMount, framed:isFramed, card:frameMount && !mirror, materials:!album,
       paperColor:isHand || frameMount && !mirror,
       wood: isFramed && art.frame !== "金屬框", metal: isFramed && art.frame === "金屬框",
@@ -81,21 +84,52 @@ export function mountEditor(host, art, save, addTemplates) {
     host.querySelector('[data-mount-field="floatLift"]').max = availableLiftCm(spec);
     host.querySelector('[data-mount-field="thirdColor"]').parentElement.firstChild.textContent =
       isHand ? "隔水細邊色" : spec.scrollStyle === "宣和裱" ? "仿古細邊色" : "副隔水色";
+    if(board) {
+      const backing=spec.boardThickness, cover=spec.isAcrylic ? spec.acrylicThickness : 0, gap=spec.wallStandoff;
+      const profile=host.querySelector("#mount-board-section");
+      const mm=value=>cmFormat.format(1000*value);
+      profile.querySelector("[data-board-gap]").style.flexGrow=gap*1000;
+      const core=profile.querySelector("[data-board-backing]");
+      core.style.flexGrow=backing*1000;core.style.backgroundColor=spec.boardEdgeColor;
+      core.dataset.boardBacking=spec.boardMaterial;
+      const face=profile.querySelector("[data-board-cover]");
+      face.style.flexGrow=cover*1000;face.hidden=!cover;
+      profile.querySelector("figcaption").textContent=(gap ? "離牆 "+mm(gap)+" mm" : "貼牆")+
+        " · 背板 "+mm(backing)+" mm"+(cover ? " · 壓克力 "+mm(cover)+" mm" : "")+
+        "　總厚 "+mm(backing+cover)+" mm";
+    }
     for (const button of host.querySelectorAll("[data-mount-sample]")) {
       button.setAttribute("aria-pressed", String(spec[button.dataset.sampleKey] === button.dataset.mountSample));
     }
     for (const input of host.querySelectorAll("[data-mount-field]")) {
       const key = input.dataset.mountField;
       let value = spec[key] ?? art[key];
-      if (key === "mount") value = album ? "冊頁" : mirror ? "鏡片" : isHand ? "手卷" : isScroll ? "掛軸" : "畫框";
+      if (key === "mount") value = board ? art.mount : album ? "冊頁" : mirror ? "鏡片" : isHand ? "手卷" : isScroll ? "掛軸" : "畫框";
       if (key === "frame") value = art.frame || "木框";
       if (key === "finish") value = art.finish || "霧面";
-      if (input.dataset.cm || key === "surfaceSheen") value = +(value * 100).toFixed(2);
+      const factor=Number(input.dataset.factor) || (key==="surfaceSheen" ? 100 : 1);
+      if(factor!==1)value=+(value*factor).toFixed(2);
       // Keep a partially entered decimal usable on touch keyboards.
       if (document.activeElement !== input || input.type !== "number") input.value = value;
       if (key === "surfaceSheen") host.querySelector("output").textContent = value + "%";
     }
+    const materialLabel = board ? spec.boardMaterial : textile || mirror ? spec.silkPattern : [
+      art.frame === "金屬框" ? spec.metalFinish : isFramed ? spec.woodSpecies : spec.matMaterial,
+      spec.surfaceCover === "包膜" && isFramed ? spec.filmPattern + "包膜" : "",
+    ].filter(Boolean).join(" · ");
+    materialValue.textContent = materialLabel;
+    const spanLabel = textile || album || mirror ? "留邊" : isFramed ? "框寬" : "卡紙";
+    const spanCm = cmFormat.format(100 * (isFramed && !mirror ? spec.frameWidth : spec.mat));
+    sizeValue.textContent = spanLabel + " " + spanCm + " 公分";
     const palettes = album ? albumPalettes : mirror ? mirrorPalettes : textile ? scrollPalettes : framePalettes;
+    const match = palettes.find(([, colors]) => Object.entries(colors).every(([key, value]) => spec[key].toLowerCase() === value));
+    colorValue.textContent = match ? match[0] : "目前用色";
+    const chips = album ? [spec.albumCoverColor, spec.albumLeafColor] : textile ?
+      [spec.silkColor, spec.accentColor, spec.rodColor] : mirror ? [spec.frameColor,spec.silkColor] : [spec.frameColor,spec.matColor];
+    for (const [index, chip] of [...currentChips.children].entries()) {
+      chip.hidden = !chips[index];
+      if (chips[index]) chip.style.backgroundColor = chips[index];
+    }
     if (paletteList !== palettes) {
       paletteList = palettes;
       swatches.replaceChildren(...palettes.map(([name, colors]) => {
@@ -134,16 +168,24 @@ export function mountEditor(host, art, save, addTemplates) {
     refresh();
   }
   function section(title, when) {
-    const group = elem("div", undefined, "mount-section");
+    const group = elem(title ? "details" : "div", undefined, "mount-section");
     if (when) group.dataset.mountWhen = when;
-    if (title) group.append(elem("h3", title));
+    if (title) {
+      group.append(elem("summary", title));
+      group.open = openSections.has(title);
+      group.addEventListener("toggle", () => {
+        if (!group.isConnected) return;
+        if (group.open) openSections.add(title);
+        else openSections.delete(title);
+      });
+    }
     const grid = elem("div", undefined, "mount-grid");
     group.append(grid);
     host.append(group);
     return grid;
   }
   function shapeSamples(key, caption, when) {
-    const grid = section(caption, when);
+    const grid = section("比較" + caption, when);
     grid.className = "mount-samples";
     grid.setAttribute("role", "group");
     grid.setAttribute("aria-label", caption);
@@ -209,7 +251,7 @@ export function mountEditor(host, art, save, addTemplates) {
         input.max = opts.max;
         input.step = opts.type === "number" ? "any" : "1";
         if (opts.type === "number") {
-          input.dataset.cm = "true";
+          input.dataset.factor = String(opts.factor || 100);
           input.inputMode = "decimal";
           input.required = true;
         }
@@ -222,7 +264,7 @@ export function mountEditor(host, art, save, addTemplates) {
     const update = () => {
       if (!input.value || !input.validity.valid) return;
       let value = input.value;
-      if (input.dataset.cm || key === "surfaceSheen") value = Number(value) / 100;
+      if (input.dataset.factor || key==="surfaceSheen") value=Number(value)/Number(input.dataset.factor || 100);
       if (art[key] === value) return;
       const delta = { [key]: value };
       if (key === "frame" && art.frame === "無框" && value !== "無框" && !(art.frameWidth > 0))
@@ -238,7 +280,7 @@ export function mountEditor(host, art, save, addTemplates) {
     input.addEventListener("change", update);
     if (input.type === "number") input.onblur = () => {
       const value = mountSpec(art)[key];
-      input.value = +(value * 100).toFixed(2);
+      input.value = +(value * Number(input.dataset.factor)).toFixed(2);
     };
     return input;
   }
@@ -248,17 +290,47 @@ export function mountEditor(host, art, save, addTemplates) {
   const color = (parent, key, label, when) => control(parent, key, label, {type:"color"}, when);
   host.replaceChildren(title,sizeReadout);
   const form = section();
-  select(form, "mount", "裝裱方式", ["畫框", "掛軸", "手卷", "冊頁", "鏡片"]);
+  select(form, "mount", "裝裱方式", ["畫框", "掛軸", "手卷", "冊頁", "鏡片", "無框板裱", "壓克力面裱"]);
+  const plain=elem("button","無框・只加厚度");
+  plain.type="button";plain.dataset.mountQuick="thickness";
+  plain.onclick=()=>apply({mount:"無框板裱",frame:"無框",frameWidth:0,mat:0,profile:null,
+    boardMaterial:mountSpec(art).boardMaterial,boardThickness:art.boardThickness || .01,wallStandoff:0});
+  form.append(plain);
   select(form, "frame", "框材", ["木框", "金屬框", "無框"], "picture");
   select(form, "profile", "框型", mountChoices.profile, "framed");
   select(form, "scrollStyle", "掛軸形式", mountChoices.scrollStyle, "scroll");
   select(form, "handscrollStyle", "手卷形式", mountChoices.handscrollStyle, "hand");
   select(form, "albumStyle", "冊頁裝式", mountChoices.albumStyle, "album");
+  const boards=section(undefined,"board");
+  const mm=(key,label,min,max,when)=>control(boards,key,label+"（mm）",{type:"number",min,max,factor:1000},when);
+  mm("boardThickness","背板厚度",1,50);
+  color(boards,"boardEdgeColor","側邊顏色");
+  select(boards,"boardMaterial","背板材質",mountChoices.boardMaterial);
+  mm("wallStandoff","離牆距離",0,120);
+  mm("acrylicThickness","壓克力厚度",1,30,"acrylic");
+  const resetEdge=elem("button","使用板材原色");
+  resetEdge.type="button";resetEdge.onclick=()=>apply({boardEdgeColor:""});
+  boards.append(resetEdge);
+  const crossSection=elem("figure");
+  crossSection.id="mount-board-section";
+  const caption=elem("figcaption"), sectionBar=elem("div",undefined,"mount-board-cross-section");
+  sectionBar.setAttribute("aria-hidden","true");
+  for(const key of ["boardGap","boardBacking","boardCover"]) {
+    const segment=elem("i");segment.dataset[key]="";sectionBar.append(segment);
+  }
+  crossSection.append(elem("strong","側面剖面　牆 → 作品正面"),sectionBar,caption);
+  boards.after(crossSection);
   shapeSamples("profile", "框條剖面", "framed");
   shapeSamples("scrollStyle", "裱式小樣", "scroll");
   shapeSamples("handscrollStyle", "手卷小樣", "hand");
   shapeSamples("albumStyle", "冊頁單開小樣", "album");
+  function recap(grid) {
+    const value = elem("small", undefined, "mount-recap");
+    grid.parentElement.querySelector("summary").append(value);
+    return value;
+  }
   const material = section("材質與表面", "materials");
+  const materialValue = recap(material);
   select(material, "woodSpecies", "木種", mountChoices.woodSpecies, "wood");
   select(material, "metalFinish", "金屬", mountChoices.metalFinish, "metal");
   select(material, "matMaterial", "卡紙材質", mountChoices.matMaterial, "card");
@@ -268,9 +340,14 @@ export function mountEditor(host, art, save, addTemplates) {
   select(material, "silkPattern", "裱料", mountChoices.silkPattern, "silk");
   select(material, "rodMaterial", "軸頭材質", mountChoices.rodMaterial, "textile");
   select(material, "finish", "表面光澤", ["霧面", "亮面"], "framed");
-  control(material, "surfaceSheen", "光澤微調", {type:"range", min:0, max:100}, "framed");
+  control(material, "surfaceSheen", "光澤微調", {type:"range", min:0, max:100}, "finishable");
 
-  const colors = section("配色");
+  const colors = section("配色","trim");
+  const colorValue = recap(colors);
+  const currentChips = elem("span", undefined, "mount-chips mount-current-chips");
+  currentChips.setAttribute("aria-hidden","true");
+  currentChips.append(elem("i"),elem("i"),elem("i"));
+  colorValue.after(currentChips);
   swatches = elem("div", undefined, "mount-palettes");
   colors.before(swatches);
   color(colors, "frameColor", "框色", "framed");
@@ -294,7 +371,8 @@ export function mountEditor(host, art, save, addTemplates) {
   };
   colors.after(restore);
 
-  const specs = section("實際規格");
+  const specs = section("實際規格","trim");
+  const sizeValue = recap(specs);
   cm(specs, "frameWidth", "框寬", 0, 50, "framed");
   cm(specs, "depth", "框深", 1, 50, "framed");
   cm(specs, "floatLift", "畫心墊高", 0, 20, "box");
@@ -315,7 +393,15 @@ export function mountEditor(host, art, save, addTemplates) {
   host.append(templates);
   addTemplates(templates, apply);
   const recipes=templates.querySelector(".mount-recipe-picker");
-  if(recipes)form.parentElement.before(recipes);
+  if (recipes) {
+    form.parentElement.before(recipes);
+    const source = recipes.querySelector("small");
+    if (source) {
+      const references = elem("details", undefined, "mount-section mount-reference");
+      references.append(elem("summary", "裝裱參考資料"), source);
+      host.append(references);
+    }
+  }
   refresh();
 }
 
@@ -340,7 +426,14 @@ export function paintWallMount(button, art) {
     const dx=(w-art.width)/2, dy=(h-art.height)/2;
     layer(dx-x, dx+x, dy+y, dy-y, color);
   };
-  if (spec.isAlbum) {
+  if (spec.isBoard) {
+    layers.dataset.boardMount=art.mount;
+    layer(0,0,0,0,spec.boardEdgeColor);
+    if(spec.wallStandoff) {
+      const offset=Math.min(4,spec.wallStandoff*100);
+      layers.style.boxShadow=offset*.45+"px "+offset+"px "+(1+offset)+"px #192c3545";
+    }
+  } else if (spec.isAlbum) {
     albumPanels(spec,cut);
   } else if (spec.isMirror) {
     const f=spec.frameWidth;

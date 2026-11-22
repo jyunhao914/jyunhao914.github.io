@@ -1,8 +1,8 @@
-import {mountFields} from "./mount-fields.js?v=mount32";
+import {mountFields} from "./mount-fields.js?v=desk33";
 import {mobileControls} from "./mobile-controls.js?v=stickspace20";
-import {roomSize} from "./room-size.js?v=mount32";
+import {roomSize} from "./room-size.js?v=desk33";
 import * as T from "./vendor/three.module.js";
-import {mountRenderer, disposeMount} from "./mount-render.js?v=mount32";
+import {mountRenderer, disposeMount} from "./mount-render.js?v=desk33";
 import { architecture } from "./architecture.js?v=mount32";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
   const scene = new T.Scene(),
@@ -74,7 +74,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     let depth = ((a.wall % 2 ? halfWidth : halfDepth) - .13) - (a.z || 0);
     const shadow=g.getObjectByName("mount-contact");
     if(shadow){
-      shadow.position.z=-.067-(a.z || 0);
+      shadow.position.z=(shadow.userData.wallZ ?? -.067)-(a.z || 0);
       shadow.visible=Math.abs(a.z || 0)<.09;
     }
     g.position.set(
@@ -206,23 +206,24 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       new T.MeshStandardMaterial({ map: tagTex }),
     );
     plaque.position.set(spec.right+.28,-h/2+.08,-.064);
-    mounted.set(a.id,{mount,face,plaque,g,a,strip:mountedSurfaceTarget(g,a,spec)});
+    const entry={mount,face,plaque,g,a,strip:mountedSurfaceTarget(g,a,spec)};
+    mounted.set(a.id,entry);
     g.add(plaque);
     plaque.userData.a = a;
     targets.push(plaque);
-    let k = a.kelvin,
-      t = (k - 2500) / 4500;
-    let light = new T.SpotLight(
-      new T.Color().setRGB(1, 0.72 + 0.26 * t, 0.46 + 0.54 * t),
-      a.power,
-      12,
-      (a.angle * Math.PI) / 180,
-      0.72,
-    );
-    light.position.set(a.lx, a.ly, a.lz);
+    const light=new T.SpotLight(0xffffff, a.power, 12, a.angle*Math.PI/180, .72);
+    entry.light=light;
+    setLight(light,a);
     g.add(light);
     light.target = face;
   });
+  function setLight(light,art) {
+    const t=(art.kelvin-2500)/4500;
+    light.color.setRGB(1,.72+.26*t,.46+.54*t);
+    light.intensity=art.power;
+    light.angle=art.angle*Math.PI/180;
+    light.position.set(art.lx,art.ly,art.lz);
+  }
   const rulers = onMove && tools?.makeRulers(T,host,works,groups,cam);
   function updatePlacement() {
     for (const art of drag.members) layout(groups[works.indexOf(art)],art);
@@ -413,10 +414,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       x: e.clientX,
       y: e.clientY,
       dist: 0,
-      obj: onMove && obj,
+      obj: onMove && tools?.canMove?.()!==false && obj,
       click: obj,
     };
-    if (onMove && obj) {
+    if (drag.obj) {
       let center = obj.getWorldPosition(new T.Vector3()),
         normal = new T.Vector3(0, 0, 1).applyQuaternion(obj.parent.quaternion);
       drag.plane = new T.Plane().setFromNormalAndCoplanarPoint(normal, center);
@@ -500,6 +501,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     else if (drag.dist < 9 && drag.click) {
       const work = drag.click.userData.a;
       if (onMove) {
+        editorSelection=drag.index;
+        rulers?.select(drag.index);
         if(drag.move){ drag.move(0,0); updatePlacement(); }
         onPick(work);
       }
@@ -960,6 +963,34 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     select(i) {
       return changeWork(i);
     },
+    inspectMountEdge(id) {
+      const entry=mounted.get(id);
+      if(!onMove || !entry)return;
+      const {g,mount}=entry, spec=mount.userData.spec;
+      wheelZoom=null;
+      zoomed=false;
+      g.updateWorldMatrix(true,false);
+      // Inspect the physical edge from the side with the most space inside the room.
+      const candidates=[-1,1].map(sign=>{
+        const x=sign*spec.w/2;
+        const at=g.localToWorld(new T.Vector3(x,0,spec.faceZ));
+        const eye=g.localToWorld(new T.Vector3(x+sign*.42,0,spec.faceZ+.27));
+        const space=Math.min(halfWidth-Math.abs(eye.x),halfDepth-Math.abs(eye.z),eye.y,roomHeight-eye.y);
+        return {at,eye,space};
+      });
+      const {eye,at}=candidates[0].space>candidates[1].space ? candidates[0] : candidates[1];
+      eye.x=T.MathUtils.clamp(eye.x,-halfWidth+.12,halfWidth-.12);
+      eye.z=T.MathUtils.clamp(eye.z,-halfDepth+.12,halfDepth-.12);
+      eye.y=T.MathUtils.clamp(eye.y,.15,roomHeight-.15);
+      if(reducedMotion.matches || eye.distanceTo(cam.position)<.005) {
+        travel=null;
+        cam.position.copy(eye);
+        cam.lookAt(at);
+      } else {
+        navigate(eye,at);
+        travel.duration=Math.min(travel.duration,650);
+      }
+    },
     updateMount(id,next) {
       const entry=mounted.get(id);
       if(!onMove || disposed || !entry || !next)return;
@@ -987,6 +1018,13 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       plaque.position.set(spec.right+.28,-spec.h/2+.08,-.064);
       renderer.shadowMap.needsUpdate=true;
       rulers?.dirty();
+    },
+    updateLight(id,next) {
+      const entry=mounted.get(id);
+      if(!onMove || disposed || !entry)return;
+      for(const key of ["lx","ly","lz","power","kelvin","angle"])entry.a[key]=next[key];
+      setLight(entry.light,entry.a);
+      renderer.shadowMap.needsUpdate=true;
     },
     updatePlacements(changes) {
       if(!onMove)return;

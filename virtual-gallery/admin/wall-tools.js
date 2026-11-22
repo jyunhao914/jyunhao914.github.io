@@ -1,4 +1,4 @@
-import { mountSpec } from "../mount-spec.js?v=mount32";
+import { mountSpec } from "../mount-spec.js?v=desk33";
 
 // Wall coordinates and physical artwork dimensions are expressed in metres.
 export function wallHeight(theme) {
@@ -75,7 +75,7 @@ function measures(wall,a) {
 
 export function makeRulers(T,host,works,groups,cam) {
   const ns='http://www.w3.org/2000/svg', svg=document.createElementNS(ns,'svg');
-  const report=host.parentElement.querySelector('.wall-readout');
+  const report=host.closest('.hanging-desk').querySelector('.wall-readout');
   svg.classList.add('wall-rulers');
   svg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden';
   svg.setAttribute('aria-hidden','true');

@@ -33,10 +33,19 @@ function color(value, fallback) { return /^#[\da-f]{6}$/i.test(value) ? value : 
 
 export function mountSpec(a) {
   const w=number(a.width,1), h=number(a.height,1);
-  const isScroll=a.mount === "掛軸", isHandscroll=a.mount === "手卷", frame=select(a.frame,["木框","金屬框","無框"]);
+  const isAcrylic=a.mount==="壓克力面裱", isBoard=isAcrylic || a.mount==="無框板裱";
+  const isScroll=a.mount === "掛軸", isHandscroll=a.mount === "手卷";
+  const frame=isBoard ? "無框" : select(a.frame,["木框","金屬框","無框"]);
+  const boardMaterial=select(a.boardMaterial,["鋁複合板","發泡板","木質板"]);
+  const naturalEdge={"鋁複合板":"#424749","發泡板":"#e7e6df","木質板":"#b58d61"};
+  const boardEdgeColor=color(a.boardEdgeColor,naturalEdge[boardMaterial]);
+  const boardThickness=Math.max(.001,Math.min(.05,number(a.boardThickness,.003)));
+  const wallStandoff=Math.min(.12,number(a.wallStandoff,.018));
+  const acrylicThickness=Math.max(.001,Math.min(.03,number(a.acrylicThickness,.006)));
   const isAlbum=a.mount==="冊頁", isMirror=a.mount==="鏡片";
   const frameWidth=!isScroll && !isHandscroll && !isAlbum && frame!=="無框" ? number(a.frameWidth,.06) : 0;
-  const mat=number(a.mat,.07), depth=number(a.depth,.05);
+  const mat=isBoard ? 0 : number(a.mat,.07);
+  const depth=isBoard ? boardThickness+(isAcrylic ? acrylicThickness : 0) : number(a.depth,.05);
   const topBorder=number(a.topBorder,.29), bottomBorder=number(a.bottomBorder,.19);
   const rodDiameter=number(a.rodDiameter,.054);
   const scrollWidth=w+mat*2, scrollHeight=h+topBorder+bottomBorder;
@@ -97,17 +106,20 @@ export function mountSpec(a) {
   const matMaterial=select(a.matMaterial,["棉紙","亞麻"]), silkPattern=select(a.silkPattern,["織錦","素絹","花綾","細麻"]);
   const rodMaterial=select(a.rodMaterial,["木軸","銅軸","漆軸"]);
   // The guide group sits 70 mm in front of the inner wall surface.
-  const backZ=-.064, isBox=frameWidth>0 && profile==="立體盒框";
+  const panelWallZ=-.07;
+  const backZ=isBoard ? panelWallZ+wallStandoff : -.064, isBox=frameWidth>0 && profile==="立體盒框";
   const boxFloorZ=backZ+Math.min(.003,depth*.12), glassZ=backZ+depth*.90;
   const paperThickness=Math.min(.0012,depth*.065);
   const maxLift=Math.max(0,Math.min(.2,glassZ-boxFloorZ-paperThickness-Math.min(.004,depth*.09)));
   const floatLift=Math.min(maxLift,number(a.floatLift,.009));
-  const faceZ=isBox ? boxFloorZ+floatLift+paperThickness : backZ+depth*(frameWidth ? .73 : 1);
+  const faceZ=isBoard ? backZ+boardThickness : isBox ? boxFloorZ+floatLift+paperThickness : backZ+depth*(frameWidth ? .73 : 1);
+  const frontZ=isBoard ? backZ+depth : Math.max(faceZ,backZ+depth);
   const glazing=select(a.glazing,["無罩","透明壓克力","低反射玻璃"]);
   const matColor=color(a.matColor,"#eee8d8");
   const shade=matColor.slice(1).match(/../g).map(v=>Math.round(parseInt(v,16)*.84).toString(16).padStart(2,"0")).join("");
   const linerColor=color(a.linerColor,"#"+shade);
   return {w,h,rects,left,right,top,bottom,width:right-left,height:top-bottom,
+    isBoard,isAcrylic,boardMaterial,boardEdgeColor,boardThickness,wallStandoff,acrylicThickness,panelWallZ,frontZ,
     isAlbum,isMirror,albumStyle,albumLeafColor,albumCoverColor,albumLeaves,albumCover,albumGap:gap,mirrorEnd,borderX,borderY,innerW,innerH,
     isHandscroll,handscrollStyle,headLength,tailLength,handHeight,handParts,divider,sheetLeft,sheetRight,coreRadius,endProjection,
     isScroll,isBox,boxFloorZ,glassZ,paperThickness,maxLift,floatLift,glazing,linerColor,frame,frameWidth,mat,depth,backZ,faceZ,topBorder,bottomBorder,rodDiameter,finialLength,battenHeight,

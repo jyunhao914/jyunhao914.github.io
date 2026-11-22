@@ -6,6 +6,7 @@ export const mountChoices = {
   scrollStyle: ["一色裱", "二色裱", "三色裱", "文人裱", "宣和裱"],
   woodSpecies: ["白橡木", "胡桃木", "梣木", "柚木"],
   metalFinish: ["鋁合金", "黃銅", "不鏽鋼"],
+  boardMaterial: ["鋁複合板", "發泡板", "木質板"],
   matMaterial: ["棉紙", "亞麻"],
   silkPattern: ["素絹", "花綾", "織錦", "細麻"],
   rodMaterial: ["木軸", "銅軸", "漆軸"],
@@ -13,8 +14,9 @@ export const mountChoices = {
   glazing: ["無罩", "透明壓克力", "低反射玻璃"],
   filmPattern: ["素色", "木紋", "髮絲紋", "織紋"],
 };
-const mountColors = ["frameColor", "matColor", "silkColor", "accentColor", "thirdColor", "linerColor", "albumLeafColor", "albumCoverColor", "rodColor"];
+const mountColors = ["frameColor", "matColor", "silkColor", "accentColor", "thirdColor", "linerColor", "albumLeafColor", "albumCoverColor", "rodColor", "boardEdgeColor"];
 const mountRanges = {
+  boardThickness: [.001, .05], wallStandoff: [0, .12], acrylicThickness: [.001, .03],
   mirrorEnd: [0, .5],
   headLength: [0, 3], tailLength: [0, 3],
   floatLift: [0, .2],

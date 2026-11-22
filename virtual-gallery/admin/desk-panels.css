@@ -1,0 +1,90 @@
+.desk-heading {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin:16px 0 12px;
+}
+.desk-heading h1 {margin:0}
+.desk-heading label,.desk-work-picker {
+  display:flex; align-items:center; gap:10px; min-width:0; font-size:.88rem;
+}
+.desk-heading select {max-width:min(48vw,360px)}
+.hanging-desk {
+  --desk-line:#d0dadd; --desk-ink:#19394e;
+  display:grid; grid-template-columns:minmax(0,1.78fr) minmax(302px,1fr);
+  height:min(78dvh,860px); min-height:410px; gap:16px; align-items:stretch;
+}
+.desk-heading,.hanging-desk,#wall-preview {scroll-margin-top:calc(var(--workspace-nav-height,50px) + 5px)}
+.hanging-desk .desk-sidebar,#wall-preview {
+  min-width:0; min-height:0; border:1px solid var(--desk-line); border-radius:9px; overflow:hidden; background:white;
+}
+.hanging-desk .desk-sidebar {display:grid;grid-template-rows:auto auto minmax(0,1fr)}
+.desk-work-picker {padding:10px 12px; background:#f8fafb}
+.desk-work-picker label {white-space:nowrap; font-weight:600}
+.desk-work-picker select {flex:1; min-width:0; height:40px; padding:5px 9px; font:inherit; background:white}
+.desk-tool-tabs {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:0 6px;border-block:1px solid var(--desk-line);background:white}
+.desk-tool-tabs button {
+  min-height:44px; padding:5px 0; border:0; border-bottom:3px solid transparent;
+  border-radius:0; font-size:.875rem; color:#52636c; background:transparent;
+}
+.desk-tool-tabs button[aria-selected=true] {color:var(--desk-ink); background:#eaf0f3; border-bottom-color:var(--desk-ink); font-weight:700}
+.desk-tool-tabs button:disabled {color:#889499;cursor:default}
+.desk-tool-tabs button:focus-visible {outline:2px solid #2878a9;outline-offset:-4px}
+.hanging-desk #layout-inspector {
+  height:auto; max-height:none; min-height:0; overflow:auto; scrollbar-gutter:stable;
+  padding:12px; border:0; background:white; overscroll-behavior:contain;
+}
+.hanging-desk [data-desk-panel][hidden] {display:none!important}
+.hanging-desk #form {min-width:0}
+.hanging-desk .inventory {padding:0;border:0}
+.hanging-desk #wall-progress {margin:0 0 10px}
+.hanging-desk #position-pad {padding:0 0 12px;border:0}
+.hanging-desk #position-pad .pad-caption {margin:0 0 8px;color:#4d646e;font-size:.84rem}
+.hanging-desk .desk-primary-fields {
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:12px
+}
+.hanging-desk .desk-primary-fields input {box-sizing:border-box;width:100%;height:42px}
+.hanging-desk .desk-advanced {border:0;border-top:1px solid var(--desk-line);border-radius:0;margin:10px 0 0;background:transparent;padding:0}
+.hanging-desk .desk-advanced summary {padding:12px 0;font-weight:650;font-size:.92rem;cursor:pointer;color:var(--desk-ink)}
+.hanging-desk .desk-advanced > div {padding:1px 1px 10px}
+.hanging-desk .desk-advanced .fields {grid-template-columns:repeat(2,minmax(0,1fr))}
+.hanging-desk .desk-advanced .fields + button,.hanging-desk .desk-advanced label + button {margin-top:9px}
+.hanging-desk .light-looks {margin:0 0 14px}
+.hanging-desk #mount-controls {margin:0;padding:0;border:0;min-width:0}
+.hanging-desk #mount-controls > legend {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.hanging-desk #wall-preview {display:flex;flex-direction:column}
+#wall-preview .surface-tools {min-width:0;justify-content:flex-end;flex-wrap:wrap;gap:5px;padding:6px;background:white;border-bottom:1px solid var(--desk-line)}
+#wall-preview .surface-tools > button {font-size:.8rem;min-height:36px;padding:4px 7px}
+#wall-preview .desk-view-modes {display:flex;align-items:center;gap:0;margin-right:auto;min-width:0}
+#wall-preview .desk-view-modes button {padding:4px 7px;font-size:.8rem;min-height:36px;border-radius:0}
+#wall-preview .desk-view-modes button:first-child {border-radius:5px 0 0 5px}
+#wall-preview .desk-view-modes button:last-child {border-radius:0 5px 5px 0;border-left-width:0}
+#wall-preview #surface {flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden;background:#edf1f2}
+#wall-preview #surface #stage {height:auto;flex:1 1 auto;min-height:0}
+.hanging-desk .desk-advanced .wall-readout:not([hidden]) {display:block;padding:8px 10px;border-radius:5px;background:#f2f5f7;color:var(--desk-ink);font-size:.875rem;line-height:1.7}
+#wall-preview > .wall-save {margin:0;border-top:1px solid var(--desk-line);padding:3px 8px;min-height:24px;align-content:center}
+.hanging-desk[data-rulers=off] .wall-rulers {display:none!important}
+@media(max-width:740px) and (orientation:portrait) {
+  .desk-heading {margin:10px 0 8px}
+  .desk-heading h1 {font-size:1.3rem}
+  .desk-heading label {gap:6px;font-size:.8rem}
+  .desk-heading select {padding:5px;min-height:36px}
+  .hanging-desk {
+    height:calc(100dvh - var(--workspace-nav-height,50px) - 70px);min-height:440px;
+    grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(228px,42%) minmax(0,1fr);gap:7px;
+  }
+  .desk-work-picker {min-height:36px;padding:4px 9px;gap:8px}
+  .desk-work-picker select {height:36px}
+  .hanging-desk #layout-inspector {padding:10px}
+  #wall-preview .surface-tools {padding:2px 6px}
+  #wall-preview .surface-tools button,#wall-preview .desk-view-modes button {min-height:44px}
+  #wall-preview > .wall-save {min-height:19px;font-size:.72rem}
+}
+@media(orientation:landscape) and (max-height:550px) {
+  .hanging-desk {height:calc(100dvh - var(--workspace-nav-height,50px) - 12px);min-height:210px;grid-template-columns:minmax(0,1.22fr) minmax(212px,1fr);gap:8px}
+  .desk-work-picker {padding:4px 7px}
+  .desk-work-picker select {height:34px}
+  .hanging-desk #layout-inspector {padding:8px}
+}
+
+@media(pointer:coarse) {
+  #wall-preview .surface-tools button,#wall-preview .desk-view-modes button {min-height:44px}
+}

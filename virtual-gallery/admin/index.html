@@ -365,18 +365,22 @@
     @media(hover:hover){.piece:hover{z-index:1}.piece:hover .plan-label{display:block}}
     @media(max-width:400px){.surface-tools{gap:3px}.surface-tools button{font-size:.8rem;padding:3px 5px}}
   </style>
-  <header>
-    <strong>虛擬策展工作室</strong
-    ><span id="status" role="status">正在開啟策展後台…</span><button data-save-retry hidden>重試儲存</button>
+  <link rel="stylesheet" href="./workspace.css?v=desk33">
+  <link rel="stylesheet" href="./catalog-desk.css?v=desk33">
+  <link rel="stylesheet" href="./desk-panels.css?v=desk33">
+  <header class="studio-header">
+    <strong class="studio-brand"><i class="studio-emblem" aria-hidden="true"></i>虛擬策展工作室</strong>
+    <span id="status" role="status">正在開啟策展後台…</span><button data-save-retry hidden>重試儲存</button>
+    <a class="gallery-return" href="../" target="_blank" rel="noopener">公開展廳</a>
     <button id="logout" hidden>登出</button>
   </header>
   <main>
     <div id="login">
-      <h1>線上策展工作室</h1>
-      <p>使用策展帳號登入，管理私人作品與展覽。</p>
+      <h1>登入策展工作室</h1>
+      <p>以策展帳號開啟私人作品庫與展覽。</p>
       <label class="remember-choice"><input id="remember-device" type="checkbox" checked>在這台裝置保持登入 30 天</label>
       <button id="account" class="action" disabled>使用 GitHub 帳號登入</button>
-      <p>個人手機可勾選保持登入。共用裝置請取消勾選，關閉分頁即結束本機登入。</p>
+
       <details>
         <summary>擁有者設定與備援登入</summary>
         <p><a href="./register.html">設定 GitHub 登入應用程式</a></p>
@@ -389,12 +393,12 @@
         ><button id="signin" disabled>使用既有憑證登入</button>
       </details>
     </div>
-    <nav id="tabs"></nav>
+    <nav id="tabs" aria-label="工作室主選單"></nav>
     <div id="app"></div>
   </main>
   <dialog id="preview" aria-label="參觀預覽">
     <div class="preview-heading"><button id="closePreview">返回布展</button><strong id="previewTitle"></strong></div>
     <iframe title="草稿預覽" allowfullscreen></iframe>
   </dialog>
-  <script type="module" src="./login.js?v=mount32"></script>
+  <script type="module" src="./login.js?v=desk33"></script>
 </html>

@@ -1,4 +1,4 @@
-import { mountFields } from "../mount-fields.js?v=mount32";
+import { mountFields } from "../mount-fields.js?v=desk33";
 
 // Explicit defaults replace any decoration inherited from the destination's library record.
 function snapshot(art) {
@@ -20,6 +20,12 @@ const recipes = [
   ["水墨", "墨綠布面蝴蝶冊", {mount:"冊頁", albumStyle:"蝴蝶裝", albumCoverColor:"#54625b", albumLeafColor:"#e6ddc9", mat:.026}],
   ["書法", "宣紙懸浮盒框", {profile:"立體盒框", woodSpecies:"胡桃木", matColor:"#b5a690", matMaterial:"亞麻", linerColor:"#51483d", frameWidth:.031, depth:.066, floatLift:.012, mat:.072, glazing:"低反射玻璃"}],
   ["書法", "月白宣和裱", {mount:"掛軸", scrollStyle:"宣和裱", silkPattern:"素絹", silkColor:"#666f69", accentColor:"#c5c1aa", thirdColor:"#876f4e", rodMaterial:"漆軸", mat:.04, topBorder:.33, bottomBorder:.22, rodDiameter:.044}],
+  ["攝影", "攝影白卡典藏框", {mount:"畫框", frame:"木框", profile:"平框", woodSpecies:"梣木", frameColor:"#333331", matColor:"#f4f1e9", matMaterial:"棉紙", frameWidth:.018, mat:.065, depth:.032, surfaceSheen:.16}],
+  ["攝影", "攝影鋁板懸浮裱", {mount:"無框板裱", frame:"無框", frameWidth:0, mat:0, boardMaterial:"鋁複合板", boardThickness:.003, wallStandoff:.018, surfaceSheen:.22}],
+  ["攝影", "攝影壓克力面裱", {mount:"壓克力面裱", frame:"無框", frameWidth:0, mat:0, boardMaterial:"鋁複合板", boardThickness:.003, acrylicThickness:.006, wallStandoff:.018, surfaceSheen:.82}],
+  ["設計", "海報窄邊鋁框", {mount:"畫框", frame:"金屬框", profile:"平框", metalFinish:"鋁合金", frameWidth:.012, mat:0, depth:.022, surfaceSheen:.38}],
+  ["設計", "設計原木浮框", {mount:"畫框", frame:"木框", profile:"浮框", woodSpecies:"白橡木", frameWidth:.026, mat:0, depth:.04, surfaceSheen:.20}],
+  ["設計", "設計輸出硬板裱", {mount:"無框板裱", frame:"無框", frameWidth:0, mat:0, boardMaterial:"發泡板", boardThickness:.01, wallStandoff:0, surfaceSheen:.14}],
 ];
 
 function recipePicker(apply) {
@@ -31,15 +37,33 @@ function recipePicker(apply) {
   const empty = new Option("選擇搭配", "");
   list.setAttribute("aria-label", "依作品類型選裝裱");
   list.add(empty);
-  let group;
-  recipes.forEach(([medium, title], index) => {
-    if (group?.label !== medium) {
-      group = document.createElement("optgroup");
-      group.label = medium;
-      list.append(group);
-    }
-    group.append(new Option(title, String(index)));
-  });
+  const families = document.createElement("div");
+  families.className = "mount-family-picker";
+  families.setAttribute("role","group");
+  families.setAttribute("aria-label","裝裱搭配分類");
+  function selectFamily(family) {
+    let group;
+    list.replaceChildren(empty);
+    recipes.forEach(([medium, title], index) => {
+      if (family !== "全部" && family !== medium) return;
+      if (group?.label !== medium) {
+        group = document.createElement("optgroup");
+        group.label = medium;
+        list.append(group);
+      }
+      group.append(new Option(title, String(index)));
+    });
+    for (const button of families.children)
+      button.setAttribute("aria-pressed",String(button.dataset.mountFamily===family));
+    if(family!=="全部")list.selectedIndex=1;
+    load.disabled=!list.value;
+  }
+  for(const family of ["全部","攝影","設計"]) {
+    const button=document.createElement("button");
+    button.type="button";button.dataset.mountFamily=family;button.textContent=family;
+    button.onclick=()=>selectFamily(family);
+    families.append(button);
+  }
   label.append(list);
   const load = document.createElement("button");
   load.type = "button";
@@ -61,7 +85,8 @@ function recipePicker(apply) {
   classification.rel = "noopener noreferrer";
   classification.textContent = "農業部裝裱分類";
   source.append(classification, " · ", reference);
-  section.append(label, load, source);
+  selectFamily("全部");
+  section.append(families, label, load, source);
   return section;
 }
 
