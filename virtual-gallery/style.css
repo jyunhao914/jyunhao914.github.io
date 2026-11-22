@@ -531,3 +531,9 @@ body.visiting {
 #visit.controls-idle :is(.museum-head,.reading-hud,.walk-pad) {opacity:0;visibility:hidden;transition:opacity .2s ease,visibility 0s .2s}
 #visit.controls-idle,#visit.controls-idle canvas {cursor:none}
 @media(prefers-reduced-motion:reduce){#visit:is(:fullscreen,.expanded) :is(.museum-head,.reading-hud,.walk-pad){transition:none}}
+
+/* Leave the resting joystick touchable at its usual position. */
+#visit.controls-idle .walk-pad {visibility:visible;pointer-events:none}
+#visit.controls-idle .walk-stick {pointer-events:auto}
+#visit.controls-idle.stick-active .walk-pad {opacity:1}
+@media(hover:hover){#visit.controls-idle .walk-pad:has(.walk-stick:hover){opacity:1}}

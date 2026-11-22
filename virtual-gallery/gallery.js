@@ -393,7 +393,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
       else if (drag.gesture !== "pan") changeWork(works.indexOf(work), drag.u);
     } else if (drag.obj) onMove(drag.obj.userData.a);
     else if (drag.dist < 9 && !onMove) {
-      hit(e);
+      if (!hit(e) && !host.dispatchEvent(new Event("galleryblanktap",{cancelable:true}))) {
+        drag=null;
+        return;
+      }
       const floorHit = ray.intersectObject(building.floor)[0];
       if (floorHit) {
         stopInspection();

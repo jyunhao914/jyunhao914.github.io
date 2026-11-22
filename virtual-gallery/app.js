@@ -177,7 +177,7 @@ async function enter() {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=quietkeys21");
+    let { gallery } = await import("./gallery.js?v=gesturehud22");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -223,7 +223,7 @@ $("stage").addEventListener("viewreset", () => {
 });
 const visit = $("visit");
 const activePointers = new Set();
-let idleTimer, wakeTap, keyboardFocus=false;
+let idleTimer, canvasPress, stickPointer, keyboardFocus=false;
 function fullView() {
   return document.fullscreenElement === visit || visit.classList.contains("expanded");
 }
@@ -238,26 +238,46 @@ function revealControls() {
     },2500);
   }
 }
+function quietNavigation() {
+  clearTimeout(idleTimer);
+  $("visitMenu").hidden=true;
+  $("menuButton").setAttribute("aria-expanded","false");
+  visit.classList.add("controls-idle");
+}
 visit.addEventListener("pointerdown", e=>{
   keyboardFocus=false;
   if(!fullView()) return;
-  if(visit.classList.contains("controls-idle") && e.target.tagName==="CANVAS" && e.pointerType==="touch")
-    wakeTap={id:e.pointerId,x:e.clientX,y:e.clientY};
-  activePointers.add(e.pointerId);
-  revealControls();
+  if(e.target.closest(".walk-stick")){
+    quietNavigation();
+    stickPointer=e.pointerId;
+    visit.classList.add("stick-active");
+  } else if(e.target.tagName==="CANVAS"){
+    canvasPress={id:e.pointerId,x:e.clientX,y:e.clientY};
+  } else {
+    activePointers.add(e.pointerId);
+    revealControls();
+  }
 },true);
 visit.addEventListener("pointermove", e=>{
-  if(!fullView())return;
-  if(wakeTap?.id===e.pointerId && Math.hypot(e.clientX-wakeTap.x,e.clientY-wakeTap.y)>8)wakeTap=null;
-  revealControls();
-},{passive:true});
-function endInteraction(e) {
-  if(!activePointers.delete(e.pointerId))return;
-  if(wakeTap?.id===e.pointerId){
-    if(e.type==="pointerup")e.preventDefault();
-    wakeTap=null;
+  if(fullView() && canvasPress?.id===e.pointerId &&
+      Math.hypot(e.clientX-canvasPress.x,e.clientY-canvasPress.y)>6) {
+    quietNavigation();
+    canvasPress=null;
   }
-  revealControls();
+},{passive:true});
+$("stage").addEventListener("galleryblanktap",e=>{
+  if(fullView() && visit.classList.contains("controls-idle")) {
+    e.preventDefault();
+    revealControls();
+  }
+});
+function endInteraction(e) {
+  if(canvasPress?.id===e.pointerId) canvasPress=null;
+  if(stickPointer===e.pointerId){
+    stickPointer=null;
+    visit.classList.remove("stick-active");
+  }
+  if(activePointers.delete(e.pointerId)) revealControls();
 }
 window.addEventListener("pointerup",endInteraction,true);
 window.addEventListener("pointercancel",endInteraction,true);
@@ -271,10 +291,18 @@ visit.addEventListener("focusin",e=>{
 });
 function resetControls() {
   activePointers.clear();
-  wakeTap=null;
+  canvasPress=null;
+  stickPointer=null;
+  visit.classList.remove("stick-active");
   revealControls();
 }
-window.addEventListener("blur",resetControls);
+window.addEventListener("blur",()=>{
+  activePointers.clear();
+  canvasPress=null;
+  stickPointer=null;
+  visit.classList.remove("stick-active");
+  if(fullView() && $("visitMenu").hidden) quietNavigation();
+});
 $("scrollPosition").oninput = e => viewer?.seek(Number(e.target.value)/1000);
 $("overview").onclick = () => viewer?.overview();
 function showFocus(a) {
