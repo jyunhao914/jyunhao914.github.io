@@ -49,16 +49,51 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     const w = halfWidth, l = halfDepth;
     const tones = colors || (theater ? [0x20232f, 0x29212d, 0x233231, 0x313541] :
       [0x424a50, 0x47423f, 0x394641, 0x46404a]);
-    const plaster = {...surface("plaster", 5, 2), roughness: .96, normalScale: new T.Vector2(.18,.18)};
-    const wood = surface("wood", 3, 1);
+    const plaster = {...surface("plaster", 1, 1), roughness: .96, normalScale: new T.Vector2(.18,.18)};
+    const wood = surface("wood", 1, 1);
     const timber = {...wood, roughness: .75};
-    const floor = box(scene, w*2, .14, l*2, study ? 0x947960 : 0x777878, 0, -.07, 0,
-      study ? timber : surface("stone", 4, 3));
-    box(scene, w*2, height, .12, tones[0], 0, height/2, -l, plaster);
-    box(scene, w*2, height, .12, tones[1], 0, height/2, l, plaster);
-    box(scene, .12, height, l*2, tones[2], -w, height/2, 0, plaster);
-    box(scene, .12, height, l*2, tones[3], w, height/2, 0, plaster);
-    box(scene, w*2, .12, l*2, study ? 0x89816e : 0x444749, 0, height, 0, plaster);
+    // Use metres for the scan coordinates on each face, including narrow returns.
+    function facing(mesh, period) {
+      const {position, normal, uv} = mesh.geometry.attributes;
+      for (let i = 0; i < uv.count; i++) {
+        const nx = Math.abs(normal.getX(i)), ny = Math.abs(normal.getY(i));
+        uv.setXY(i, (nx > .5 ? position.getZ(i) : position.getX(i))/period,
+          (ny > .5 ? position.getZ(i) : position.getY(i))/period);
+      }
+      return mesh;
+    }
+    const floor = facing(box(scene, w*2, .14, l*2, study ? 0xe1d8c9 : 0xb3b1ab, 0, -.07, 0,
+      {...surface(study ? "boards" : "stone", 1, 1), roughness: study ? .83 : .76,
+        normalScale: new T.Vector2(.26,.26)}), study ? 1.7 : 1.5);
+    const walls = [
+      box(scene, w*2, height, .12, tones[0], 0, height/2, -l, plaster),
+      box(scene, w*2, height, .12, tones[1], 0, height/2, l, plaster),
+      box(scene, .12, height, l*2, tones[2], -w, height/2, 0, plaster),
+      box(scene, .12, height, l*2, tones[3], w, height/2, 0, plaster),
+    ];
+    walls.forEach(wall => facing(wall,1));
+    const ceiling = facing(box(scene, w*2,.12,l*2, study ? 0x89816e : 0x626565, 0,height,0,plaster),1);
+    // Broad reflected window light and occlusion at perpendicular surface joins.
+    for (const mesh of [floor, ceiling, ...walls]) {
+      mesh.material.onBeforeCompile = (shader) => {
+        shader.vertexShader = "varying vec3 roomPoint;\n" + shader.vertexShader.replace(
+          "#include <worldpos_vertex>", "#include <worldpos_vertex>\nroomPoint=(modelMatrix*vec4(transformed,1.)).xyz;");
+        shader.fragmentShader = "varying vec3 roomPoint;\n" + shader.fragmentShader.replace(
+          "#include <lights_fragment_end>", `#include <lights_fragment_end>
+          vec2 edge=max(vec2(0.),vec2(${w.toFixed(3)},${l.toFixed(3)})-abs(roomPoint.xz));
+          float join=${mesh===floor||mesh===ceiling ? "min(edge.x,edge.y)" : "min(roomPoint.y,"+height.toFixed(3)+"-roomPoint.y)"};
+          reflectedLight.indirectDiffuse *= .68 + .32*smoothstep(0.,.46,join);
+          ${study ? `float bounce=0.;
+            for(int bay=0;bay<6;bay++){
+              vec3 ray=vec3(-${(w-.2).toFixed(2)},2.,-7.25+2.9*float(bay))-roomPoint;
+              float r=max(length(ray),.18);
+              bounce+=max(0.,dot(inverseTransformDirection(normal,viewMatrix),ray/r))*max(0.,-ray.x/r)/(1.+r*r*.38);
+            }
+            reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.89,.74)*bounce*1.4;` : ""}
+          `);
+      };
+      mesh.material.customProgramCacheKey=()=>theme+"-"+mesh.id;
+    }
     const diffuser = {emissive: 0xffe2ad, emissiveIntensity: .7, roughness: .95};
     if (study) {
       // A sequence of timber portals and luminous lattice bays defines the promenade.
@@ -82,8 +117,15 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
         box(scene,.36,.08,l*2-.4,0xf4e8d1,x,height-.12,0,diffuser);
     }
     scene.add(new T.HemisphereLight(0xfff0d9,0x939291,study ? 1.05 : .85));
-    const key = new T.DirectionalLight(0xffedcf,1.25);
-    key.position.set(-w, height, l*.45);
+    const key = new T.DirectionalLight(0xffedcf,study ? .72 : 1.05);
+    key.position.set(-w+.22, height-.32, l*.45);
+    key.castShadow = true;
+    Object.assign(key.shadow.camera,{left:-l,right:l,top:height+3,bottom:-height-3,near:.1,far:l*4});
+    key.shadow.mapSize.set(1024,1024);
+    key.shadow.normalBias=.012;
+    key.shadow.radius=3;
+    for(const child of scene.children)
+      if(child.isMesh && child!==floor && child!==ceiling && !walls.includes(child) && !child.material.emissive?.getHex()) child.castShadow=true;
     scene.add(key);
     return {floor, wood, textures, ready: Promise.all(loads)};
   }
@@ -96,7 +138,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
       mesh.material.onBeforeCompile = (shader) => {
         shader.fragmentShader = shader.fragmentShader.replace(
           "#include <map_fragment>",
-          "#include <map_fragment>\n diffuseColor.rgb=mix(diffuseColor.rgb,diffuse*vec3(.84,.83,.80),.63);",
+          "#include <map_fragment>\n diffuseColor.rgb=mix(diffuseColor.rgb,diffuse*vec3(.84,.83,.80),.30);",
         );
       };
     }

@@ -1,5 +1,5 @@
 import * as T from "./vendor/three.module.js";
-import { architecture } from "./architecture.js?v=plans4";
+import { architecture } from "./architecture.js?v=surface5";
 export function gallery(host, works, onPick, onMove) {
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
@@ -126,12 +126,18 @@ export function gallery(host, works, onPick, onMove) {
     if (a.mount === "掛軸") {
       const silkWidth = w + 2 * m;
       const silkHeight = h + .48;
-      const weave = new T.TextureLoader().load(new URL("./materials/silk-weave.png", import.meta.url).href);
-      textures.push(weave);
-      weave.wrapS = weave.wrapT = T.RepeatWrapping;
-      weave.repeat.set(silkWidth * 9, silkHeight * 9);
-      box(g, silkWidth, silkHeight, .012, dark ? 0xa49c80 : 0xb9ae94, 0, .05, d / 2 - .006,
-        { bumpMap: weave, bumpScale: .0007, roughness: .91 });
+      const brocadeMap = (channel) => {
+        const map = new T.TextureLoader().load(new URL("./materials/brocade-" + channel + ".webp", import.meta.url).href);
+        textures.push(map);
+        map.wrapS = map.wrapT = T.RepeatWrapping;
+        map.repeat.set(silkWidth / .28, silkHeight / .284);
+        map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        if (channel === "color") map.colorSpace = T.SRGBColorSpace;
+        return map;
+      };
+      box(g, silkWidth, silkHeight, .012, dark ? 0xd4cdb7 : 0xd1c6aa, 0, .05, d / 2 - .006,
+        {map: brocadeMap("color"), normalMap: brocadeMap("normal"), roughnessMap: brocadeMap("rough"),
+          normalScale: new T.Vector2(.25,.25), roughness: .85});
       box(g, silkWidth, .014, .018, 0x504639, 0, silkHeight / 2 + .05, d / 2);
       {
         const height = -silkHeight / 2 + .05;
@@ -186,6 +192,7 @@ export function gallery(host, works, onPick, onMove) {
       animated.push({ img, ctx: c.getContext("2d"), tex });
     } else if (a.type === "圖片") tex = new T.TextureLoader().load(a.src);
     else tex = labelTexture(a);
+    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     tex.colorSpace = T.SRGBColorSpace;
     textures.push(tex);
     let face = new T.Mesh(
@@ -195,7 +202,7 @@ export function gallery(host, works, onPick, onMove) {
         roughness: 0.92,
         emissive: 0xffffff,
         emissiveMap: tex,
-        emissiveIntensity: 0.17,
+        emissiveIntensity: 0.045,
       }),
     );
     face.position.z = d / 2 + 0.012;

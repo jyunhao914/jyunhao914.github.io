@@ -176,7 +176,7 @@ async function enter() {
   document.querySelector(".hero").hidden = true;
   $("stage").textContent = "正在開啟 3D 展廳…";
   try {
-    let { gallery } = await import("./gallery.js?v=plans4");
+    let { gallery } = await import("./gallery.js?v=surface5");
     if (n === seq)
       viewer = gallery(
         $("stage"),

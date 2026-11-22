@@ -25,3 +25,7 @@ https://polyhaven.com/a/shady_patch
 Creative Commons CC0 1.0 Universal. The woodland.webp derivative is a
 2048 × 1024 equirectangular sRGB image from the original HDR panorama;
 exposure and foliage saturation have been adjusted for the gallery windows.
+
+Wood Floor (Dimitrios Savva), 1.70 m scan. https://polyhaven.com/a/wood_floor
+Quatrefoil Jacquard Fabric (colormass and Rico Cilliers), 0.28 m scan; diffuse recolored for scroll mounting. https://polyhaven.com/a/quatrefoil_jacquard_fabric
+Both assets are CC0.
