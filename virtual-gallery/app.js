@@ -177,7 +177,7 @@ async function enter() {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=stick18");
+    let { gallery } = await import("./gallery.js?v=hud19");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -222,6 +222,53 @@ $("stage").addEventListener("viewreset", () => {
   menu(false);
 });
 const visit = $("visit");
+const activePointers = new Set();
+let idleTimer, wakeTap, keyboardFocus=false;
+function fullView() {
+  return document.fullscreenElement === visit || visit.classList.contains("expanded");
+}
+function revealControls() {
+  clearTimeout(idleTimer);
+  visit.classList.remove("controls-idle");
+  if (fullView() && !activePointers.size && $("visitMenu").hidden) {
+    idleTimer=setTimeout(()=>{
+      if (fullView() && !activePointers.size && $("visitMenu").hidden &&
+          !(keyboardFocus && visit.contains(document.activeElement) && document.activeElement.matches("button,input,select,summary,a")))
+        visit.classList.add("controls-idle");
+    },2500);
+  }
+}
+visit.addEventListener("pointerdown", e=>{
+  keyboardFocus=false;
+  if(!fullView()) return;
+  if(visit.classList.contains("controls-idle") && e.target.tagName==="CANVAS" && e.pointerType==="touch")
+    wakeTap={id:e.pointerId,x:e.clientX,y:e.clientY};
+  activePointers.add(e.pointerId);
+  revealControls();
+},true);
+visit.addEventListener("pointermove", e=>{
+  if(!fullView())return;
+  if(wakeTap?.id===e.pointerId && Math.hypot(e.clientX-wakeTap.x,e.clientY-wakeTap.y)>8)wakeTap=null;
+  revealControls();
+},{passive:true});
+function endInteraction(e) {
+  if(!activePointers.delete(e.pointerId))return;
+  if(wakeTap?.id===e.pointerId){
+    if(e.type==="pointerup")e.preventDefault();
+    wakeTap=null;
+  }
+  revealControls();
+}
+window.addEventListener("pointerup",endInteraction,true);
+window.addEventListener("pointercancel",endInteraction,true);
+document.addEventListener("keydown",e=>{if(e.key==="Tab")keyboardFocus=true; if(fullView())revealControls()},true);
+visit.addEventListener("focusin",()=>{if(fullView())revealControls()});
+function resetControls() {
+  activePointers.clear();
+  wakeTap=null;
+  revealControls();
+}
+window.addEventListener("blur",resetControls);
 $("scrollPosition").oninput = e => viewer?.seek(Number(e.target.value)/1000);
 $("overview").onclick = () => viewer?.overview();
 function showFocus(a) {
@@ -241,12 +288,14 @@ function showFocus(a) {
 }
 function menu(open) {
   $("visitMenu").hidden = !open;
+  revealControls();
   if(!open && !$("visit").hidden) $("stage").querySelector("canvas")?.focus({preventScroll:true});
   $("menuButton").setAttribute("aria-expanded", String(open));
 }
 $("menuButton").onclick = () => menu($("visitMenu").hidden);
 $("tour").addEventListener("change", () => menu(false));
 function syncExpand() {
+  resetControls();
   $("expand").textContent =
     document.fullscreenElement === visit || visit.classList.contains("expanded")
       ? "退出全螢幕"

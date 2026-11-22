@@ -490,10 +490,6 @@ body.visiting {
 #visit.immersive .walk-pad {
   bottom: max(18px, env(safe-area-inset-bottom));
 }
-#visit.expanded .museum-head #visitTitle,
-#visit:fullscreen .museum-head #visitTitle {
-  visibility: hidden;
-}
 
 #visit.immersive #stage { background-color: #dedbd2; }
 
@@ -527,3 +523,11 @@ body.visiting {
 #stage{touch-action:none}
 .touch-motion{display:none}
 @media(any-pointer:coarse){.touch-motion{display:block;margin-bottom:8px}.view-caption{max-width:calc(100% - 122px)}}
+
+.reading-hud {position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));display:flex;flex-direction:column-reverse;align-items:flex-end;gap:6px;max-width:calc(100% - 106px);pointer-events:none}
+.reading-hud .view-caption,.reading-hud #inspectControls {position:static;max-width:100%;box-sizing:border-box}
+.reading-hud #inspectControls{pointer-events:auto;flex-wrap:wrap}
+#visit:is(:fullscreen,.expanded) :is(.museum-head,.reading-hud,.walk-pad) {transition:opacity .2s ease}
+#visit.controls-idle :is(.museum-head,.reading-hud,.walk-pad) {opacity:0;visibility:hidden;transition:opacity .2s ease,visibility 0s .2s}
+#visit.controls-idle,#visit.controls-idle canvas {cursor:none}
+@media(prefers-reduced-motion:reduce){#visit:is(:fullscreen,.expanded) :is(.museum-head,.reading-hud,.walk-pad){transition:none}}

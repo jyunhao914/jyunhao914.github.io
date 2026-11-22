@@ -377,6 +377,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
   canvas.tabIndex = 0;
   canvas.setAttribute("aria-label", "展廳視角，可拖曳環視或點地板前往");
   canvas.onpointerup = (e) => {
+    if (e.defaultPrevented) { drag=null; return; }
     if (!drag || drag.pointer !== e.pointerId) return;
     const dx = e.clientX - drag.startX,
       dy = e.clientY - drag.startY;
@@ -428,7 +429,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}) {
     cam.rotation.y+=yaw;
     cam.rotation.x=T.MathUtils.clamp(cam.rotation.x+pitch,-1.2,1.2);
   }
-  const mobile = !onMove && (navigator.maxTouchPoints>0 || matchMedia("(pointer:coarse)").matches)
+  const mobile = !onMove
     ? mobileControls(host,turn,()=>Boolean(travel || guide>=0 || drag)) : null;
   const shortcuts={KeyW:"前進",KeyS:"後退",KeyA:"左移",KeyD:"右移",
     ArrowUp:"前進",ArrowDown:"後退",ArrowLeft:"左移",ArrowRight:"右移"};
