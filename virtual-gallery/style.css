@@ -1,5 +1,4 @@
 :root {
-  font-family: Inter, "PingFang TC", "Microsoft JhengHei", sans-serif;
   color: #192d42;
   background: #f5f6f6;
   font-size: 16px;
@@ -25,7 +24,6 @@ header {
   background: white;
 }
 header strong {
-  font-family: Georgia, serif;
   font-size: 22px;
 }
 header nav,
@@ -73,10 +71,6 @@ h2,
 h3,
 p {
   margin: 0 0 12px;
-}
-h1,
-h2 {
-  font-family: Georgia, "Songti TC", serif;
 }
 h1 {
   font-size: clamp(40px, 5vw, 80px);
@@ -318,9 +312,6 @@ section {
 #visit .row {
   gap: 8px;
 }
-#visitTitle {
-  font-family: Georgia, "Songti TC", serif;
-}
 #stage {
   height: clamp(360px, 68dvh, 900px);
   background: #c9c8c0;
@@ -556,3 +547,32 @@ body.visiting {
 #visit.controls-idle .walk-stick {pointer-events:auto}
 #visit.controls-idle.stick-active .walk-pad {opacity:1}
 @media(hover:hover){#visit.controls-idle .walk-pad:has(.walk-stick:hover){opacity:1}}
+
+/* Public entrance and individual room doors */
+header nav a {display:inline-flex;align-items:center;min-height:44px;text-decoration:none}
+header nav a[aria-current="page"] {box-shadow:inset 0 -2px #26445a;font-weight:650}
+#hallEntrance {margin:clamp(18px,4.5vw,70px) 0 clamp(40px,6vw,90px)}
+.entrance-heading {display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:clamp(18px,3vw,34px);border-bottom:1px solid #b6c3c8}
+.entrance-heading h1 {margin:0 0 18px;font-size:clamp(2.1rem,4.8vw,4.25rem);font-weight:750;line-height:1.1;letter-spacing:.012em}
+.entrance-heading p {font-size:.9rem;color:#415664;white-space:nowrap}
+#hallList {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(14px,2vw,30px)}
+.hall-door {min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:start;align-items:center;overflow:hidden;background:white;border:1px solid #cdd5d8;border-radius:5px;text-decoration:none;color:#193247}
+.hall-door:focus-visible {outline-offset:3px}
+.hall-door:hover {border-color:#576e77}
+.hall-picture {grid-column:1/-1;aspect-ratio:1.95;overflow:hidden;background:linear-gradient(110deg,#283d48,#506066 55%,#899396)}
+.hall-picture img {display:block;width:100%;height:100%;object-fit:cover;object-position:50% 44%}
+.hall-caption {min-width:0;padding:16px 4px 17px 18px}
+.hall-caption h2 {margin:0 0 4px;font-size:clamp(1.2rem,2vw,1.65rem);line-height:1.25;font-weight:700;overflow-wrap:anywhere}
+.hall-caption p {margin:0;font-size:.86rem;color:#4a616d;overflow-wrap:anywhere}
+.door-action {padding:10px 16px 10px 5px;white-space:nowrap;font-size:.85rem;font-weight:650;color:#26485f}
+#visit #backToEntrance {width:100%;margin:0 0 10px;min-height:44px;font-weight:650}
+@media(max-width:960px) {#hallList {grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px) {
+  #hallList {grid-template-columns:1fr;gap:12px}
+  #hallEntrance {margin-top:20px}
+  .hall-door {grid-template-columns:clamp(77px,23vw,120px) minmax(0,1fr) auto;align-content:stretch;min-height:96px}
+  .hall-picture {grid-column:auto;align-self:stretch;min-height:100%;aspect-ratio:auto;position:relative}
+  .hall-picture img {position:absolute;inset:0}
+  .hall-caption {padding:14px 2px 14px 12px}
+  .door-action {padding:6px 10px 6px 4px;font-size:.76rem}
+}

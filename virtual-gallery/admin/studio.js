@@ -2,7 +2,7 @@ import { exhibitionCheck } from "./exhibition-check.js?v=desk33";
 import { mountEditor, paintWallMount } from "./mount-editor.js?v=desk33";
 import { mountTemplates } from "./mount-templates.js?v=desk33";
 import { readDimensions } from "./dimensions.js";
-import * as wallTools from "./wall-tools.js?v=desk33";
+import * as wallTools from "./wall-tools.js?v=hall34";
 import {roomSize} from "../room-size.js?v=desk33";
 import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
 import { state, post, versions, exhibition } from "./storage.js?v=desk33";
@@ -12,7 +12,7 @@ const $ = (s) => document.querySelector(s),
 const workspaceViews = {
   "展覽管理": "exhibitions",
   "作品資料庫": "library",
-  "布展編輯": "desk",
+  "佈展設定": "desk",
   "備份與版本": "backup",
 };
 const requestedView = new URLSearchParams(location.search).get("view");
@@ -196,7 +196,7 @@ function syncWorkspaceNav() {
           tab = name;
           render();
         }
-        if (tab !== "布展編輯") window.scrollTo(0, 0);
+        if (tab !== "佈展設定") window.scrollTo(0, 0);
       };
       nav.append(button);
     }
@@ -204,10 +204,10 @@ function syncWorkspaceNav() {
   for (const button of nav.children) button.setAttribute("aria-current", String(button.textContent === tab));
   document.title = tab + "｜虛擬策展工作室";
   const route = new URL(location.href);
-  if (tab !== "布展編輯") {
+  if (tab !== "佈展設定") {
     for (const key of ["layout", "work", "panel"]) route.searchParams.delete(key);
   }
-  if (tab === "展覽管理" || (tab === "布展編輯" && route.searchParams.has("layout"))) route.searchParams.delete("view");
+  if (tab === "展覽管理" || (tab === "佈展設定" && route.searchParams.has("layout"))) route.searchParams.delete("view");
   else route.searchParams.set("view", workspaceViews[tab]);
   if (route.href !== location.href) history.replaceState(null, "", route);
 }
@@ -221,7 +221,7 @@ function render() {
   syncWorkspaceNav();
   if (tab === "作品資料庫") library();
   else if (tab === "展覽管理") manage();
-  else if (tab === "布展編輯") {
+  else if (tab === "佈展設定") {
     layout();
     const panel=$("#layout-inspector");
     if(panel) {
@@ -352,7 +352,7 @@ function library() {
     finally {input.value="";}
   };
   action("delete",()=>{
-    if(!confirm("刪除「"+a.title+"」及其布展位置？"))return;
+    if(!confirm("刪除「"+a.title+"」及其佈展位置？"))return;
     db.arts=db.arts.filter(x=>x.id!==a.id);
     db.shows.forEach(s=>{s.ids=s.ids.filter(i=>i!==a.id);delete s.layout[a.id];});
     aid=db.arts[0]?.id;libraryDetailOpen=false;
@@ -439,7 +439,7 @@ function manage() {
   const published = s.status === "已發布";
   $("#form").innerHTML = '<section class="show-overview"><span class="show-status"></span><h2 id="show-title" tabindex="-1"></h2>' +
     '<p class="catalog-meta"><span id="show-dates"></span> · <span id="show-count"></span></p>' +
-    '<div class="catalog-actions">'+btn("layout","進入布展")+btn("preview","參觀預覽")+btn("publish",published?"更新公開展覽":"發布展覽") +
+    '<div class="catalog-actions">'+btn("layout","進入佈展")+btn("preview","參觀預覽")+btn("publish",published?"更新公開展覽":"發布展覽") +
     '</div><p id="show-first-work" class="catalog-empty" hidden></p>' +
     (published ? '<a class="live-exhibition" target="_blank" rel="noopener noreferrer" href="../#'+encodeURIComponent(s.id)+'">查看公開展覽</a>' : '') + '</section>' +
     '<details class="catalog-section" id="show-check"><summary>展前檢查 <small id="check-count"></small></summary>'+
@@ -476,7 +476,7 @@ function manage() {
       libraryDetailOpen=true;
       search=filter="";
     } else {
-      tab="布展編輯";
+      tab="佈展設定";
       deskTool="position";
     }
     openReviewShow=s.id;
@@ -568,7 +568,7 @@ function manage() {
     $("#members").innerHTML=btn("to-library","前往作品資料庫");
     action("to-library",()=>{libraryDetailOpen=false;tab="作品資料庫";render();});
   }
-  action("layout",()=>{tab="布展編輯";if(!s.ids.includes(aid))aid=s.ids[0];render();});
+  action("layout",()=>{tab="佈展設定";if(!s.ids.includes(aid))aid=s.ids[0];render();});
   action("preview",()=>previewShow(s));
   action("copy",()=>{
     const clone=structuredClone(s);
@@ -660,7 +660,7 @@ let deskTool=Object.hasOwn(deskTools,requestedTool) ? requestedTool : "position"
 const lightFields=["lx","ly","lz","power","kelvin","angle"];
 let rulerPreference=null;
 matchMedia("(orientation:landscape) and (max-height:550px)").addEventListener("change",event=>{
-  if(event.matches && tab==="布展編輯")requestAnimationFrame(()=>$("#wall-preview")?.scrollIntoView({block:"start"}));
+  if(event.matches && tab==="佈展設定")requestAnimationFrame(()=>$("#wall-preview")?.scrollIntoView({block:"start"}));
 });
 function showDeskRulers() {
   const button=$("#ruler-toggle"), readout=$(".wall-readout");
@@ -703,15 +703,15 @@ function layout(keepScene=false) {
   const toolButtons=Object.entries(deskTools).map(([key,label])=>
     '<button type="button" role="tab" id="'+(key==="mount"?"jump-mount":"desk-tab-"+key)+'" data-desk-tool="'+key+'" aria-controls="desk-panel-'+key+'">'+label+'</button>').join("");
   if(!keepScene) app.innerHTML =
-    '<div class="desk-heading"><h1>布展編輯</h1><label>展覽<select id="ex"></select></label></div>'+
+    '<div class="desk-heading"><h1>佈展設定</h1><label>展覽<select id="ex"></select></label></div>'+
     '<div class="hanging-desk"><section id="wall-preview" aria-label="即時展牆預覽"><div class="surface-tools">'+
     '<div class="desk-view-modes" role="group" aria-label="展牆視圖">'+btn("3D","3D 實景")+btn("2D","2D 展牆")+'</div>'+
     (mode==="3D" && a ? '<button id="ruler-toggle" aria-pressed="true">隱藏尺標</button>' : '')+
     btn("preview","參觀預覽")+'</div><div id="surface"></div>'+
     '<div class="wall-save"><span role="status" id="wall-save-status"></span><button id="wall-save-retry" data-save-retry hidden>重試儲存</button></div></section>'+
     '<div class="desk-sidebar"><div class="desk-work-picker"><label for="sel">編輯作品</label><select id="sel"></select></div>'+
-    '<div class="desk-tool-tabs" role="tablist" aria-label="布展工具">'+toolButtons+'</div>'+
-    '<div id="layout-inspector" role="region" aria-label="布展工具內容" tabindex="-1"><section id="desk-panel-inventory" class="inventory" role="tabpanel" aria-labelledby="desk-tab-inventory" data-desk-panel="inventory">'+
+    '<div class="desk-tool-tabs" role="tablist" aria-label="佈展工具">'+toolButtons+'</div>'+
+    '<div id="layout-inspector" role="region" aria-label="佈展工具內容" tabindex="-1"><section id="desk-panel-inventory" class="inventory" role="tabpanel" aria-labelledby="desk-tab-inventory" data-desk-panel="inventory">'+
     '<p id="wall-progress"></p><div id="wall-list"></div></section><div id="form"></div></div></div></div>';
   function activateTool(key,resetScroll=false) {
     deskTool=key;
@@ -840,7 +840,7 @@ function layout(keepScene=false) {
         showDeskRulers();
       };
       let t = token;
-      import("../gallery.js?v=desk33")
+      import("../gallery.js?v=hall34")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(
@@ -1085,7 +1085,7 @@ function layout(keepScene=false) {
   $("#form").onchange=(e)=>{
     const key=e.target.closest("[data-key]")?.dataset.key;
     if(!key || lightFields.includes(key))return;
-    setTimeout(()=>{if(tab==="布展編輯") {
+    setTimeout(()=>{if(tab==="佈展設定") {
       if(["x","y","z","rotate"].includes(key))refreshPlacement();else render();
     }},0);
   };
@@ -1154,7 +1154,7 @@ async function refreshRestored() {
 }
 function backup() {
   app.innerHTML='<section class="catalog-desk backup-desk"><div class="catalog-heading"><h1>備份與版本</h1></div>'+
-    '<section class="backup-card"><h2>匯出工作室</h2><p>下載作品原檔、展覽與私人布展設定，保存至裝置或 Google Drive。</p>'+
+    '<section class="backup-card"><h2>匯出工作室</h2><p>下載作品原檔、展覽與私人佈展設定，保存至裝置或 Google Drive。</p>'+
     btn("export","下載完整備份")+'</section>'+
     '<details class="catalog-section" id="restore-file-panel"><summary>從備份檔還原</summary><p>選擇完整工作室備份，確認後取代目前資料。</p>'+
     '<label>選擇備份檔<input id="import" type="file" accept=".json"></label></details>'+
@@ -1247,7 +1247,7 @@ if(requested) {
     sid=draft.id;
     aid=workId ? (draft.ids.includes(selected) ? selected : null) : draft.ids[0];
     if(workId && !aid)unmatchedEntry=sid;
-    tab="布展編輯";
+    tab="佈展設定";
   }
 }
 

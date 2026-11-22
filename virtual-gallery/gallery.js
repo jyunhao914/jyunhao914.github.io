@@ -5,6 +5,8 @@ import * as T from "./vendor/three.module.js";
 import {mountRenderer, disposeMount} from "./mount-render.js?v=desk33";
 import { architecture } from "./architecture.js?v=mount32";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
+  const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";
+  const canvasFont=(px,weight)=>weight+" "+px+"px "+family;
   const scene = new T.Scene(),
     cam = new T.PerspectiveCamera(
       64,
@@ -83,6 +85,26 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
       -Math.sin(ang) * a.x - Math.cos(ang) * depth,
     );
   }
+  // Keep the original glyph proportions. Long titles and credits wrap to the panel's physical width.
+  function drawLines(ctx,value,x,y,width,leading,limit) {
+    const lines=[];
+    let line="",overflow=false;
+    for(const char of String(value ?? "").replace(/\r\n?/g,"\n")) {
+      if(char==="\n" || (line && ctx.measureText(line+char).width>width)) {
+        lines.push(line);
+        if(lines.length===limit){overflow=true;break;}
+        line=char==="\n" ? "" : char;
+      } else line+=char;
+    }
+    if(!overflow && line)lines.push(line);
+    if(overflow) {
+      const chars=Array.from(lines[limit-1]);
+      while(chars.length && ctx.measureText(chars.join("")+"…").width>width)chars.pop();
+      lines[limit-1]=chars.join("")+"…";
+    }
+    for(const text of lines){ctx.fillText(text,x,y);y+=leading;}
+    return y;
+  }
   function labelTexture(a) {
     let c = document.createElement("canvas");
     c.width = 768;
@@ -91,14 +113,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     ctx.fillStyle = "#eae8e0";
     ctx.fillRect(0, 0, 768, 512);
     ctx.fillStyle = "#16334b";
-    ctx.font = "40px serif";
-    ctx.fillText(a.title, 36, 150, 690);
-    ctx.font = "25px sans-serif";
-    Array.from(a.description || "")
-      .join("")
-      .match(/.{1,22}/gu)
-      ?.slice(0, 7)
-      .forEach((v, i) => ctx.fillText(v, 36, 210 + i * 38, 690));
+    ctx.font = canvasFont(30,700);
+    const afterTitle=drawLines(ctx,a.title,36,76,696,40,2);
+    ctx.font = canvasFont(30,400);
+    const bodyY=afterTitle+14;
+    drawLines(ctx,a.description,36,bodyY,696,40,Math.floor((480-bodyY)/40)+1);
     return new T.CanvasTexture(c);
   }
   function mountedSurfaceTarget(g,a,spec) {
@@ -194,10 +213,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools) {
     tc.fillStyle = "#edeade";
     tc.fillRect(0, 0, 512, 190);
     tc.fillStyle = "#202b31";
-    tc.font = "bold 44px sans-serif";
-    tc.fillText(a.title, 22, 75, 465);
-    tc.font = "26px sans-serif";
-    tc.fillText(a.artist || a.type, 24, 133, 462);
+    tc.font = canvasFont(32,700);
+    const creditY=drawLines(tc,a.title,24,41,464,39,2)+12;
+    tc.font = canvasFont(32,400);
+    drawLines(tc,a.artist || a.type,24,creditY,464,39,2);
     const tagTex = new T.CanvasTexture(tag);
     tagTex.colorSpace = T.SRGBColorSpace;
     textures.push(tagTex);

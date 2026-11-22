@@ -1,5 +1,5 @@
 import { roomSize } from "../room-size.js?v=desk33";
-import { bounds } from "./wall-tools.js?v=desk33";
+import { bounds } from "./wall-tools.js?v=hall34";
 
 const taipeiDate = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" });
 const mediaTypes = new Set(["圖片", "動態", "影片", "語音"]);

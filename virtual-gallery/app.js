@@ -91,15 +91,16 @@ function leave() {
   $("visit").classList.remove("immersive", "expanded");
   document.body.classList.remove("visiting");
   menu(false);
-  if (document.fullscreenElement === $("visit"))
-    document.exitFullscreen().catch(() => {});
+  const exit=document.fullscreenElement === $("visit") ? document.exitFullscreen().catch(()=>{}) : null;
   $("expand").textContent = "放大展廳";
   seq++;
   viewer?.dispose();
   viewer = null;
+  $("stage").replaceChildren();
   $("visit").hidden = true;
   document.querySelector(".hero").hidden = false;
   $("music").pause();
+  return exit;
 }
 function updateEditLink(work) {
   const params=new URLSearchParams({layout:current.id});
@@ -134,7 +135,7 @@ function draw() {
     caption.append(node("small",[a.room,a.category || a.type].filter(Boolean).join(" · ")),
       node("strong",a.title),node("span","到展牆看 →"));
     visitButton.append(media(a,true),caption);
-    visitButton.onclick=()=>enter(a.id);
+    visitButton.onclick=()=>openRoom(current,a.room,a.id);
     info.className="card-info";
     info.setAttribute("aria-label","《"+a.title+"》作品資料");
     info.onclick=()=>detail(a);
@@ -183,7 +184,7 @@ function offerCatalogue(message) {
   notice.className="gallery-fallback";
   const browse=node("button","查看展出作品");
   browse.onclick=()=>{
-    leave();
+    openCatalogue();
     $("cards").querySelector(".card-info")?.focus();
   };
   notice.append(node("p",message),browse);
@@ -194,6 +195,8 @@ function offerCatalogue(message) {
 async function enter(workId) {
   const target=current.works.find(work=>work.id===workId);
   if(target)$("room").value=target.room;
+  if(!privatePreview)lastDoor=Array.from($("hallList").children).find(card=>
+    card.dataset.show===current.id && card.dataset.room===$("room").value);
   let n = ++seq;
   viewer?.dispose();
   viewer = null;
@@ -213,7 +216,7 @@ async function enter(workId) {
   $("stage").textContent = "正在開啟 3D 展廳…";
   $("stage").focus({preventScroll:true});
   try {
-    let { gallery } = await import("./gallery.js?v=desk33");
+    let { gallery } = await import("./gallery.js?v=hall34");
     if (n === seq)
       viewer = gallery(
         $("stage"),
@@ -249,9 +252,9 @@ async function enter(workId) {
     console.error(e);
   }
 }
-$("enter").onclick = () => enter();
-$("room").onchange = () => enter();
-$("leave").onclick = leave;
+$("enter").onclick = () => openRoom(current,$("room").value);
+$("room").onchange = () => openRoom(current,$("room").value);
+$("leave").onclick = openCatalogue;
 for (const [name, step] of [
   ["prev", -1],
   ["next", 1],
@@ -421,6 +424,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
 const embeddedPreview = location.search === "?studio-preview" && parent !== window;
+const privatePreview = embeddedPreview || location.pathname.startsWith("/preview/");
 let previewWork;
 async function loadExhibitions() {
   if (embeddedPreview) {
@@ -439,16 +443,127 @@ async function loadExhibitions() {
   return (await response.json()).filter(valid);
 }
 
-function selectShow(index, openHall, work) {
-  current = shows[index];
-  $("shows").value = $("visitShows").value = String(index);
-  draw();
-  if(openHall)enter(work);
+// Keep existing exhibition bookmarks and express an individual room independently of its title.
+function visitUrl(show, room, view, work) {
+  const url=new URL(location.href);
+  for (const key of ["room","view","work"]) url.searchParams.delete(key);
+  if(room && show?.works.some(a=>a.room!==room))url.searchParams.set("room",room);
+  if(view)url.searchParams.set("view",view);
+  if(work)url.searchParams.set("work",work);
+  url.hash=show ? encodeURIComponent(show.id) : "";
+  return url;
 }
+function showCatalogue(visible) {
+  for(const el of [document.querySelector(".hero"),$("exhibits"),$("works"),$("cards"),$("worksLink")])el.hidden=!visible;
+}
+let lastRoute, lastDoor;
+function showEntrance() {
+  const returning=$("hallEntrance").hidden;
+  const exit=leave();
+  showCatalogue(false);
+  $("hallEntrance").hidden=false;
+  document.title="展廳入口｜虛擬策展工作室";
+  $("entranceLink").setAttribute("aria-current","page");
+  if(returning)restorePageFocus(lastDoor?.isConnected ? lastDoor : $("entranceTitle"),exit);
+}
+function restorePageFocus(target,exit) {
+  const focus=()=>{if(target.getClientRects().length)target.focus({preventScroll:true});};
+  if(exit)exit.then(()=>requestAnimationFrame(focus));
+  else focus();
+}
+function displayShow(show,room,work,catalogue) {
+  $("hallEntrance").hidden=true;
+  $("entranceLink").removeAttribute("aria-current");
+  if(current!==show) {
+    current=show;
+    $("shows").value=$("visitShows").value=String(shows.indexOf(show));
+    draw();
+  }
+  if(room && show.works.some(a=>a.room===room))$("room").value=room;
+  else $("room").selectedIndex=0;
+  document.title=show.title+"｜虛擬策展工作室";
+  if(catalogue) {
+    const exit=leave();
+    showCatalogue(true);
+    restorePageFocus($("enter"),exit);
+    window.scrollTo(0,0);
+  } else {
+    showCatalogue(false);
+    enter(work);
+  }
+}
+function applyRoute() {
+  if(!shows.length || lastRoute===location.href || privatePreview)return;
+  lastRoute=location.href;
+  const params=new URLSearchParams(location.search);
+  const show=shows.find(s=>"#"+encodeURIComponent(s.id)===location.hash);
+  if(show)displayShow(show,params.get("room"),params.get("work"),params.get("view")==="works");
+  else if(["#exhibits","#works"].includes(location.hash)) {
+    displayShow(current || shows[0],null,null,true);
+    if(location.hash==="#works")$("works").scrollIntoView();
+  } else showEntrance();
+}
+function go(url) {
+  if(url.href!==location.href)history.pushState(null,"",url);
+  applyRoute();
+}
+function openRoom(show,room,work) {
+  if(privatePreview)displayShow(show,room,work,false);
+  else go(visitUrl(show,room,null,work));
+}
+function openCatalogue() {
+  if(privatePreview)displayShow(current,$("room").value,null,true);
+  else go(visitUrl(current,$("room").value,"works"));
+}
+function linkAction(event,action) {
+  if(event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)return;
+  event.preventDefault();
+  action();
+}
+function drawEntrance() {
+  const list=$("hallList");
+  list.replaceChildren();
+  for(const show of shows) {
+    const rooms=new Map();
+    for(const work of show.works) {
+      if(!rooms.has(work.room))rooms.set(work.room,[]);
+      rooms.get(work.room).push(work);
+    }
+    for(const [room,works] of rooms) {
+      const name=room || show.title;
+      const card=node("a"), picture=node("div"), caption=node("div");
+      card.className="hall-door";card.dataset.show=show.id;card.dataset.room=room || "";
+      card.href=visitUrl(show,room);
+      card.setAttribute("aria-label","進入"+name+(show.title===name ? "" : " · "+show.title));
+      card.onclick=e=>linkAction(e,()=>openRoom(show,room));
+      picture.className="hall-picture";
+      picture.setAttribute("aria-hidden","true");
+      const cover=works.find(a=>a.type==="圖片" && a.src);
+      if(cover) {
+        const img=node("img");
+        img.alt="";img.decoding="async";img.loading=list.children.length<2 ? "eager" : "lazy";
+        img.src=cover.tiles?.length ? cover.tiles[Math.floor(cover.tiles.length/2)] : cover.src;
+        picture.append(img);
+      }
+      caption.className="hall-caption";
+      caption.append(node("h2",name),node("p",[show.title!==name ? show.title : "",works.length+" 件作品"].filter(Boolean).join(" · ")));
+      const enterText=node("span","進入展廳 →");enterText.className="door-action";
+      card.append(picture,caption,enterText);list.append(card);
+    }
+  }
+  $("hallStatus").textContent="開放參觀 · "+list.childElementCount+" 個展廳";
+}
+$("entranceLink").href=visitUrl();
+$("entranceLink").onclick=e=>linkAction(e,()=>go(visitUrl()));
+$("backToEntrance").onclick=()=>go(visitUrl());
+$("worksLink").onclick=e=>linkAction(e,()=>$("works").scrollIntoView());
+window.addEventListener("popstate",applyRoute);
+window.addEventListener("hashchange",applyRoute);
 
 function collectionStatus(message, retry) {
   leave();
-  for(const el of [document.querySelector(".hero"),$("exhibits"),$("works"),$("cards")])el.hidden=true;
+  showCatalogue(false);
+  $("hallEntrance").hidden=true;
   const panel=$("collection-status") || node("section");
   panel.id="collection-status";
   panel.setAttribute("role","status");
@@ -467,23 +582,23 @@ function collectionStatus(message, retry) {
 
 async function openCollection() {
   try {
-    shows=await loadExhibitions();
+    shows=(await loadExhibitions()).filter(s=>s.works?.length);
     if(!shows.length) {
       collectionStatus("目前休展",false);
       return;
     }
     $("collection-status")?.remove();
-    for(const el of [$("exhibits"),$("works"),$("cards")])el.hidden=false;
+    $("backToEntrance").hidden=$("entranceLink").hidden=privatePreview;
     for(const control of [$("shows"),$("visitShows")]) {
       control.replaceChildren(...shows.map((s,i)=>new Option(s.title,i)));
       control.onchange=()=>{
-        selectShow(Number(control.value),control===$("visitShows"));
-        if(!embeddedPreview)history.replaceState(null,"","#"+encodeURIComponent(current.id));
+        const show=shows[Number(control.value)], catalogue=control===$("shows");
+        if(privatePreview)displayShow(show,null,null,catalogue);
+        else go(visitUrl(show,null,catalogue ? "works" : null));
       };
     }
-    const offlinePreview=location.pathname.startsWith("/preview/");
-    const work=offlinePreview ? new URLSearchParams(location.search).get("work") : previewWork;
-    selectShow(Math.max(0,shows.findIndex(s=>"#"+encodeURIComponent(s.id)===location.hash)),true,work);
+    if(privatePreview)displayShow(shows[0],null,previewWork || new URLSearchParams(location.search).get("work"),false);
+    else {drawEntrance();applyRoute();}
   } catch {
     collectionStatus("展覽資料暫時無法讀取",!embeddedPreview);
   }

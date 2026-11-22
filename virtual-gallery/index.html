@@ -4,15 +4,19 @@
   <meta charset="utf-8" /><meta
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
-  /><title>水墨畫展廳｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=work27" />
-  <link rel="modulepreload" href="gallery.js?v=desk33">
+  /><title>展廳入口｜虛擬策展工作室</title
+  ><link rel="stylesheet" href="style.css?v=hall34" />
+  <link rel="stylesheet" href="typography.css?v=hall34">
   <header>
     <strong>虛擬策展工作室</strong>
-    <nav><a href="#exhibits">展覽</a><a href="#works">典藏作品</a></nav>
+    <nav aria-label="參觀導覽"><a id="entranceLink" href="./">展廳入口</a><a id="worksLink" href="#works" hidden>展出作品</a></nav>
   </header>
   <main>
-    <section id="exhibits">
+    <section id="hallEntrance" aria-labelledby="entranceTitle">
+      <div class="entrance-heading"><h1 id="entranceTitle" tabindex="-1">展廳入口</h1><p id="hallStatus" role="status">正在讀取展廳…</p></div>
+      <div id="hallList"></div>
+    </section>
+    <section id="exhibits" hidden>
       <div class="row">
         <label>展覽選擇<select id="shows"></select></label>
       </div>
@@ -26,10 +30,10 @@
         <button id="enter">進入 3D 展廳</button>
       </div>
     </article>
-    <section id="visit" class="immersive" aria-label="3D 展廳">
+    <section id="visit" class="immersive" aria-label="3D 展廳" hidden>
       <div id="stage" tabindex="-1" aria-label="可行走的 3D 展廳">正在開啟 3D 展廳…</div>
       <div class="museum-head">
-        <h1 id="visitTitle">水墨畫展廳</h1>
+        <h1 id="visitTitle">展廳</h1>
         <button id="homeView" title="回到本廳預設視角（R）" aria-keyshortcuts="R">回到預設</button>
         <button id="expand">全螢幕</button
         ><button
@@ -52,6 +56,7 @@
       </div>
       </div>
       <div id="visitMenu" hidden>
+        <button type="button" id="backToEntrance">返回展廳入口</button>
         <div class="touch-motion"><button type="button" id="gyroTurn" aria-pressed="false">陀螺儀轉向</button> <span id="gyroStatus" role="status"></span></div>
         <small>即時畫面更新率　<output id="frameMeter">量測中</output></small>
         <details class="gesture-guide">
@@ -85,11 +90,11 @@
         /></label>
       </div>
     </section>
-    <div id="works" class="section">
+    <div id="works" class="section" hidden>
       <h2>展出作品</h2>
       <span id="count"></span>
     </div>
-    <div class="grid" id="cards"></div>
+    <div class="grid" id="cards" hidden></div>
   </main>
   <footer>
     虛擬策展工作室　線上美術館　·　<a href="admin/">線上策展後台</a>　·　<a
@@ -106,6 +111,13 @@
     // Capture the first navigation gesture while the exhibition data and WebGL module load.
     (() => {
       const stage=document.getElementById("stage"), visit=document.getElementById("visit");
+      const preview=location.search==="?studio-preview" || location.pathname.startsWith("/preview/");
+      const direct=location.hash && !["#entrance","#exhibits","#works"].includes(location.hash);
+      if(preview || direct && new URLSearchParams(location.search).get("view")!=="works") {
+        document.getElementById("hallEntrance").hidden=true;
+        visit.hidden=false;
+        stage.focus({preventScroll:true});
+      }
       let pending=[];
       let touch=null;
       stage.addEventListener("pointerdown",e=>{
@@ -137,8 +149,7 @@
         for(const event of pending) e.detail(event);
         pending=[];
       });
-      stage.focus({preventScroll:true});
     })();
   </script>
-  <script type="module" src="app.js?v=desk33"></script>
+  <script type="module" src="app.js?v=hall34"></script>
 </html>

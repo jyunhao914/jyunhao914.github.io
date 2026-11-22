@@ -1,0 +1,33 @@
+/* Use the same family list for HTML, form widgets, SVG measurements and 3D canvas textures. */
+:root {
+  font-size:max(100%, 16px) !important;
+  --gallery-font-family: "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "Heiti TC", Arial, sans-serif;
+}
+*, *::before, *::after {
+  font-family: var(--gallery-font-family) !important;
+  font-style: normal !important;
+}
+em, cite, var { font-weight: 600; }
+input::file-selector-button, input::placeholder, textarea::placeholder, video::cue {
+  font-family: var(--gallery-font-family);
+  font-style: normal;
+}
+
+/* rem follows the browser's preferred text size. Rulers use the coordinate scale of their SVG. */
+body, body :where(:not(svg, svg *)), body ::before, body ::after {
+  font-size:1rem !important;
+  letter-spacing:normal !important;
+}
+h1 {font-weight:750 !important}
+h2 {font-weight:700 !important}
+h3, h4, h5, h6 {font-weight:650 !important}
+input::file-selector-button, input::placeholder, textarea::placeholder, video::cue {
+  font-size:1rem;
+}
+@media(max-width:760px) {
+  #tabs:not(:empty) {grid-template-columns:minmax(0,4fr) minmax(0,5fr) minmax(0,4fr) minmax(0,5fr);height:auto;min-height:var(--workspace-nav-height,50px)}
+  #tabs button {min-width:0;padding-inline:0;white-space:normal;line-height:1.2}
+}
+@media(max-width:360px) {
+  #wall-preview .surface-tools button, #wall-preview .desk-view-modes button {padding-inline:3px}
+}

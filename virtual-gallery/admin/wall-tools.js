@@ -116,7 +116,7 @@ export function makeRulers(T,host,works,groups,cam) {
       element('path',{d:path,stroke:color,'stroke-width':1.4,fill:'none'});
       const mx=(s.x+t.x)/2,my=(s.y+t.y)/2;
       if(mx>=0 && mx<=w && my>=8 && my<h)
-        element('text',{x:Math.min(w-48,Math.max(48,mx)),y:my-6,'text-anchor':'middle',fill:color,stroke:'#152825','stroke-width':3,'paint-order':'stroke','font-size':12,'font-family':'system-ui'},text);
+        element('text',{x:Math.min(w-48,Math.max(48,mx)),y:my-6,'text-anchor':'middle',fill:color,stroke:'#152825','stroke-width':3,'paint-order':'stroke','font-size':12,'font-weight':600},text);
     }
   }
   return {draw,select(i){index=i;dirty=true},dirty(){dirty=true}};
