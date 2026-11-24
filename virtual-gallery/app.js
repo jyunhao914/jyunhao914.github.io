@@ -508,7 +508,7 @@ function showCatalogue(visible) {
 let lastRoute, lastDoor;
 const doors=[];
 let incomingDoor;
-function loadRoomRenderer() {return import("./gallery.js?v=arrival57");}
+function loadRoomRenderer() {return import("./gallery.js?v=arrival58");}
 const lobby=lobbyPage(door=>{
   incomingDoor=door;
   openRoom(door.show,door.room);
