@@ -54,17 +54,17 @@ export function mountPierLetters(T,root,{title,width,height,x,y,z,family,face,ed
   let label=title;
   while(glyphs.length && ctx.measureText(label).width>mask.width-22){glyphs.pop();label=glyphs.join("")+"…";}
   ctx.fillText(label,10,mask.height*.49);
-  const letters=new T.Mesh(cutLetters(T,mask,width,height,.032),[face,edge]);
+  const letters=new T.Mesh(cutLetters(T,mask,width,height,.011),[face,edge]);
   letters.name="pier-metal-letters";letters.position.set(x,y,z-.003);root.add(letters);
 
   // The wall receives the silhouette cast by the upper-left grazing light.
   const cast=document.createElement("canvas");cast.width=mask.width;cast.height=mask.height;
   const ink=cast.getContext("2d");
-  ink.shadowColor="rgba(23,15,8,.85)";ink.shadowBlur=2.4;ink.shadowOffsetX=5;ink.shadowOffsetY=3;
+  ink.shadowColor="rgba(23,15,8,.85)";ink.shadowBlur=1.7;ink.shadowOffsetX=2;ink.shadowOffsetY=1.5;
   ink.drawImage(mask,0,0);
   ink.globalCompositeOperation="source-in";ink.fillStyle="#211910";ink.fillRect(0,0,cast.width,cast.height);
   const map=new T.CanvasTexture(cast);map.colorSpace=T.SRGBColorSpace;textures.push(map);
-  const mat=new T.MeshBasicMaterial({map,transparent:true,opacity:.66,depthWrite:false});
+  const mat=new T.MeshBasicMaterial({map,transparent:true,opacity:.53,depthWrite:false});
   materials.push(mat);
   const shadow=new T.Mesh(new T.PlaneGeometry(width,height),mat);
   shadow.position.set(x,y,z+.001);root.add(shadow);

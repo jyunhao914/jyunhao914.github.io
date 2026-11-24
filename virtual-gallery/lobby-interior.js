@@ -1,4 +1,4 @@
-import {mountPierLetters} from "./pier-lettering.js?v=pier46";
+import {mountPierLetters} from "./pier-lettering.js?v=human48";
 import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=reception41";
 import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
 
@@ -165,11 +165,11 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const metal=standard({color:0x706653,metalness:.32,roughness:.57});
   const recess=standard({color:0x403e39,roughness:.92,side:T.DoubleSide});
   const entryZ=-3.08,midZ=(entryZ+wallNorth)/2+.09,entryDepth=.64,head=3.29;
-  const galleryLeft=1.60,galleryRight=4.98;
+  const galleryLeft=1.10,galleryRight=4.98;
   // Solid plan dimensions drive the section, pedestrian radius and direct-light occlusion.
   const piece=(name,x,z,width,depth,height)=>({name,x,z,width,depth,height,radius:0});
   const piers=[
-    piece("lobby-gallery-left-pier",.19,entryZ-entryDepth/2,2.82,entryDepth,head),
+    piece("lobby-gallery-left-pier",.10,entryZ-entryDepth/2,2.0,entryDepth,head),
     piece("lobby-gallery-right-pier",(galleryRight+w)/2,entryZ-entryDepth/2,w-galleryRight,entryDepth,head),
     piece("lobby-gallery-inner-left",.75,midZ,.64,.69,3.23),
     piece("lobby-gallery-inner-right",5.23,midZ,.81,.69,3.23),
@@ -187,8 +187,8 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   ];
   const rearX=(.48+w)/2,rearWidth=w-.48;
   const rearRelief=piece("lobby-gallery-north-relief",rearX,wallNorth+.128,rearWidth,.255,3.20);
-  // A floor-standing directory wall shares the stone jamb at its right edge.
-  const directorySlab=piece("lobby-directory-monolith",-.38,entryZ+.14,3.96,.25,3.82);
+  // The directory is a shallow facing fixed to the left jamb at reading height.
+  const directorySlab=piece("lobby-directory-facing",.10,entryZ+.021,1.72,.038,1.85);
   const jambs=[galleryLeft+.026,galleryRight-.026].map(x=>piece("jamb",x,entryZ-.365,.052,.31,head));
   const partition=partitionPlan(w,d,[...piers,...(doors.length?[directorySlab]:[]),...cheeks,...galleryLeaves,rearRelief,...jambs,...furnitureObstacles]),gardenBays=[];
   const openingLeft=-w+.81,openingRight=w-.82,northSill=3.19,northHead=5.97;
@@ -197,7 +197,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const partitionOcclusion=`float partitionVisibility(vec3 o,vec3 r,float limit){
     float light=1.;
     ${[...piers,
-       {x:(w-1.22)/2,z:entryZ-entryDepth/2,width:w+1.22,depth:entryDepth,low:head,height:H+.02},
+       {x:(w-.90)/2,z:entryZ-entryDepth/2,width:w+.90,depth:entryDepth,low:head,height:H+.02},
        {x:(w+.42)/2,z:(wallNorth+entryZ-entryDepth)/2,width:w-.42,depth:entryZ-entryDepth-wallNorth,low:3.23,height:3.54}
       ].map(p=>`{
       vec3 lo=vec3(${(p.x-p.width/2).toFixed(4)},${(p.low??.012).toFixed(4)},${(p.z-p.depth/2).toFixed(4)})-o;
@@ -554,14 +554,12 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     const mat=b.name.includes("reception")?darkVeneer:b.name.includes("inner")?innerStone:portalStone;
     box(world,mat,b.width,b.height,b.depth,b.x,b.height/2,b.z,b.name);
   }
-  const beamWidth=w+1.22,beamMid=(w-1.22)/2;
+  const beamWidth=w+.90,beamMid=(w-.90)/2;
   box(world,portalStone,beamWidth,H-head+.015,entryDepth,beamMid,(H+head)/2,entryZ-entryDepth/2,"lobby-gallery-stone-lintel");
   if(doors.length){
     const slab=directorySlab;
-    // Set back the dark plinth and mounting bed to articulate the slab perimeter.
-    box(world,recess,slab.width-.10,.11,slab.depth-.05,slab.x,.055,slab.z);
-    box(world,bronze,slab.width-.04,slab.height-.14,.045,slab.x,slab.height/2+.045,entryZ+.011);
-    box(world,pierStone,slab.width,slab.height-.11,slab.depth,slab.x,(slab.height+.11)/2,slab.z,slab.name);
+    box(world,recess,slab.width-.02,slab.height-.02,.009,slab.x,1.56,entryZ+.004);
+    box(world,pierStone,slab.width,slab.height,slab.depth,slab.x,1.56,slab.z,slab.name);
   }
   const portalFrame=standard({color:0x433d37,metalness:.28,roughness:.44});
   for(const x of [galleryLeft+.026,galleryRight-.026]){
@@ -600,8 +598,8 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
 
   // At the welcome bay the ashlar datum becomes a dark timber canopy. Wide vertical
   // cuts above it are seen in relief from both the threshold and the reception desk.
-  box(world,darkVeneer,w-2.36,.28,.40,(-w-2.36)/2,2.98,entryZ-.15,"lobby-reception-canopy");
-  box(world,bronze,w-2.36,.035,.26,(-w-2.36)/2,3.125,entryZ-.13);
+  box(world,darkVeneer,w-.90,.28,.40,(-w-.90)/2,2.98,entryZ-.15,"lobby-reception-canopy");
+  box(world,bronze,w-.90,.035,.26,(-w-.90)/2,3.125,entryZ-.13);
   const warmPiers=(length,place)=>{
     const widths=[.48,.26,.58,.36,.51,.31],margin=.036;let pos=0;
     for(let i=0;pos<length-.04;i++){
@@ -752,12 +750,12 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     }));
     if(doors.length>rows.length)rows.push({title:"完整名錄",action:"directory"});
     const font=getComputedStyle(document.documentElement).getPropertyValue("--gallery-font-family").trim()||"sans-serif";
-    const width=pier.width-.42,pitch=Math.min(.68,3.40/rows.length),height=pitch*.96,top=1.97+(rows.length-1)*pitch/2;
+    const width=pier.width-.17,pitch=Math.min(.34,1.70/rows.length),height=pitch*.94,top=1.56+(rows.length-1)*pitch/2;
     const hitMat=material(T.MeshBasicMaterial,{visible:false});
     const reflectedDaylight=texture("pier-daylight.webp",true,false);
     reflectedDaylight.mapping=T.EquirectangularReflectionMapping;
     const edge=standard({envMap:reflectedDaylight,envMapIntensity:.62,color:0xa27a48,metalness:.38,roughness:.35,side:T.DoubleSide});
-    const lamp=new T.SpotLight(0xffe2b0,7,5.3,1.08,.7);
+    const lamp=new T.SpotLight(0xffe7ca,3.0,5.3,1.08,.7);
     lamp.position.set(pier.x-1.60,3.08,front+1.05);
     lamp.target.position.set(pier.x,1.64,front);
     root.add(lamp,lamp.target);
@@ -767,7 +765,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       mountPierLetters(T,root,{title,width,height,x:pier.x,y,z:front,family:font,face,edge,materials,textures});
       const hit=new T.Mesh(new T.PlaneGeometry(width,pitch),hitMat);
       hit.name="lobby-pier-sign-"+i;hit.userData.signAction=action;
-      hit.position.set(pier.x,y,front+.042);root.add(hit);signHits.push(hit);
+      hit.position.set(pier.x,y,front+.014);root.add(hit);signHits.push(hit);
       signRows.push({action,face});
     });
     const endHit=new T.Mesh(new T.PlaneGeometry(rearWidth-.16,3.08),hitMat);
