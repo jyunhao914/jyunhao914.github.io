@@ -2,7 +2,7 @@ import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=atrium40";
 import {createFloorReflection} from "./lobby-floor-reflection.js?v=material45";
-import { buildLobby } from "./lobby-interior.js?v=plaques49";
+import { buildLobby } from "./lobby-interior.js?v=finish50";
 
 const eyeHeight = 1.60;
 const walkInRadius = .90;

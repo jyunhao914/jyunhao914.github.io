@@ -38,13 +38,19 @@ function cutLetters(T,mask,width,height,depth) {
   }
   const geo=new T.BufferGeometry();
   geo.setAttribute("position",new T.Float32BufferAttribute(caps.concat(edges),3));
+  const positions=geo.attributes.position,uv=new Float32Array(positions.count*2);
+  for(let i=0;i<positions.count;i++){
+    uv[2*i]=positions.getX(i)/width+.5;
+    uv[2*i+1]=positions.getY(i)/height+.5;
+  }
+  geo.setAttribute("uv",new T.BufferAttribute(uv,2));
   geo.addGroup(0,caps.length/3,0);geo.addGroup(caps.length/3,edges.length/3,1);
   geo.computeVertexNormals();
   return geo;
 }
 
 export function mountPierLetters(T,root,{title,width,height,x,y,z,family,face,edge,materials,textures}){
-  const mask=document.createElement("canvas");mask.width=416;mask.height=Math.round(416*height/width);
+  const mask=document.createElement("canvas");mask.width=640;mask.height=Math.round(mask.width*height/width);
   const ctx=mask.getContext("2d",{willReadFrequently:true});
   let size=Math.floor(mask.height*.84);
   ctx.font="650 "+size+"px "+family;
@@ -60,7 +66,7 @@ export function mountPierLetters(T,root,{title,width,height,x,y,z,family,face,ed
   // The wall receives the silhouette cast by the upper-left grazing light.
   const cast=document.createElement("canvas");cast.width=mask.width;cast.height=mask.height;
   const ink=cast.getContext("2d");
-  ink.shadowColor="rgba(23,15,8,.85)";ink.shadowBlur=1.7;ink.shadowOffsetX=2;ink.shadowOffsetY=1.5;
+  ink.shadowColor="rgba(23,15,8,.85)";ink.shadowBlur=2.2;ink.shadowOffsetX=3.2;ink.shadowOffsetY=2.1;
   ink.drawImage(mask,0,0);
   ink.globalCompositeOperation="source-in";ink.fillStyle="#211910";ink.fillRect(0,0,cast.width,cast.height);
   const map=new T.CanvasTexture(cast);map.colorSpace=T.SRGBColorSpace;textures.push(map);

@@ -1,4 +1,4 @@
-import {mountPierLetters} from "./pier-lettering.js?v=human48";
+import {mountPierLetters} from "./pier-lettering.js?v=finish50";
 import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=reception41";
 import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
 
@@ -564,11 +564,46 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const rowPitch=Math.min(.385,(directorySlab.height+gap)/Math.max(1,plaqueRows.length));
   const plaqueHeight=rowPitch-gap;
   const rowY=i=>1.56+((plaqueRows.length-1)/2-i)*rowPitch;
-  plaqueRows.forEach((_,i)=>{
-    const slab=directorySlab,y=rowY(i);
-    box(world,recess,slab.width-.025,plaqueHeight-.018,.009,slab.x,y,entryZ+.004);
-    box(world,pierStone,slab.width,plaqueHeight,slab.depth,slab.x,y,slab.z,"lobby-stone-plaque-"+i);
-  });
+  if(plaqueRows.length){
+    const slab=directorySlab,bevel=.0035,h=plaqueHeight/2,w=slab.width/2;
+    const honed=standard({map:stoneMap,normalMap:stoneNormal,color:0xd8cfc0,
+      normalScale:new T.Vector2(.065,.065),roughness:.52});
+    daylight(honed);
+    const outline=new T.Shape();
+    outline.moveTo(-w+bevel,-h+bevel);outline.lineTo(w-bevel,-h+bevel);
+    outline.lineTo(w-bevel,h-bevel);outline.lineTo(-w+bevel,h-bevel);outline.closePath();
+    // Bake only the near-wall contact and the short penumbra cast by the grazing lamp.
+    const pad=.050,shadowWidth=slab.width+2*pad,shadowHeight=plaqueHeight+2*pad;
+    const canvas=document.createElement("canvas");
+    canvas.width=1024;canvas.height=Math.round(canvas.width*shadowHeight/shadowWidth);
+    const ink=canvas.getContext("2d"),density=canvas.width/shadowWidth;
+    ink.fillStyle="#211b15";ink.shadowColor="rgba(26,21,17,.64)";
+    ink.shadowOffsetX=.014*density;ink.shadowOffsetY=.010*density;ink.shadowBlur=.014*density;
+    ink.fillRect(pad*density,pad*density,slab.width*density,plaqueHeight*density);
+    const shadowMap=new T.CanvasTexture(canvas);shadowMap.colorSpace=T.SRGBColorSpace;textures.push(shadowMap);
+    const contact=material(T.MeshBasicMaterial,{map:shadowMap,transparent:true,opacity:.66,depthWrite:false});
+    plaqueRows.forEach((_,i)=>{
+      const y=rowY(i);
+      const shadow=new T.Mesh(new T.PlaneGeometry(shadowWidth,shadowHeight),contact);
+      shadow.position.set(slab.x,y,entryZ+.0008);root.add(shadow);
+      box(world,recess,slab.width-.030,plaqueHeight-.024,.009,slab.x,y,entryZ+.004);
+      const geo=new T.ExtrudeGeometry(outline,{depth:slab.depth-2*bevel,bevelEnabled:true,
+        bevelThickness:bevel,bevelSize:bevel,bevelSegments:2,steps:1});
+      const {position,uv}=geo.attributes;
+      // Each tablet samples another part of the same quarry scan. Wrap its
+      // face coordinates over the small arris so the grain meets at the cut.
+      for(let j=0;j<position.count;j++){
+        const x=position.getX(j),v=position.getY(j),z=position.getZ(j);
+        const returnDepth=slab.depth-bevel-z;
+        const u=x+(Math.abs(x)>w-.006?Math.sign(x)*returnDepth:0);
+        const t=v+(Math.abs(v)>h-.006?Math.sign(v)*returnDepth:0);
+        uv.setXY(j,u/.92+i*.283,t/.70+i*.457);
+      }
+      const tablet=new T.Mesh(geo,honed);
+      tablet.position.set(slab.x,y,slab.z-slab.depth/2+bevel);
+      tablet.name="lobby-stone-plaque-"+i;root.add(tablet);
+    });
+  }
   const portalFrame=standard({color:0x433d37,metalness:.28,roughness:.44});
   for(const x of [galleryLeft+.026,galleryRight-.026]){
     box(world,portalFrame,.052,head,.31,x,head/2,entryZ-.365);
@@ -759,6 +794,8 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     const hitMat=material(T.MeshBasicMaterial,{visible:false});
     const reflectedDaylight=texture("pier-daylight.webp",true,false);
     reflectedDaylight.mapping=T.EquirectangularReflectionMapping;
+    const brushed=texture("mount/brush-normal.webp",false);
+    brushed.repeat.set(2.5,.8);
     const edge=standard({envMap:reflectedDaylight,envMapIntensity:.62,color:0xa27a48,metalness:.38,roughness:.35,side:T.DoubleSide});
     const lamp=new T.SpotLight(0xffe7ca,3.0,5.3,1.08,.7);
     lamp.position.set(pier.x-1.60,3.08,front+1.05);
@@ -766,7 +803,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     root.add(lamp,lamp.target);
     plaqueRows.forEach(({title,action},i)=>{
       const y=rowY(i);
-      const face=standard({color:0x624627,roughness:.38,metalness:.58,envMap:reflectedDaylight,envMapIntensity:.68});
+      const face=standard({color:0x715333,normalMap:brushed,normalScale:new T.Vector2(.13,.13),roughness:.37,metalness:.58,envMap:reflectedDaylight,envMapIntensity:.68});
       mountPierLetters(T,root,{title,width,height,x:pier.x,y,z:front,family:font,face,edge,materials,textures});
       const hit=new T.Mesh(new T.PlaneGeometry(pier.width,plaqueHeight),hitMat);
       hit.name="lobby-pier-sign-"+i;hit.userData.signAction=action;
