@@ -1,4 +1,4 @@
-import {mountPierLetters} from "./pier-lettering.js?v=granite51";
+import {mountPierLetters} from "./pier-lettering.js?v=wayfinding53";
 import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=reception41";
 import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
 
@@ -173,7 +173,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     piece("lobby-gallery-right-pier",(galleryRight+w)/2,entryZ-entryDepth/2,w-galleryRight,entryDepth,head),
     piece("lobby-gallery-inner-left",.75,midZ,.64,.69,3.23),
     piece("lobby-gallery-inner-right",5.23,midZ,.81,.69,3.23),
-    piece("lobby-gallery-side-wall",.28,(wallNorth+entryZ)/2,.28,entryZ-wallNorth,3.44),
+    piece("lobby-gallery-side-wall",.28,(wallNorth+entryZ-entryDepth)/2,.28,entryZ-entryDepth-wallNorth,3.44),
     piece("lobby-reception-back-wall",(-w+.20)/2,-4.64,w+.20,.21,3.02)
   ];
   const recesses=[{side:-1,start:-2.93,end:1.85,push:.55,top:3.01},
@@ -187,8 +187,8 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   ];
   const rearX=(.48+w)/2,rearWidth=w-.48;
   const rearRelief=piece("lobby-gallery-north-relief",rearX,wallNorth+.128,rearWidth,.255,3.20);
-  // The directory is a shallow facing fixed to the left jamb at reading height.
-  const directorySlab=piece("lobby-directory-facing",.10,entryZ-.002,1.72,.020,1.85);
+  // Metres. The recessed stones and the masonry opening share one datum.
+  const directorySlab=piece("lobby-directory-facing",.10,entryZ-.037,1.72,.028,1.86);
   const jambs=[galleryLeft+.026,galleryRight-.026].map(x=>piece("jamb",x,entryZ-.365,.052,.31,head));
   const partition=partitionPlan(w,d,[...piers,...(doors.length?[directorySlab]:[]),...cheeks,...galleryLeaves,rearRelief,...jambs,...furnitureObstacles]),gardenBays=[];
   const openingLeft=-w+.81,openingRight=w-.82,northSill=3.19,northHead=5.97;
@@ -550,7 +550,21 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
 
   // A trabeated opening bears on two broad masonry walls. The contrasting, deep
   // reveal continues into a genuinely walkable secondary bay at the north end.
+  const signY=1.54,pocketDepth=.085,perimeterJoint=.026;
   for(const b of piers){
+    if(b===piers[0] && doors.length){
+      const openingW=directorySlab.width+2*perimeterJoint;
+      const openingH=directorySlab.height+2*perimeterJoint;
+      const shoulder=(b.width-openingW)/2,lipZ=entryZ-pocketDepth/2;
+      box(world,portalStone,b.width,b.height,b.depth-pocketDepth,b.x,b.height/2,b.z-pocketDepth/2,b.name);
+      for(const side of [-1,1])
+        box(world,portalStone,shoulder,b.height,pocketDepth,b.x+side*(openingW+shoulder)/2,b.height/2,lipZ);
+      const sill=signY-openingH/2,lintel=signY+openingH/2;
+      box(world,portalStone,openingW,sill,pocketDepth,b.x,sill/2,lipZ);
+      box(world,portalStone,openingW,b.height-lintel,pocketDepth,b.x,(b.height+lintel)/2,lipZ);
+      box(world,recess,openingW,openingH,.003,b.x,signY,entryZ-pocketDepth+.0015);
+      continue;
+    }
     const mat=b.name.includes("reception")?darkVeneer:b.name.includes("inner")?innerStone:portalStone;
     box(world,mat,b.width,b.height,b.depth,b.x,b.height/2,b.z,b.name);
   }
@@ -560,34 +574,23 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     title:door.title||door.room||"展廳",action:"sign:"+i
   }));
   if(doors.length>plaqueRows.length)plaqueRows.push({title:"完整名錄",action:"directory"});
-  const gap=.065;
-  const rowPitch=Math.min(.385,(directorySlab.height+gap)/Math.max(1,plaqueRows.length));
-  const plaqueHeight=rowPitch-gap;
-  const rowY=i=>1.56+((plaqueRows.length-1)/2-i)*rowPitch;
+  // The top line points to the walkable first gallery. The index underneath
+  // lists direct destinations in their publication order, including future halls.
+  const headerHeight=.32,joint=.016;
+  const rowPitch=(directorySlab.height-headerHeight)/Math.max(plaqueRows.length,1);
+  const plaqueHeight=rowPitch-joint;
+  const headerY=signY+(directorySlab.height-headerHeight)/2;
+  const rowY=i=>headerY-headerHeight/2-(i+.5)*rowPitch;
   if(plaqueRows.length){
-    const slab=directorySlab,bevel=.0018,h=plaqueHeight/2,w=slab.width/2;
-    const honed=standard({map:texture("directory-granite-color.webp"),normalMap:texture("directory-granite-normal.webp",false),
-      roughnessMap:texture("directory-granite-rough.webp",false),color:0xdbdfe0,
-      normalScale:new T.Vector2(.23,.23),roughness:.89});
+    const slab=directorySlab,bevel=.0014,h=plaqueHeight/2,w=slab.width/2;
+    const honed=standard({map:stoneMap,normalMap:stoneNormal,color:0xe1ded5,
+      normalScale:new T.Vector2(.07,.07),roughness:.70});
     daylight(honed);
     const outline=new T.Shape();
     outline.moveTo(-w+bevel,-h+bevel);outline.lineTo(w-bevel,-h+bevel);
     outline.lineTo(w-bevel,h-bevel);outline.lineTo(-w+bevel,h-bevel);outline.closePath();
-    // Bake only the near-wall contact and the short penumbra cast by the grazing lamp.
-    const pad=.050,shadowWidth=slab.width+2*pad,shadowHeight=plaqueHeight+2*pad;
-    const canvas=document.createElement("canvas");
-    canvas.width=1024;canvas.height=Math.round(canvas.width*shadowHeight/shadowWidth);
-    const ink=canvas.getContext("2d"),density=canvas.width/shadowWidth;
-    ink.fillStyle="#211b15";ink.shadowColor="rgba(26,21,17,.64)";
-    ink.shadowOffsetX=.004*density;ink.shadowOffsetY=.003*density;ink.shadowBlur=.005*density;
-    ink.fillRect(pad*density,pad*density,slab.width*density,plaqueHeight*density);
-    const shadowMap=new T.CanvasTexture(canvas);shadowMap.colorSpace=T.SRGBColorSpace;textures.push(shadowMap);
-    const contact=material(T.MeshBasicMaterial,{map:shadowMap,transparent:true,opacity:.66,depthWrite:false});
     plaqueRows.forEach((_,i)=>{
       const y=rowY(i);
-      const shadow=new T.Mesh(new T.PlaneGeometry(shadowWidth,shadowHeight),contact);
-      shadow.position.set(slab.x,y,entryZ+.0008);root.add(shadow);
-      box(world,recess,slab.width+.005,plaqueHeight+.005,.003,slab.x,y,entryZ+.001);
       const geo=new T.ExtrudeGeometry(outline,{depth:slab.depth-2*bevel,bevelEnabled:true,
         bevelThickness:bevel,bevelSize:bevel,bevelSegments:2,steps:1});
       const {position,uv}=geo.attributes;
@@ -598,12 +601,16 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         const returnDepth=slab.depth-bevel-z;
         const u=x+(Math.abs(x)>w-.006?Math.sign(x)*returnDepth:0);
         const t=v+(Math.abs(v)>h-.006?Math.sign(v)*returnDepth:0);
-        uv.setXY(j,.5+.96*u/slab.width,1-(i+.5-.93*t/plaqueHeight)/6);
+        uv.setXY(j,.50+.62*u,.27+.64*(y+t-signY));
       }
       const tablet=new T.Mesh(geo,honed);
       tablet.position.set(slab.x,y,slab.z-slab.depth/2+bevel);
       tablet.name="lobby-stone-plaque-"+i;root.add(tablet);
     });
+  }
+  if(plaqueRows.length){
+    const s=directorySlab;
+    box(world,darkVeneer,s.width,headerHeight-joint,s.depth,s.x,headerY,s.z,"lobby-direction-head");
   }
   const portalFrame=standard({color:0x433d37,metalness:.28,roughness:.44});
   for(const x of [galleryLeft+.026,galleryRight-.026]){
@@ -791,24 +798,27 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   if(doors.length){
     const pier=directorySlab,front=pier.z+pier.depth/2;
     const font=getComputedStyle(document.documentElement).getPropertyValue("--gallery-font-family").trim()||"sans-serif";
-    const width=pier.width-.17,height=plaqueHeight*.93;
+    const width=pier.width-.10,height=plaqueHeight*.95;
     const hitMat=material(T.MeshBasicMaterial,{visible:false});
     const reflectedDaylight=texture("pier-daylight.webp",true,false);
     reflectedDaylight.mapping=T.EquirectangularReflectionMapping;
     const brushed=texture("mount/brush-normal.webp",false);
     brushed.repeat.set(2.5,.8);
-    const edge=standard({envMap:reflectedDaylight,envMapIntensity:.62,color:0xa27a48,metalness:.38,roughness:.35,side:T.DoubleSide});
+    const edge=standard({envMap:reflectedDaylight,envMapIntensity:.62,color:0x95877a,metalness:.38,roughness:.35,side:T.DoubleSide});
     const lamp=new T.SpotLight(0xffead6,2.4,5.3,1.08,.7);
     lamp.position.set(pier.x-1.85,3.38,front+1.25);
     lamp.target.position.set(pier.x,1.64,front);
     root.add(lamp,lamp.target);
-    plaqueRows.forEach(({title,action},i)=>{
-      const y=rowY(i);
-      const face=standard({color:0xe0cea9,normalMap:brushed,normalScale:new T.Vector2(.13,.13),roughness:.37,metalness:.46,envMap:reflectedDaylight,envMapIntensity:.55});
-      mountPierLetters(T,root,{title,width,height,x:pier.x,y,z:front,family:font,face,edge,materials,textures});
-      const hit=new T.Mesh(new T.PlaneGeometry(pier.width,plaqueHeight),hitMat);
-      hit.name="lobby-pier-sign-"+i;hit.userData.signAction=action;
-      hit.position.set(pier.x,y,front+.014);root.add(hit);signHits.push(hit);
+    const signs=[{title:"第一廳入口",action:"first-hall"},...plaqueRows];
+    signs.forEach(({title,action},n)=>{
+      const isHeader=n===0,i=n-1,y=isHeader?headerY:rowY(i);
+      const face=standard({color:isHeader?0xf2e8d8:0x443b34,normalMap:brushed,normalScale:new T.Vector2(.09,.09),
+        roughness:.50,metalness:.35,envMap:reflectedDaylight,envMapIntensity:.48});
+      const ordinal=!isHeader&&action!=="directory"?String(n).padStart(2,"0"):"";
+      mountPierLetters(T,root,{title,ordinal,isHeader,width,height:isHeader?headerHeight:height,x:pier.x,y,z:front,family:font,face,edge,materials,textures});
+      const hit=new T.Mesh(new T.PlaneGeometry(pier.width,isHeader?headerHeight-joint:plaqueHeight),hitMat);
+      hit.name=isHeader?"lobby-wayfinding-header-hit":"lobby-pier-sign-"+i;hit.userData.signAction=action;
+      hit.position.set(pier.x,y,front+.005);root.add(hit);signHits.push(hit);
       signRows.push({action,face});
     });
     const endHit=new T.Mesh(new T.PlaneGeometry(rearWidth-.16,3.08),hitMat);

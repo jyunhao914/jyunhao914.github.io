@@ -49,19 +49,31 @@ function cutLetters(T,mask,width,height,depth) {
   return geo;
 }
 
-export function mountPierLetters(T,root,{title,width,height,x,y,z,family,face,edge,materials,textures}){
-  const mask=document.createElement("canvas");mask.width=640;mask.height=Math.round(mask.width*height/width);
+export function mountPierLetters(T,root,{title,ordinal,isHeader,width,height,x,y,z,family,face,edge,materials,textures}){
+  const mask=document.createElement("canvas");mask.width=620;mask.height=Math.round(mask.width*height/width);
   const ctx=mask.getContext("2d",{willReadFrequently:true});
-  let size=Math.floor(mask.height*.79);
-  ctx.font="500 "+size+"px "+family;
-  while(size>16&&ctx.measureText(title).width>mask.width-48)ctx.font="500 "+(--size)+"px "+family;
+  const h=mask.height,baseline=h*.49,nameX=isHeader?14:mask.width*.205;
+  const available=mask.width-nameX-(isHeader?h*.95:14);
+  let size=Math.floor(h*(isHeader ? .68 : .73));
   ctx.textBaseline="middle";ctx.fillStyle="white";
-  const glyphs=Array.from(title);
-  let label=title;
-  while(glyphs.length && ctx.measureText(label).width>mask.width-48){glyphs.pop();label=glyphs.join("")+"…";}
-  ctx.fillText(label,24,mask.height*.49);
+  if(ordinal){
+    ctx.font="450 "+Math.round(h*.45)+"px "+family;
+    ctx.fillText(ordinal,14,baseline);
+  }
+  const glyphs=Array.from(title);let label=title;
+  const setFont=()=>{ctx.font=(isHeader?"600 ":"500 ")+size+"px "+family;};
+  setFont();
+  while(size>h*.42&&ctx.measureText(label).width>available){size--;setFont();}
+  while(glyphs.length&&ctx.measureText(label).width>available){glyphs.pop();label=glyphs.join("")+"…";}
+  ctx.fillText(label,nameX,baseline);
+  if(isHeader){
+    const x=mask.width-h*.16,arm=h*.19;
+    ctx.lineWidth=h*.054;ctx.strokeStyle="white";ctx.lineJoin="round";
+    ctx.beginPath();ctx.moveTo(x-arm*2.8,baseline);ctx.lineTo(x,baseline);
+    ctx.moveTo(x-arm,baseline-arm);ctx.lineTo(x,baseline);ctx.lineTo(x-arm,baseline+arm);ctx.stroke();
+  }
   const letters=new T.Mesh(cutLetters(T,mask,width,height,.006),[face,edge]);
-  letters.name="pier-metal-letters";letters.position.set(x,y,z-.003);root.add(letters);
+  letters.name=isHeader?"pier-direction-letters":"pier-metal-letters";letters.position.set(x,y,z-.003);root.add(letters);
 
   // The wall receives the silhouette cast by the upper-left grazing light.
   const cast=document.createElement("canvas");cast.width=mask.width;cast.height=mask.height;

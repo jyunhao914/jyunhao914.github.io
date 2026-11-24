@@ -27,14 +27,20 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     loads = [];
   const previews=[];
   const sheet=loadScanPreview();
-  const loader = new T.TextureLoader();
+  const loader = new T.ImageLoader();
   function texture(file, color = false, x = 1, y = 1) {
-    let tex;
+    const tex=new T.Texture();
     loads.push(
       new Promise((resolve) => {
-        tex = loader.load(
+        loader.load(
           new URL("./materials/" + file, import.meta.url).href,
-          resolve,
+          image=>{
+            // WebGL2 texture storage cannot grow after a preview has been uploaded.
+            if(tex.image && (tex.image.width!==image.width || tex.image.height!==image.height))tex.dispose();
+            tex.image=image;
+            tex.needsUpdate=true;
+            resolve();
+          },
           undefined,
           resolve,
         );

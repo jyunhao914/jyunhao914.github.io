@@ -2,7 +2,7 @@ import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=atrium40";
 import {createFloorReflection} from "./lobby-floor-reflection.js?v=material45";
-import { buildLobby } from "./lobby-interior.js?v=granite51";
+import { buildLobby } from "./lobby-interior.js?v=wayfinding53";
 
 const eyeHeight = 1.60;
 const walkInRadius = .90;
@@ -129,7 +129,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     return true;
   }
   function receptionYaw(position) {
-    return Math.atan2(position.x+.55,position.z+3.05);
+    return Math.atan2(position.x+.14,position.z+3.05);
   }
   function notifyNearest() {
     // The visible deck defines selection independently of old exhibition locations.

@@ -168,7 +168,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
     message.textContent=startZone==="lobby" ? "正在開啟展場大廳…" : "正在載入空間…";message.hidden=false;
     el("lobbyHint").hidden=true;
     try {
-      const {createLobby}=await import("./lobby.js?v=granite51");
+      const {createLobby}=await import("./lobby.js?v=wayfinding53");
       if(!active || version!==generation)return;
       const signs=rooms.map(({title,subtitle,room,show})=>({title,subtitle,room,show:{id:show.id,title:show.title}}));
       scene=createLobby(stage,signs,index=>{
