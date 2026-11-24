@@ -1,3 +1,4 @@
+import {mountPierLetters} from "./pier-lettering.js?v=pier46";
 import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=reception41";
 import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
 
@@ -164,11 +165,11 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const metal=standard({color:0x706653,metalness:.32,roughness:.57});
   const recess=standard({color:0x403e39,roughness:.92,side:T.DoubleSide});
   const entryZ=-3.08,midZ=(entryZ+wallNorth)/2+.09,entryDepth=.64,head=3.29;
-  const galleryLeft=.63,galleryRight=4.98;
+  const galleryLeft=1.60,galleryRight=4.98;
   // Solid plan dimensions drive the section, pedestrian radius and direct-light occlusion.
   const piece=(name,x,z,width,depth,height)=>({name,x,z,width,depth,height,radius:0});
   const piers=[
-    piece("lobby-gallery-left-pier",.045,entryZ-entryDepth/2,1.17,entryDepth,head),
+    piece("lobby-gallery-left-pier",.19,entryZ-entryDepth/2,2.82,entryDepth,head),
     piece("lobby-gallery-right-pier",(galleryRight+w)/2,entryZ-entryDepth/2,w-galleryRight,entryDepth,head),
     piece("lobby-gallery-inner-left",.75,midZ,.64,.69,3.23),
     piece("lobby-gallery-inner-right",5.23,midZ,.81,.69,3.23),
@@ -194,7 +195,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const partitionOcclusion=`float partitionVisibility(vec3 o,vec3 r,float limit){
     float light=1.;
     ${[...piers,
-       {x:(w-.54)/2,z:entryZ-entryDepth/2,width:w+.54,depth:entryDepth,low:head,height:H+.02},
+       {x:(w-1.22)/2,z:entryZ-entryDepth/2,width:w+1.22,depth:entryDepth,low:head,height:H+.02},
        {x:(w+.42)/2,z:(wallNorth+entryZ-entryDepth)/2,width:w-.42,depth:entryZ-entryDepth-wallNorth,low:3.23,height:3.54}
       ].map(p=>`{
       vec3 lo=vec3(${(p.x-p.width/2).toFixed(4)},${(p.low??.012).toFixed(4)},${(p.z-p.depth/2).toFixed(4)})-o;
@@ -551,7 +552,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     const mat=b.name.includes("reception")?darkVeneer:b.name.includes("inner")?innerStone:portalStone;
     box(world,mat,b.width,b.height,b.depth,b.x,b.height/2,b.z,b.name);
   }
-  const beamWidth=w+.54,beamMid=(w-.54)/2;
+  const beamWidth=w+1.22,beamMid=(w-1.22)/2;
   box(world,portalStone,beamWidth,H-head+.015,entryDepth,beamMid,(H+head)/2,entryZ-entryDepth/2,"lobby-gallery-stone-lintel");
   const portalFrame=standard({color:0x433d37,metalness:.28,roughness:.44});
   for(const x of [galleryLeft+.026,galleryRight-.026]){
@@ -590,8 +591,8 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
 
   // At the welcome bay the ashlar datum becomes a dark timber canopy. Wide vertical
   // cuts above it are seen in relief from both the threshold and the reception desk.
-  box(world,darkVeneer,w-.37,.28,.40,(-w-.37)/2,2.98,entryZ-.15,"lobby-reception-canopy");
-  box(world,bronze,w-.37,.035,.26,(-w-.37)/2,3.125,entryZ-.13);
+  box(world,darkVeneer,w-1.22,.28,.40,(-w-1.22)/2,2.98,entryZ-.15,"lobby-reception-canopy");
+  box(world,bronze,w-1.22,.035,.26,(-w-1.22)/2,3.125,entryZ-.13);
   const warmPiers=(length,place)=>{
     const widths=[.48,.26,.58,.36,.51,.31],margin=.036;let pos=0;
     for(let i=0;pos<length-.04;i++){
@@ -742,38 +743,19 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     }));
     if(doors.length>rows.length)rows.push({title:"完整名錄",action:"directory"});
     const font=getComputedStyle(document.documentElement).getPropertyValue("--gallery-font-family").trim()||"sans-serif";
-    const width=.96,height=.205,pitch=.222,top=2.22;
-    const backing=new T.Mesh(new T.BoxGeometry(width-.045,rows.length*pitch-.014,.018),recess);
-    backing.position.set(pier.x,top-(rows.length-1)*pitch/2,front+.009);
-    root.add(backing);
+    const width=2.53,pitch=Math.min(.52,2.7/rows.length),height=pitch*.96,top=1.63+(rows.length-1)*pitch/2;
     const hitMat=material(T.MeshBasicMaterial,{visible:false});
-    const brush=texture("mount/brush-color.webp"),toolMarks=texture("mount/brush-normal.webp",false);
-    const bevel=standard({color:0xbc9e70,metalness:.55,roughness:.35,map:brush});
-    const edge=.004;
+    const reflectedDaylight=texture("pier-daylight.webp",true,false);
+    reflectedDaylight.mapping=T.EquirectangularReflectionMapping;
+    const edge=standard({envMap:reflectedDaylight,envMapIntensity:.62,color:0xa27a48,metalness:.38,roughness:.35,side:T.DoubleSide});
+    const lamp=new T.SpotLight(0xffe2b0,7,5.3,1.08,.7);
+    lamp.position.set(pier.x-1.60,3.08,front+1.05);
+    lamp.target.position.set(pier.x,1.64,front);
+    root.add(lamp,lamp.target);
     rows.forEach(({title,action},i)=>{
       const y=top-i*pitch;
-      const face=standard({color:0x8a7559,roughness:.43,metalness:.42,map:brush,
-        normalMap:toolMarks,normalScale:new T.Vector2(.14,.14)});
-      const rim=new T.Mesh(new T.BoxGeometry(width+edge,height+edge,.010),bevel);
-      rim.position.set(pier.x,y,front+.032);root.add(rim);
-      const plate=new T.Mesh(new T.BoxGeometry(width,height,.020),face);
-      plate.position.set(pier.x,y,front+.028);root.add(plate);
-      const c=document.createElement("canvas");c.width=960;c.height=205;
-      const ctx=c.getContext("2d");ctx.textBaseline="middle";
-      const text=title,available=748;
-      let size=97;
-      ctx.font="550 "+size+"px "+font;
-      while(size>51 && ctx.measureText(text).width>available)ctx.font="550 "+(--size)+"px "+font;
-      let label=text;
-      while(label.length>1 && ctx.measureText(label+"…").width>available)label=Array.from(label).slice(0,-1).join("");
-      if(label!==text)label+="…";
-      ctx.shadowColor="#21180e";ctx.shadowBlur=3;ctx.shadowOffsetY=4;
-      ctx.fillStyle="#f0dfbc";ctx.fillText(label,44,103);
-      ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle="#e3d1a8";ctx.lineWidth=5;
-      ctx.beginPath();ctx.moveTo(834,103);ctx.lineTo(902,103);ctx.moveTo(878,80);ctx.lineTo(902,103);ctx.lineTo(878,126);ctx.stroke();
-      const map=new T.CanvasTexture(c);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;textures.push(map);
-      const lettering=new T.Mesh(new T.PlaneGeometry(width,height),standard({map,transparent:true,depthWrite:false,metalness:.16,roughness:.45}));
-      lettering.position.set(pier.x,y,front+.041);root.add(lettering);
+      const face=standard({color:0x624627,roughness:.38,metalness:.58,envMap:reflectedDaylight,envMapIntensity:.68});
+      mountPierLetters(T,root,{title,width,height,x:pier.x,y,z:front,family:font,face,edge,materials,textures});
       const hit=new T.Mesh(new T.PlaneGeometry(width,pitch),hitMat);
       hit.name="lobby-pier-sign-"+i;hit.userData.signAction=action;
       hit.position.set(pier.x,y,front+.042);root.add(hit);signHits.push(hit);

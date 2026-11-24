@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=material45";
+import {lobbyPage} from "./lobby-page.js?v=pier46";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {

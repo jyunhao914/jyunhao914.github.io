@@ -2,12 +2,13 @@ import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=atrium40";
 import {createFloorReflection} from "./lobby-floor-reflection.js?v=material45";
-import { buildLobby } from "./lobby-interior.js?v=material45";
+import { buildLobby } from "./lobby-interior.js?v=pier46";
 
 const eyeHeight = 1.60;
 const walkInRadius = .90;
 const arrivalPitch = .085;
-const receptionX=1.05, receptionSetback=.68, receptionPitch=.021;
+const receptionX=1.05, receptionPitch=.021;
+const receptionSetback=()=>matchMedia("(orientation:portrait)").matches ? -2.05 : .68;
 const movementKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyW", "KeyA", "KeyS", "KeyD"]);
 const clamp = T.MathUtils.clamp;
 const shortestTurn = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -107,7 +108,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const blend=T.MathUtils.smoothstep(camera.position.z-plan.halfDepth,1.2,8);
     // A portrait frame takes in the left counter and the right-hand enfilade
     // together. Open the lens only once the visitor is within the foyer.
-    const interiorWidth=clamp(T.MathUtils.radToDeg(2*Math.atan(.79/camera.aspect)),61,112);
+    const interiorWidth=clamp(T.MathUtils.radToDeg(2*Math.atan(.79/camera.aspect)),61,70);
     const inside=T.MathUtils.smoothstep(plan.halfDepth-camera.position.z,0,.92);
     const fov=T.MathUtils.lerp(T.MathUtils.lerp(61,wide,blend),interiorWidth,inside);
     if(Math.abs(fov-camera.fov)>.005) { camera.fov=fov; camera.updateProjectionMatrix(); }
@@ -128,7 +129,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     return true;
   }
   function receptionYaw(position) {
-    return Math.atan2(position.x+1.73,position.z+3.05);
+    return Math.atan2(position.x+(camera.aspect<1 ? .12 : 1.73),position.z+3.05);
   }
   function notifyNearest() {
     // The visible deck defines selection independently of old exhibition locations.
@@ -242,7 +243,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
       step.arrived = step.elapsed >= .09;
       if(step.arrived) {
         camera.position.copy(step.finish);
-        if(step.kind==="museum"){camera.position.x=receptionX;camera.position.z+=receptionSetback;}
+        if(step.kind==="museum"){camera.position.x=receptionX;camera.position.z+=receptionSetback();}
         const yaw=step.kind==="museum" ? receptionYaw(camera.position) : Math.atan2(step.finish.x,step.finish.z-plan.halfDepth);
         camera.rotation.set(step.kind==="museum" ? receptionPitch : 0,yaw,0,"YXZ");
       }
@@ -255,7 +256,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
         // Visitors turn towards reception after they have crossed the garden elevation.
         const inside=T.MathUtils.smoothstep(mainDoor.z-camera.position.z,.02,1.65);
         camera.position.x+=receptionX*inside;
-        camera.position.z+=receptionSetback*inside;
+        camera.position.z+=receptionSetback()*inside;
         aim+=shortestTurn(receptionYaw(camera.position)-aim)*inside;
       } else if(step.kind==="grounds") {
         const outside = camera.position.z-mainDoor.z;
@@ -292,11 +293,11 @@ export function createLobby(host, doors, onEnter, options = {}) {
       camera.position.set(phone ? 10.6 : 10.5,eyeHeight,plan.halfDepth+(phone ? 23.6 : 20.7));
       camera.lookAt(phone ? -2.30 : -2.15,phone ? 3.47 : 4.05,plan.halfDepth+.36);
     } else if (!door) {
-      camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback);
+      camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback());
       camera.rotation.set(receptionPitch,receptionYaw(camera.position),0,"YXZ");
     } else {
       selectMenu(index);
-      camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback);
+      camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback());
       const at=interior.menuPoint?.(index);
       camera.lookAt(at?.x ?? -1.56,at?.y ?? 1.30,at?.z ?? .49);
     }

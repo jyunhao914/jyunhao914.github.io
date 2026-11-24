@@ -76,3 +76,5 @@ Reception counter: Marble Rock 02 by Amal Kumar, Poly Haven.
 https://polyhaven.com/a/marble_rock_02
 CC0 1.0 Universal. reception-counter-stone.webp uses the diffuse scan, with a
 warm-grey colour grade for the cut and polished counter slabs.
+
+pier-daylight.webp is a reduced derivative of garden-canopy.webp for the metal lettering reflections, from the Sunny Vondelpark panorama credited above.
