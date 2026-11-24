@@ -216,7 +216,9 @@ async function enter(workId,throughDoor=false) {
   menu(false);
   showFocus(null);
   syncExpand();
-  const roomWorks = current.works.filter((a) => a.room === $("room").value);
+  const roomName = $("room").value;
+  const roomWorks = current.works.filter((a) => a.room === roomName);
+  $("visitTitle").textContent = roomName || current.title;
   updateEditLink(target || roomWorks[0]);
   $("tour").replaceChildren(
     new Option("選擇導覽作品", ""),
@@ -506,7 +508,7 @@ function showCatalogue(visible) {
 let lastRoute, lastDoor;
 const doors=[];
 let incomingDoor;
-function loadRoomRenderer() {return import("./gallery.js?v=scan52");}
+function loadRoomRenderer() {return import("./gallery.js?v=arrival54");}
 const lobby=lobbyPage(door=>{
   incomingDoor=door;
   openRoom(door.show,door.room);

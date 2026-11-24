@@ -3,7 +3,7 @@ import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js?v=desk33";
 import * as T from "./vendor/three.module.js";
 import {mountRenderer, disposeMount} from "./mount-render.js?v=desk33";
-import { architecture } from "./architecture.js?v=scan52";
+import { architecture } from "./architecture.js?v=arrival54";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false) {
   const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";
   const canvasFont=(px,weight)=>weight+" "+px+"px "+family;
@@ -284,16 +284,65 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       : g.position.clone();
   }
   function followsWall(a) { return a.mount==="手卷" || (a.mount!=="冊頁" && a.width>=4*a.height); }
+  function publicEntrance() {
+    if (!works.length) {
+      station.set(0,1.60,halfDepth*.65);
+      entranceLook.set(0,1.60,-halfDepth);
+      return;
+    }
+    const first=works[0],wall=first.wall||0,angle=walls[wall];
+    const along=new T.Vector3(Math.cos(angle),0,-Math.sin(angle));
+    const normal=new T.Vector3(Math.sin(angle),0,Math.cos(angle));
+    const sideWall=wall%2,wallDepth=sideWall ? halfWidth : halfDepth;
+    const wallSpan=sideWall ? halfDepth : halfWidth;
+    function wallBounds(art) {
+      const {g,mount}=mounted.get(art.id),spec=mount.userData.spec;
+      const bounds=new T.Box2();
+      g.updateMatrixWorld(true);
+      for (const x of [spec.left,spec.right]) for (const y of [spec.bottom,spec.top]) {
+        const point=g.localToWorld(new T.Vector3(x,y,spec.faceZ));
+        bounds.expandByPoint(new T.Vector2(point.dot(along),point.y));
+      }
+      return bounds;
+    }
+
+    const aspect=Math.max(.22,host.clientWidth/Math.max(1,host.clientHeight));
+    const vertical=2*Math.tan(T.MathUtils.degToRad(cam.fov/2)),horizontal=vertical*aspect;
+    const artBox=wallBounds(first);
+    const faceDepth=groups[0].position.dot(normal);
+    const clearance=Math.max(.5,wallDepth-.52-faceDepth);
+    const maxOverview=Math.min(clearance,theme==="ink" ? 9.6 : 8.4);
+    const minimumDistance=theme==="calligraphy" ? 4.8 : 4.2;
+    let distance=Math.min(maxOverview,Math.max(minimumDistance,wallDepth*1.08));
+    if (!followsWall(first)) {
+      const neighbours=works.slice(1).filter(art=>(art.wall||0)===wall)
+        .sort((a,b)=>Math.abs(a.x-first.x)-Math.abs(b.x-first.x));
+      for (const art of neighbours) {
+        const joined=artBox.clone().union(wallBounds(art));
+        if (joined.max.x-joined.min.x>maxOverview*horizontal*.82) break;
+        artBox.copy(joined);
+      }
+      const neededWidth=(artBox.max.x-artBox.min.x)/(horizontal*.83);
+      const neededHeight=(artBox.max.y-artBox.min.y)/(vertical*.66);
+      distance=Math.min(clearance,Math.max(distance,neededWidth,neededHeight));
+    } else if (aspect>=1.25) {
+      const fullWidth=(artBox.max.x-artBox.min.x)/(horizontal*.88);
+      distance=Math.min(clearance,Math.max(distance,Math.min(12,fullWidth)));
+    }
+    const center=T.MathUtils.clamp((artBox.min.x+artBox.max.x)/2,-wallSpan+.48,wallSpan-.48);
+    entranceLook.copy(normal).multiplyScalar(faceDepth).addScaledVector(along,center);
+    station.copy(entranceLook).addScaledVector(normal,distance);
+    // In the ink hall, stay on the aisle side of the freestanding bench.
+    if (hasBench && Math.abs(station.x)<1.67 && station.z> -1.78 && station.z<-.62) {
+      if (!sideWall) station.z=wall===0 ? -.52 : -1.88;
+      else station.x=wall===3 ? -1.77 : 1.77;
+    }
+    station.y=1.60;
+    entranceLook.y=T.MathUtils.clamp((artBox.min.y+artBox.max.y)/2,1.53,1.74);
+  }
   function setEntrance() {
     if (!onMove || !groups.length) {
-      // Stand near the end of the longer aisle at eye level and look down its length.
-      if(halfWidth>halfDepth){
-        station.set(halfWidth-1.2,1.60,halfDepth*.40);
-        entranceLook.set(-halfWidth*.77,1.60,-halfDepth*.20);
-      }else{
-        station.set(-halfWidth*.40,1.60,halfDepth-1.2);
-        entranceLook.set(halfWidth*.20,1.60,-halfDepth*.77);
-      }
+      publicEntrance();
       return;
     }
     const a=works[0], g=groups[0], aspect=host.clientWidth/Math.max(1,host.clientHeight);
@@ -535,11 +584,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       panTo(reading.x - 0.35 * dx * panWidth / canvas.clientWidth);
     } else if (drag.gesture === "look") {
       if (drag.dist > 5) { travel=null; stopInspection(); }
-      cam.rotation.y -= dx * 0.003;
-      cam.rotation.x = Math.max(
-        -1.2,
-        Math.min(1.2, cam.rotation.x - dy * 0.003),
-      );
+      const sensitivity=e.pointerType==="touch" && !onMove
+        ? T.MathUtils.clamp(Math.PI*.68/Math.max(1,canvas.clientWidth),.003,.0065)
+        : .003;
+      turn(-dx*sensitivity,-dy*sensitivity*.90);
     }
   };
   canvas.tabIndex = 0;
@@ -767,6 +815,14 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       if(fingers.size===2)beginPinch();
     } else if(reading)startReading(reading.x,false);
     else if(guide>=0 && !onMove)focus(guide,false);
+    else if(!onMove && cam.position.distanceToSquared(station)<1e-8) {
+      const toward=entranceLook.clone().sub(station).normalize();
+      if(cam.getWorldDirection(new T.Vector3()).dot(toward)>.99999) {
+        setEntrance();
+        cam.position.copy(station);
+        cam.lookAt(entranceLook);
+      }
+    }
   });
   ro.observe(host);
   const frameMeter=document.getElementById("frameMeter");

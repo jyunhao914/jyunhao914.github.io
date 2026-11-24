@@ -17,7 +17,7 @@ function loadScanPreview(){
 export function architecture(scene, box, renderer, theme = "", halfWidth = 6, halfDepth = 7, roomHeight) {
   // Front, rear, window and opposite wall share a plaster finish.
   const palettes = {
-    calligraphy: [0x253441, 0x343039, 0x303e39, 0x38404a],
+    calligraphy: [0x4b504b, 0x49453f, 0x474b45, 0x52594f],
     ink: [0x34433f, 0x383746, 0x2c3b49, 0x464443],
   };
   const colors = palettes[theme];
@@ -76,9 +76,9 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     const theater = theme === "projection";
     const height = roomHeight ?? (study ? 3.65 : theater ? 3.35 : 5.8);
     const w = halfWidth, l = halfDepth;
-    const tones = colors || (theater ? [0x20232f, 0x29212d, 0x233231, 0x313541] :
+    const tones = colors || (theater ? [0x2a2e3a, 0x312935, 0x2b3837, 0x373b46] :
       [0x424a50, 0x47423f, 0x394641, 0x46404a]);
-    const plaster = {...surface("plaster", 1, 1), roughness: .96, normalScale: new T.Vector2(.18,.18)};
+    const plaster = {...surface("plaster", 1, 1), roughness: .91, normalScale: new T.Vector2(.13,.13)};
     const wood = surface("wood", 1, 1);
     const timber = {...wood, roughness: .75};
     // Use metres for the scan coordinates on each face, including narrow returns.
@@ -91,17 +91,29 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
       }
       return mesh;
     }
-    const floor = facing(box(scene, w*2, .14, l*2, study ? 0xe1d8c9 : 0xb3b1ab, 0, -.07, 0,
-      {...surface(study ? "boards" : "stone", 1, 1), roughness: study ? .83 : .76,
-        normalScale: new T.Vector2(.26,.26)}), study ? 1.7 : 1.5);
+    const floor = facing(box(scene, w*2, .14, l*2, study ? 0xb4aca1 : theater ? 0x7e8083 : 0xb9b6b0, 0, -.07, 0,
+      {...surface(study ? "boards" : "stone", 1, 1), roughness: study ? .74 : .82,
+        normalScale: new T.Vector2(.21,.21)}), study ? 1.7 : 1.5);
     const walls = [
       box(scene, w*2, height, .12, tones[0], 0, height/2, -l, plaster),
       box(scene, w*2, height, .12, tones[1], 0, height/2, l, plaster),
       box(scene, .12, height, l*2, tones[2], -w, height/2, 0, plaster),
       box(scene, .12, height, l*2, tones[3], w, height/2, 0, plaster),
     ];
-    walls.forEach(wall => facing(wall,1));
-    const ceiling = facing(box(scene, w*2,.12,l*2, study ? 0x89816e : 0x626565, 0,height,0,plaster),1);
+    walls.forEach(wall => facing(wall,1.08));
+    const ceiling = facing(box(scene, w*2,.12,l*2, study ? 0xa19a8d : theater ? 0x494b50 : 0x87847d, 0,height,0,plaster),1.08);
+    // A recessed dark skirting gives the floor a consistent junction with the
+    // walls while leaving the artwork planes and circulation clear.
+    const trimTone=study ? 0x38312a : theater ? 0x24252b : 0x3e3d39;
+    const skirting={roughness:.68,metalness:.18};
+    for(const side of [-1,1]){
+      box(scene,.022,.074,l*2-.16,trimTone,side*(w-.071),.039,0,skirting);
+      box(scene,w*2-.16,.074,.022,trimTone,0,.039,side*(l-.071),skirting);
+      box(scene,.018,.020,l*2-.16,0x1d1c1a,side*(w-.069),.086,0);
+      box(scene,w*2-.16,.020,.018,0x1d1c1a,0,.086,side*(l-.069));
+    }
+    const lightBays=Math.max(1,Math.round(l*2/2.95));
+    const bayPitch=l*2/lightBays;
     // Broad reflected window light and occlusion at perpendicular surface joins.
     for (const mesh of [floor, ceiling, ...walls]) {
       mesh.material.onBeforeCompile = (shader) => {
@@ -110,52 +122,89 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
         shader.fragmentShader = "varying vec3 roomPoint;\n" + shader.fragmentShader.replace(
           "#include <lights_fragment_end>", `#include <lights_fragment_end>
           vec2 edge=max(vec2(0.),vec2(${w.toFixed(3)},${l.toFixed(3)})-abs(roomPoint.xz));
+          vec3 worldNormal=inverseTransformDirection(normal,viewMatrix);
           float join=${mesh===floor||mesh===ceiling ? "min(edge.x,edge.y)" : "min(roomPoint.y,"+height.toFixed(3)+"-roomPoint.y)"};
-          reflectedLight.indirectDiffuse *= .68 + .32*smoothstep(0.,.46,join);
-          ${study ? `float bounce=0.;
-            for(int bay=0;bay<6;bay++){
-              vec3 ray=vec3(-${(w-.2).toFixed(2)},2.,-7.25+2.9*float(bay))-roomPoint;
+          float corner=${mesh===floor||mesh===ceiling ? "max(edge.x,edge.y)" : "abs(worldNormal.x)>.5?edge.y:edge.x"};
+          reflectedLight.indirectDiffuse *= (.60 + .40*smoothstep(0.,.49,join)) *
+            (.79+.21*smoothstep(0.,.63,corner));
+          ${study ? `float windowBounce=0.;
+            for(int bay=0;bay<${lightBays};bay++){
+              vec3 ray=vec3(-${(w+.06).toFixed(3)},2.04,${(-l+bayPitch/2).toFixed(4)}+${bayPitch.toFixed(4)}*float(bay))-roomPoint;
               float r=max(length(ray),.18);
-              bounce+=max(0.,dot(inverseTransformDirection(normal,viewMatrix),ray/r))*max(0.,-ray.x/r)/(1.+r*r*.38);
+              windowBounce+=max(0.,dot(worldNormal,ray/r))*max(0.,-ray.x/r)/(1.+r*r*.24);
             }
-            reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.89,.74)*bounce*1.4;` : ""}
+            float lampOffset=(${height.toFixed(3)}-roomPoint.y-.53)/1.22;
+            float grazing=max(0.,-worldNormal.x)*exp(-lampOffset*lampOffset)*
+              smoothstep(0.,1.2,edge.y);
+            reflectedLight.indirectDiffuse+=diffuseColor.rgb*(vec3(.90,.94,1.)*windowBounce*.78+
+              vec3(1.,.85,.68)*grazing*.38);` : `
+            vec2 lampOffset=roomPoint.xz/vec2(${(w*.79).toFixed(3)},${(l*.90).toFixed(3)});
+            float overhead=exp(-dot(lampOffset,lampOffset));
+            float wash=max(0.,worldNormal.y)*overhead*.14;
+            wash+=max(0.,1.-abs(worldNormal.y))*smoothstep(.18,2.,roomPoint.y)*overhead*.10;
+            reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.93,.85)*wash;
+          `}
           `);
+        if(mesh!==floor)
+          shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",
+            "#include <map_fragment>\n diffuseColor.rgb=mix(diffuseColor.rgb,diffuse*.78,.39);");
       };
       mesh.material.customProgramCacheKey=()=>theme+"-"+mesh.id;
     }
     const diffuser = {emissive: 0xffe2ad, emissiveIntensity: .7, roughness: .95};
     if (study) {
-      // Recess all timber and light-box faces into the plaster so art can hang across a bay.
-      // The mounting cleat starts 66 mm inside the architectural wall centreline.
-      for (const z of [-8.7,-5.8,-2.9,0,2.9,5.8,8.7]) {
-        box(scene, w*2, .21, .14, 0x735638, 0, height-.15, z, timber);
-        for (const side of [-1,1])
-          box(scene, .08, height-.25, .13, 0x694e39, side*(w-.023), (height-.25)/2, z, timber);
+      const timberTone=0x78644e;
+      const frame={...timber,roughness:.66,normalScale:new T.Vector2(.21,.21)};
+      // Build the screen as a timber casing with a softly lit paper insert.
+      // All screens and posts stay behind the inside face of the hanging work.
+      const panelWidth=Math.min(2.30,bayPitch-.32),panelHeight=1.57;
+      const paper={emissive:0xeadeca,emissiveIntensity:.46,color:0xc7bdab,roughness:.96};
+      for (let bay=0;bay<lightBays;bay++) {
+        const z=-l+(bay+.5)*bayPitch;
+        const opening=box(scene,.018,panelHeight,panelWidth,0xc7bdab,-w+.063,2.04,z,paper);
+        opening.material.onBeforeCompile=shader=>{
+          shader.vertexShader="varying vec2 screenUv;\n"+shader.vertexShader.replace(
+            "#include <uv_vertex>","#include <uv_vertex>\nscreenUv=uv;");
+          shader.fragmentShader="varying vec2 screenUv;\n"+shader.fragmentShader.replace(
+            "#include <emissivemap_fragment>",`#include <emissivemap_fragment>
+              float perimeter=min(min(screenUv.x,1.-screenUv.x),min(screenUv.y,1.-screenUv.y));
+              float falloff=.60+.40*smoothstep(0.,.19,perimeter);
+              float skyScreen=mix(.75,1.04,screenUv.y);
+              totalEmissiveRadiance*=falloff*skyScreen;`);
+        };
+        for(const offset of [-.5,-.25,0,.25,.5]){
+          const mullion=Math.abs(offset)===.5 ? .061 : .025;
+          facing(box(scene,.052,panelHeight+.046,mullion,timberTone,-w+.075,2.04,z+offset*panelWidth,frame),1.8);
+        }
+        for (const offset of [-.5,0,.5])
+          facing(box(scene,.060,.039,panelWidth+.055,timberTone,-w+.076,2.04+offset*panelHeight,z,frame),1.8);
+        const beamZ=z+bayPitch/2;
+        if(beamZ<l-.22)
+          facing(box(scene,w*2-.12,.115,.167,timberTone,0,height-.119,beamZ,frame),1.8);
       }
-      for (const z of [-7.25,-4.35,-1.45,1.45,4.35,7.25]) {
-        box(scene,.055,1.77,1.85,0xffedcc,-w+.0332,1.98,z,diffuser);
-        for (const offset of [-.93,-.62,-.31,0,.31,.62,.93])
-          box(scene,.06,1.82,.024,0x594935,-w+.0338,1.98,z+offset,timber);
-        for (const y of [1.09,1.68,2.27,2.87])
-          box(scene,.06,.035,1.90,0x594935,-w+.0338,y,z,timber);
-      }
+      const railX=w-.63,trackHeight=height-.135;
+      box(scene,.083,.046,l*2-.59,0x39332b,railX,trackHeight,0,skirting);
+      box(scene,.026,.012,l*2-.72,0xe7cca0,railX+.010,trackHeight-.026,0,
+        {emissive:0xffd7a1,emissiveIntensity:.45,roughness:.87});
     } else if (theater) {
-      for (const side of [-1,1])
-        box(scene,.05,.035,l*2-.4,0xbcb9cf,side*(w-.038),.20,0,diffuser);
+      const aisleLight={emissive:0xc6a587,emissiveIntensity:.46,roughness:.88};
+      for (const side of [-1,1]){
+        box(scene,.047,.038,l*2-.4,0x242328,side*(w-.054),.154,0,skirting);
+        box(scene,.023,.012,l*2-.46,0x947b63,side*(w-.071),.154,0,aisleLight);
+      }
     } else {
-      for (const x of [-w*.55,0,w*.55])
-        box(scene,.36,.08,l*2-.4,0xf4e8d1,x,height-.12,0,diffuser);
+      const lampPitch=l*2/Math.max(1,Math.ceil(l*2/4.1));
+      for (const x of [-w*.55,0,w*.55]){
+        box(scene,.32,.048,l*2-.44,0x393632,x,height-.080,0,skirting);
+        for(let z=-l+lampPitch/2;z<l;z+=lampPitch)
+          box(scene,.18,.019,lampPitch-.54,0xe1d9ca,x,height-.109,z,diffuser);
+      }
     }
-    scene.add(new T.HemisphereLight(0xfff0d9,0x939291,study ? 1.05 : .85));
-    const key = new T.DirectionalLight(0xffedcf,study ? .72 : 1.05);
+    scene.add(new T.HemisphereLight(0xf0efe8,0xa1a1a2,theater ? 1.04 : study ? .92 : .85));
+    const key = new T.DirectionalLight(0xffeed9,study ? .38 : .92);
     key.position.set(-w+.22, height-.32, l*.45);
-    key.castShadow = true;
-    Object.assign(key.shadow.camera,{left:-l,right:l,top:height+3,bottom:-height-3,near:.1,far:l*4});
-    key.shadow.mapSize.set(1024,1024);
-    key.shadow.normalBias=.012;
-    key.shadow.radius=3;
-    for(const child of scene.children)
-      if(child.isMesh && child!==floor && child!==ceiling && !walls.includes(child) && !child.material.emissive?.getHex()) child.castShadow=true;
+    // The overhead fill represents reflected room light. A directional
+    // shadow map here would project the ceiling tracks across the art walls.
     scene.add(key);
     return {floor, height, wood, textures, previewReady: Promise.all(previews).then(()=>sheet).then(image=>image || Promise.all(loads)), ready: Promise.all(loads)};
   }
@@ -164,14 +213,23 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
   illumination.flipY = false;
   illumination.wrapS = illumination.wrapT = T.ClampToEdgeWrapping;
   function bake(mesh, face) {
-    if (face !== 0) {
-      mesh.material.onBeforeCompile = (shader) => {
+    mesh.material.onBeforeCompile = (shader) => {
+      shader.vertexShader="varying vec3 galleryPoint;\n"+shader.vertexShader.replace(
+        "#include <worldpos_vertex>", "#include <worldpos_vertex>\ngalleryPoint=(modelMatrix*vec4(transformed,1.)).xyz;");
+      shader.fragmentShader="varying vec3 galleryPoint;\n"+shader.fragmentShader.replace("#include <lights_fragment_end>",`
+        #include <lights_fragment_end>
+        vec2 edge=max(vec2(0.),vec2(6.,7.)-abs(galleryPoint.xz));
+        float contact=${face === 0 || face > 4 ? "min(edge.x,edge.y)" : "min(galleryPoint.y,5.26-galleryPoint.y)"};
+        reflectedLight.indirectDiffuse*=.67+.33*smoothstep(0.,.46,contact);
+        `);
+      if (face !== 0) {
         shader.fragmentShader = shader.fragmentShader.replace(
           "#include <map_fragment>",
-          "#include <map_fragment>\n diffuseColor.rgb=mix(diffuseColor.rgb,diffuse*vec3(.84,.83,.80),.30);",
+          "#include <map_fragment>\n diffuseColor.rgb=mix(diffuseColor.rgb,diffuse*vec3(.84,.83,.80),.44);",
         );
-      };
-    }
+      }
+    };
+    mesh.material.customProgramCacheKey=()=>`vault-irradiance-${face}`;
     mesh.material.lightMap = illumination;
     mesh.material.lightMapIntensity = 15;
     mesh.updateMatrixWorld(true);
@@ -211,8 +269,8 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     new T.MeshStandardMaterial({
       ...stone,
       color: dark ? 0x696963 : 0xc4c3b9,
-      roughness: 0.63,
-      normalScale: new T.Vector2(0.14, 0.14),
+      roughness: 0.74,
+      normalScale: new T.Vector2(0.19, 0.19),
     }),
   );
   floor.rotation.x = -Math.PI / 2;
@@ -221,8 +279,8 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
   bake(floor, 0);
   const cream = {
     ...surface("plaster", 9, 3.8),
-    normalScale: new T.Vector2(0.16, 0.16),
-    roughness: 0.95,
+    normalScale: new T.Vector2(0.14, 0.14),
+    roughness: 0.92,
   };
   function wall(x, y, z, w, h, d, face) {
     return bake(box(scene, w, h, d, colors?.[face - 1] ?? 0xfffcf0, x, y, z, cream), face);
@@ -334,9 +392,12 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
       lamp.add(lens);
     }
   }
+  const skirting={roughness:.75,metalness:.18};
   for (const side of [-1, 1]) {
-    box(scene, 11.93, 0.026, 0.028, 0x6d6b60, 0, 0.045, side * 6.923);
-    box(scene, 0.028, 0.026, 13.94, 0x6d6b60, side * 5.923, 0.045, 0);
+    box(scene, 11.84, .074, .024, 0x393934, 0, .038, side * 6.930,skirting);
+    box(scene, .024, .074, 13.84, 0x393934, side * 5.930, .038, 0,skirting);
+    box(scene,11.84,.013,.018,0x242421,0,.082,side*6.928);
+    box(scene,.018,.013,13.84,0x242421,side*5.928,.082,0);
   }
   const seat = new T.Shape();
   seat.moveTo(-1.33, -0.31);
