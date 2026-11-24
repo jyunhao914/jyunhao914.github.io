@@ -76,7 +76,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     const theater = theme === "projection";
     const height = roomHeight ?? (study ? 3.65 : theater ? 3.35 : 5.8);
     const w = halfWidth, l = halfDepth;
-    const tones = colors || (theater ? [0x2a2e3a, 0x312935, 0x2b3837, 0x373b46] :
+    const tones = colors || (theater ? [0x3d414b, 0x3c343f, 0x34413e, 0x3d414a] :
       [0x424a50, 0x47423f, 0x394641, 0x46404a]);
     const plaster = {...surface("plaster", 1, 1), roughness: .91, normalScale: new T.Vector2(.13,.13)};
     const wood = surface("wood", 1, 1);
@@ -141,7 +141,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
             vec2 lampOffset=roomPoint.xz/vec2(${(w*.79).toFixed(3)},${(l*.90).toFixed(3)});
             float overhead=exp(-dot(lampOffset,lampOffset));
             float wash=max(0.,worldNormal.y)*overhead*.14;
-            wash+=max(0.,1.-abs(worldNormal.y))*smoothstep(.18,2.,roomPoint.y)*overhead*.10;
+            wash+=max(0.,1.-abs(worldNormal.y))*smoothstep(.18,2.,roomPoint.y)*overhead*${theater ? ".19" : ".10"};
             reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.93,.85)*wash;
           `}
           `);
