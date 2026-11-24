@@ -556,11 +556,19 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   }
   const beamWidth=w+.90,beamMid=(w-.90)/2;
   box(world,portalStone,beamWidth,H-head+.015,entryDepth,beamMid,(H+head)/2,entryZ-entryDepth/2,"lobby-gallery-stone-lintel");
-  if(doors.length){
-    const slab=directorySlab;
-    box(world,recess,slab.width-.02,slab.height-.02,.009,slab.x,1.56,entryZ+.004);
-    box(world,pierStone,slab.width,slab.height,slab.depth,slab.x,1.56,slab.z,slab.name);
-  }
+  const plaqueRows=doors.slice(0,5).map((door,i)=>({
+    title:door.title||door.room||"展廳",action:"sign:"+i
+  }));
+  if(doors.length>plaqueRows.length)plaqueRows.push({title:"完整名錄",action:"directory"});
+  const gap=.065;
+  const rowPitch=Math.min(.385,(directorySlab.height+gap)/Math.max(1,plaqueRows.length));
+  const plaqueHeight=rowPitch-gap;
+  const rowY=i=>1.56+((plaqueRows.length-1)/2-i)*rowPitch;
+  plaqueRows.forEach((_,i)=>{
+    const slab=directorySlab,y=rowY(i);
+    box(world,recess,slab.width-.025,plaqueHeight-.018,.009,slab.x,y,entryZ+.004);
+    box(world,pierStone,slab.width,plaqueHeight,slab.depth,slab.x,y,slab.z,"lobby-stone-plaque-"+i);
+  });
   const portalFrame=standard({color:0x433d37,metalness:.28,roughness:.44});
   for(const x of [galleryLeft+.026,galleryRight-.026]){
     box(world,portalFrame,.052,head,.31,x,head/2,entryZ-.365);
@@ -745,12 +753,9 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   // and air gap are in metres, so they retain their scale as the visitor approaches.
   const signHits=[],signRows=[];
   if(doors.length){
-    const pier=directorySlab,front=pier.z+pier.depth/2,rows=doors.slice(0,5).map((door,i)=>({
-      title:door.title||door.room||"展廳",action:"sign:"+i
-    }));
-    if(doors.length>rows.length)rows.push({title:"完整名錄",action:"directory"});
+    const pier=directorySlab,front=pier.z+pier.depth/2;
     const font=getComputedStyle(document.documentElement).getPropertyValue("--gallery-font-family").trim()||"sans-serif";
-    const width=pier.width-.17,pitch=Math.min(.34,1.70/rows.length),height=pitch*.94,top=1.56+(rows.length-1)*pitch/2;
+    const width=pier.width-.17,height=plaqueHeight*.93;
     const hitMat=material(T.MeshBasicMaterial,{visible:false});
     const reflectedDaylight=texture("pier-daylight.webp",true,false);
     reflectedDaylight.mapping=T.EquirectangularReflectionMapping;
@@ -759,11 +764,11 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     lamp.position.set(pier.x-1.60,3.08,front+1.05);
     lamp.target.position.set(pier.x,1.64,front);
     root.add(lamp,lamp.target);
-    rows.forEach(({title,action},i)=>{
-      const y=top-i*pitch;
+    plaqueRows.forEach(({title,action},i)=>{
+      const y=rowY(i);
       const face=standard({color:0x624627,roughness:.38,metalness:.58,envMap:reflectedDaylight,envMapIntensity:.68});
       mountPierLetters(T,root,{title,width,height,x:pier.x,y,z:front,family:font,face,edge,materials,textures});
-      const hit=new T.Mesh(new T.PlaneGeometry(width,pitch),hitMat);
+      const hit=new T.Mesh(new T.PlaneGeometry(pier.width,plaqueHeight),hitMat);
       hit.name="lobby-pier-sign-"+i;hit.userData.signAction=action;
       hit.position.set(pier.x,y,front+.014);root.add(hit);signHits.push(hit);
       signRows.push({action,face});
