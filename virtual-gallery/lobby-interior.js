@@ -187,8 +187,10 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   ];
   const rearX=(.48+w)/2,rearWidth=w-.48;
   const rearRelief=piece("lobby-gallery-north-relief",rearX,wallNorth+.128,rearWidth,.255,3.20);
+  // A floor-standing directory wall shares the stone jamb at its right edge.
+  const directorySlab=piece("lobby-directory-monolith",-.38,entryZ+.14,3.96,.25,3.82);
   const jambs=[galleryLeft+.026,galleryRight-.026].map(x=>piece("jamb",x,entryZ-.365,.052,.31,head));
-  const partition=partitionPlan(w,d,[...piers,...cheeks,...galleryLeaves,rearRelief,...jambs,...furnitureObstacles]),gardenBays=[];
+  const partition=partitionPlan(w,d,[...piers,...(doors.length?[directorySlab]:[]),...cheeks,...galleryLeaves,rearRelief,...jambs,...furnitureObstacles]),gardenBays=[];
   const openingLeft=-w+.81,openingRight=w-.82,northSill=3.19,northHead=5.97;
   const slotDepth=.39,outerSill=3.30,outerHead=5.90;
   const slabHeight=t=>2.90-.36*t*t*(3-2*t);
@@ -554,6 +556,13 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   }
   const beamWidth=w+1.22,beamMid=(w-1.22)/2;
   box(world,portalStone,beamWidth,H-head+.015,entryDepth,beamMid,(H+head)/2,entryZ-entryDepth/2,"lobby-gallery-stone-lintel");
+  if(doors.length){
+    const slab=directorySlab;
+    // Set back the dark plinth and mounting bed to articulate the slab perimeter.
+    box(world,recess,slab.width-.10,.11,slab.depth-.05,slab.x,.055,slab.z);
+    box(world,bronze,slab.width-.04,slab.height-.14,.045,slab.x,slab.height/2+.045,entryZ+.011);
+    box(world,pierStone,slab.width,slab.height-.11,slab.depth,slab.x,(slab.height+.11)/2,slab.z,slab.name);
+  }
   const portalFrame=standard({color:0x433d37,metalness:.28,roughness:.44});
   for(const x of [galleryLeft+.026,galleryRight-.026]){
     box(world,portalFrame,.052,head,.31,x,head/2,entryZ-.365);
@@ -591,8 +600,8 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
 
   // At the welcome bay the ashlar datum becomes a dark timber canopy. Wide vertical
   // cuts above it are seen in relief from both the threshold and the reception desk.
-  box(world,darkVeneer,w-1.22,.28,.40,(-w-1.22)/2,2.98,entryZ-.15,"lobby-reception-canopy");
-  box(world,bronze,w-1.22,.035,.26,(-w-1.22)/2,3.125,entryZ-.13);
+  box(world,darkVeneer,w-2.36,.28,.40,(-w-2.36)/2,2.98,entryZ-.15,"lobby-reception-canopy");
+  box(world,bronze,w-2.36,.035,.26,(-w-2.36)/2,3.125,entryZ-.13);
   const warmPiers=(length,place)=>{
     const widths=[.48,.26,.58,.36,.51,.31],margin=.036;let pos=0;
     for(let i=0;pos<length-.04;i++){
@@ -738,12 +747,12 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   // and air gap are in metres, so they retain their scale as the visitor approaches.
   const signHits=[],signRows=[];
   if(doors.length){
-    const pier=piers[0],front=pier.z+pier.depth/2,rows=doors.slice(0,5).map((door,i)=>({
+    const pier=directorySlab,front=pier.z+pier.depth/2,rows=doors.slice(0,5).map((door,i)=>({
       title:door.title||door.room||"展廳",action:"sign:"+i
     }));
     if(doors.length>rows.length)rows.push({title:"完整名錄",action:"directory"});
     const font=getComputedStyle(document.documentElement).getPropertyValue("--gallery-font-family").trim()||"sans-serif";
-    const width=2.53,pitch=Math.min(.52,2.7/rows.length),height=pitch*.96,top=1.63+(rows.length-1)*pitch/2;
+    const width=pier.width-.42,pitch=Math.min(.68,3.40/rows.length),height=pitch*.96,top=1.97+(rows.length-1)*pitch/2;
     const hitMat=material(T.MeshBasicMaterial,{visible:false});
     const reflectedDaylight=texture("pier-daylight.webp",true,false);
     reflectedDaylight.mapping=T.EquirectangularReflectionMapping;
