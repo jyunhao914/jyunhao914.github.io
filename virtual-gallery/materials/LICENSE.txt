@@ -78,3 +78,8 @@ CC0 1.0 Universal. reception-counter-stone.webp uses the diffuse scan, with a
 warm-grey colour grade for the cut and polished counter slabs.
 
 pier-daylight.webp is a reduced derivative of garden-canopy.webp for the metal lettering reflections, from the Sunny Vondelpark panorama credited above.
+
+Directory plaques: Granite Tile by Charlotte Baglioni, Poly Haven (CC0).
+https://polyhaven.com/a/granite_tile
+directory-granite-{color,normal,rough}.webp contain six separate interior cuts
+from the matching 4K diffuse, OpenGL normal and roughness scans, excluding grout.

@@ -52,21 +52,21 @@ function cutLetters(T,mask,width,height,depth) {
 export function mountPierLetters(T,root,{title,width,height,x,y,z,family,face,edge,materials,textures}){
   const mask=document.createElement("canvas");mask.width=640;mask.height=Math.round(mask.width*height/width);
   const ctx=mask.getContext("2d",{willReadFrequently:true});
-  let size=Math.floor(mask.height*.84);
-  ctx.font="650 "+size+"px "+family;
-  while(size>16&&ctx.measureText(title).width>mask.width-22)ctx.font="650 "+(--size)+"px "+family;
+  let size=Math.floor(mask.height*.79);
+  ctx.font="500 "+size+"px "+family;
+  while(size>16&&ctx.measureText(title).width>mask.width-48)ctx.font="500 "+(--size)+"px "+family;
   ctx.textBaseline="middle";ctx.fillStyle="white";
   const glyphs=Array.from(title);
   let label=title;
-  while(glyphs.length && ctx.measureText(label).width>mask.width-22){glyphs.pop();label=glyphs.join("")+"…";}
-  ctx.fillText(label,10,mask.height*.49);
-  const letters=new T.Mesh(cutLetters(T,mask,width,height,.011),[face,edge]);
+  while(glyphs.length && ctx.measureText(label).width>mask.width-48){glyphs.pop();label=glyphs.join("")+"…";}
+  ctx.fillText(label,24,mask.height*.49);
+  const letters=new T.Mesh(cutLetters(T,mask,width,height,.006),[face,edge]);
   letters.name="pier-metal-letters";letters.position.set(x,y,z-.003);root.add(letters);
 
   // The wall receives the silhouette cast by the upper-left grazing light.
   const cast=document.createElement("canvas");cast.width=mask.width;cast.height=mask.height;
   const ink=cast.getContext("2d");
-  ink.shadowColor="rgba(23,15,8,.85)";ink.shadowBlur=2.2;ink.shadowOffsetX=3.2;ink.shadowOffsetY=2.1;
+  ink.shadowColor="rgba(23,15,8,.85)";ink.shadowBlur=1.4;ink.shadowOffsetX=1.6;ink.shadowOffsetY=1.1;
   ink.drawImage(mask,0,0);
   ink.globalCompositeOperation="source-in";ink.fillStyle="#211910";ink.fillRect(0,0,cast.width,cast.height);
   const map=new T.CanvasTexture(cast);map.colorSpace=T.SRGBColorSpace;textures.push(map);
