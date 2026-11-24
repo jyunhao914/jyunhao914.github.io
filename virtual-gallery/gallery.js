@@ -3,7 +3,7 @@ import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js?v=desk33";
 import * as T from "./vendor/three.module.js";
 import {mountRenderer, disposeMount} from "./mount-render.js?v=desk33";
-import { architecture } from "./architecture.js?v=arrival55";
+import { architecture } from "./architecture.js?v=arrival56";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false) {
   const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";
   const canvasFont=(px,weight)=>weight+" "+px+"px "+family;
@@ -75,24 +75,39 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   // Keep the underlying image handles so returning during a slow load can
   // detach unfinished stills and roll tiles along with the playback elements.
   const pendingStills=new Set();
-  function artworkTexture(src,onLoad,onError) {
-    const image=new Image(), texture=new T.Texture();
-    image.crossOrigin="anonymous";
-    pendingStills.add(image);
-    image.onload=()=>{
-      pendingStills.delete(image);
-      image.onload=image.onerror=null;
-      if(disposed)return;
+  function artworkTexture(src,onLoad,onError,preview,onPreview) {
+    const texture=new T.Texture();
+    function request(url,loaded,failed) {
+      const image=new Image();
+      image.crossOrigin="anonymous";
+      pendingStills.add(image);
+      image.onload=()=>{
+        pendingStills.delete(image);
+        image.onload=image.onerror=null;
+        if(!disposed)loaded(image);
+      };
+      image.onerror=()=>{
+        pendingStills.delete(image);
+        image.onload=image.onerror=null;
+        if(!disposed)failed?.();
+      };
+      image.src=url;
+    }
+    function upload(image) {
+      if(texture.image && (texture.image.width!==image.width || texture.image.height!==image.height))
+        texture.dispose();
       texture.image=image;
       texture.needsUpdate=true;
+    }
+    if(preview)request(preview,image=>{
+      if(texture.image)return;
+      upload(image);
+      onPreview?.();
+    });
+    request(src,image=>{
+      upload(image);
       onLoad?.(image);
-    };
-    image.onerror=()=>{
-      pendingStills.delete(image);
-      image.onload=image.onerror=null;
-      onError?.();
-    };
-    image.src=src;
+    },onError);
     return texture;
   }
   const walls = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
@@ -166,7 +181,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     const mount=mounts.build(a), spec=mount.userData.spec;
     g.add(mount);
     const {w,h}=spec;
-    let tex;
+    const isStill=a.type==="圖片" && !a.src.startsWith("data:image/gif");
+    let tex,artworkReady;
     if (
       a.type === "影片" ||
       (a.type === "動態" &&
@@ -188,7 +204,16 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       tex = new T.CanvasTexture(c);
       animated.push({ img, ctx: c.getContext("2d"), tex });
     } else if (a.type === "圖片") {
+      let markArtwork;
+      artworkReady=new Promise(resolve=>{markArtwork=resolve;});
+      function showArtwork() {
+        face.material.color.setHex(0xffffff);
+        face.material.map=face.material.emissiveMap=tex;
+        face.material.needsUpdate=true;
+        markArtwork();
+      }
       function loadedImage(image) {
+        showArtwork();
         if(disposed || a.tiles?.length || (!spec.isHandscroll && w < 4*h) || image.width<=4096) return;
         const count=Math.ceil(image.width/2048);
         for(let i=0;i<count;i++){
@@ -201,7 +226,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
           addSection(new T.CanvasTexture(crop),i,count);
         }
       }
-      tex=artworkTexture(a.src,loadedImage);
+      tex=artworkTexture(a.src,loadedImage,markArtwork,a.preview,showArtwork);
     }
     else tex = labelTexture(a);
     tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -210,10 +235,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     let face = new T.Mesh(
       new T.PlaneGeometry(w, h),
       new T.MeshStandardMaterial({
-        map: tex,
+        color: isStill ? 0xc8bcaa : 0xffffff,
+        map: isStill ? null : tex,
         roughness: 0.92,
         emissive: 0xffffff,
-        emissiveMap: tex,
+        emissiveMap: isStill ? null : tex,
         emissiveIntensity: 0.045,
       }),
     );
@@ -233,9 +259,16 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       section.material.map=section.material.emissiveMap=tile;
       section.position.set(a.width*((index+.5)/count-.5),0,face.position.z+.001);
       g.add(section);
+      return section;
     }
-    if (Array.isArray(a.tiles))
-      a.tiles.forEach((url,index)=>addSection(artworkTexture(url),index,a.tiles.length));
+    if (Array.isArray(a.tiles)) {
+      a.tiles.forEach((url,index)=>{
+        const tile=artworkTexture(url,()=>{section.visible=true;});
+        const section=addSection(tile,index,a.tiles.length);
+        // Leave the roll overview visible until each higher-resolution tile is ready.
+        section.visible=false;
+      });
+    }
     const tag = document.createElement("canvas");
     tag.width = 512;
     tag.height = 190;
@@ -255,7 +288,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       new T.MeshStandardMaterial({ map: tagTex }),
     );
     plaque.position.set(spec.right+.28,-h/2+.08,-.064);
-    const entry={mount,face,plaque,g,a,strip:mountedSurfaceTarget(g,a,spec)};
+    const entry={mount,face,plaque,g,a,artworkReady,strip:mountedSurfaceTarget(g,a,spec)};
     mounted.set(a.id,entry);
     g.add(plaque);
     plaque.userData.a = a;
@@ -356,6 +389,23 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   setEntrance();
   cam.position.copy(station);
   cam.lookAt(entranceLook);
+  cam.aspect=Math.max(.22,host.clientWidth/Math.max(1,host.clientHeight));
+  cam.updateProjectionMatrix();
+  cam.updateMatrixWorld();
+  let arrivalArtworkReady=true,artworkTimer;
+  if (portalEntry) {
+    const visibleArtwork=Array.from(mounted.values()).filter(({g,artworkReady})=>{
+      if(!artworkReady)return false;
+      const projected=g.position.clone().project(cam);
+      return projected.z<1&&projected.z>0&&Math.abs(projected.x)<1&&Math.abs(projected.y)<1;
+    }).slice(0,2);
+    if(visibleArtwork.length) {
+      arrivalArtworkReady=false;
+      const revealArtwork=()=>{arrivalArtworkReady=true;clearTimeout(artworkTimer);};
+      artworkTimer=setTimeout(revealArtwork,850);
+      Promise.all(visibleArtwork.map(entry=>entry.artworkReady)).then(revealArtwork);
+    }
+  }
   let keys = new Map(),
     ray = new T.Raycaster(),
     drag,
@@ -912,7 +962,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     if(wheelZoom)advanceWheel(now);
     if (!travel) marker.visible = false;
     renderer.render(scene, cam);
-    if(surfaceReady && markDrawn && !renderer.getContext().isContextLost()) {
+    if(surfaceReady && arrivalArtworkReady && markDrawn && !renderer.getContext().isContextLost()) {
       markDrawn();
       markDrawn=null;
     }
@@ -1171,6 +1221,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     home:resetView,
     focus,
     dispose() {
+      clearTimeout(artworkTimer);
       markDrawn?.();
       mounts.dispose();
       building.dispose?.();
