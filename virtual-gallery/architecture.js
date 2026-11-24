@@ -1,5 +1,17 @@
 import * as T from "./vendor/three.module.js";
 
+// Small versions of the actual registered scans arrive together on a cold visit.
+const scanNames=["plaster-color.webp", "plaster-normal.webp", "wood-color.webp", "wood-normal.webp", "wood-rough.webp", "boards-color.webp", "boards-normal.webp", "boards-rough.webp", "stone-color.webp", "stone-normal.webp", "stone-rough.webp", "daylight.webp", "woodland.webp"];
+let previewSheet;
+function loadScanPreview(){
+  if(!previewSheet){
+    const image=new Image();
+    image.src=new URL("./materials/room-scan-preview.webp",import.meta.url).href;
+    previewSheet=image.decode().then(()=>image).catch(()=>{previewSheet=null;return null;});
+  }
+  return previewSheet;
+}
+
 // The atlas contains diffuse interreflection from the garden window and roof apertures.
 // UV sets are independent: scanned textures tile in metres, irradiance spans the whole room.
 export function architecture(scene, box, renderer, theme = "", halfWidth = 6, halfDepth = 7, roomHeight) {
@@ -13,8 +25,8 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
 
   const textures = [],
     loads = [];
-  // Average scan colours preserve the room silhouette during slow texture loads.
-  const baseColours={"plaster-color.webp": "#dadada", "wood-color.webp": "#633f28", "stone-color.webp": "#b19d79", "boards-color.webp": "#806042", "daylight.webp": "#181817", "woodland.webp": "#5e644e"};
+  const previews=[];
+  const sheet=loadScanPreview();
   const loader = new T.TextureLoader();
   function texture(file, color = false, x = 1, y = 1) {
     let tex;
@@ -28,15 +40,15 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
         );
       }),
     );
-    if(!tex.image) {
-      const swatch=document.createElement("canvas");
-      swatch.width=swatch.height=1;
-      const ctx=swatch.getContext("2d");
-      ctx.fillStyle=baseColours[file] || (file.endsWith("-normal.webp") ? "#8080ff" : "#cccccc");
-      ctx.fillRect(0,0,1,1);
-      tex.image=swatch;
+    const index=scanNames.indexOf(file);
+    previews.push(sheet.then(image=>{
+      if(!image || tex.image || index<0)return;
+      const tile=document.createElement("canvas");
+      tile.width=tile.height=256;
+      tile.getContext("2d").drawImage(image,index%4*256,Math.floor(index/4)*256,256,256,0,0,256,256);
+      tex.image=tile;
       tex.needsUpdate=true;
-    }
+    }));
     if (color) tex.colorSpace = T.SRGBColorSpace;
     tex.wrapS = tex.wrapT = T.RepeatWrapping;
     tex.repeat.set(x, y);
@@ -139,7 +151,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     for(const child of scene.children)
       if(child.isMesh && child!==floor && child!==ceiling && !walls.includes(child) && !child.material.emissive?.getHex()) child.castShadow=true;
     scene.add(key);
-    return {floor, height, wood, textures, ready: Promise.all(loads)};
+    return {floor, height, wood, textures, previewReady: Promise.all(previews).then(()=>sheet).then(image=>image || Promise.all(loads)), ready: Promise.all(loads)};
   }
   const illumination = texture("daylight.webp");
   illumination.channel = 1;
@@ -395,5 +407,5 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
   });
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.normalBias = 0.012;
-  return { floor, height:5.26, textures, wood, ready: Promise.all(loads) };
+  return { floor, height:5.26, textures, wood, previewReady: Promise.all(previews).then(()=>sheet).then(image=>image || Promise.all(loads)), ready: Promise.all(loads) };
 }

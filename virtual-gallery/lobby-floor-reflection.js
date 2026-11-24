@@ -23,13 +23,13 @@ export function createFloorReflection(T,renderer,scene,floor,invalidate){
         vec2 projected=floorImage.xy/max(.0001,floorImage.w);
         if(reflectionEnabled>.5 && floorImage.w>0. && all(greaterThan(projected,vec2(0.))) && all(lessThan(projected,vec2(1.)))){
           float facing=clamp(dot(normal,normalize(vViewPosition)),0.,1.);
-          vec2 spread=reflectionPixel*mix(1.85,.72,1.-facing);
+          vec2 spread=reflectionPixel*mix(1.2,5.5,roughnessFactor)*(1.+.5*facing);
           vec3 field=texture2D(floorMirror,projected).rgb*.40;
           field+=(texture2D(floorMirror,projected+spread*vec2(1.,.5)).rgb+
                   texture2D(floorMirror,projected+spread*vec2(-.5,1.)).rgb+
                   texture2D(floorMirror,projected-spread*vec2(1.,.5)).rgb+
                   texture2D(floorMirror,projected-spread*vec2(-.5,1.)).rgb)*.15;
-          float fresnel=.057+.65*pow(1.-facing,4.);
+          float fresnel=(.048+.52*pow(1.-facing,4.))*(1.-.42*roughnessFactor);
           outgoingLight=mix(outgoingLight,field,fresnel);
         }
         #include <opaque_fragment>`);

@@ -155,7 +155,9 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const portalStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.25,.25),color:0x978673,roughness:.61});
   const innerStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.13,.13),color:0xa99c88,roughness:.59});
   const galleryDeck=standard({map:plasterMap,color:0xb1aa9a,roughness:.82});
-  const darkVeneer=standard({map:oakMap,normalMap:oakNormal,normalScale:new T.Vector2(.12,.12),color:0x675f54,roughness:.53});
+  const walnut=texture("mount/walnut-color.webp"),walnutNormal=texture("mount/walnut-normal.webp",false);
+  const darkVeneer=standard({map:walnut,normalMap:walnutNormal,roughnessMap:texture("mount/walnut-rough.webp",false),
+    normalScale:new T.Vector2(.20,.20),color:0x69482f,roughness:.80});
   const ribOak=standard({map:oakMap,color:0xad8a62,roughness:.60});
   const warmCut=standard({color:0xe5b57b,emissive:0xffbc74,emissiveIntensity:1.16,roughness:.70});
   const bronze=standard({color:0x8d7862,metalness:.44,roughness:.47});
@@ -240,7 +242,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       shader.vertexShader="varying vec3 lobbyPoint;\n"+shader.vertexShader.replace("#include <worldpos_vertex>",
         "#include <worldpos_vertex>\nlobbyPoint=(modelMatrix*vec4(transformed,1.)).xyz;");
       shader.fragmentShader="varying vec3 lobbyPoint;uniform sampler2D treeShadow;\n"+partitionOcclusion+"\n"+shader.fragmentShader;
-      if(mat===wallStone){
+      if(mat===wallStone || mat===portalStone){
         // Metre-scale slab joints and a displaced sample of the same real scan in each cut.
         shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`
           vec2 panel=vMapUv/vec2(2.14,1.02);
@@ -375,7 +377,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       const nx=normal.getX(i),ny=normal.getY(i),nz=normal.getZ(i);
       batch.pos.push(X,v,Z);batch.normal.push(nx*c+nz*s,ny,-nx*s+nz*c);
       const across=Math.abs(nx*c+nz*s)>.5 ? Z : X;
-      const metreUv=mat===wallStone,cutStone=mat.map===stoneMap;
+      const metreUv=mat===wallStone || mat===portalStone,cutStone=mat.map===stoneMap;
       if(mat===stone)batch.uv.push(X/1.20,Z/1.20);
       else if(mat===darkVeneer||mat===ribOak||mat===timberVeneer)batch.uv.push(across*.68,v*.32);
       else if(mat===oak)batch.uv.push((Math.abs(ny)>.5 ? Z : v)*.64,X*.26);
@@ -578,10 +580,10 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     box(world,bronze,.022,3.12,.028,edgeX,1.57,leaf.z+(leaf.depth-.028)/2);
   }
   box(world,darkVeneer,rearWidth,3.24,.09,rearX,1.62,wallNorth+.05,"lobby-gallery-rear-screen");
-  const reedCount=27,reedWidth=(rearWidth-.16)/reedCount;
+  const reedCount=17,reedWidth=(rearWidth-.16)/reedCount;
   for(let i=0;i<reedCount;i++){
     const raised=.095+.042*Math.cos(i*.59),x=.56+(i+.5)*reedWidth;
-    box(world,i%4===1?portalStone:i%4===3?ribOak:innerStone,reedWidth-.018,3.08,raised,x,1.58,wallNorth+.092+raised/2);
+    box(world,i%4===3?ribOak:darkVeneer,reedWidth-.018,3.08,raised,x,1.58,wallNorth+.092+raised/2);
   }
   box(world,metal,rearWidth,.092,.26,rearX,3.18,wallNorth+.16);
   box(world,warmCut,rearWidth-.21,.016,.034,rearX,3.135,wallNorth+.236);
@@ -745,9 +747,15 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     backing.position.set(pier.x,top-(rows.length-1)*pitch/2,front+.009);
     root.add(backing);
     const hitMat=material(T.MeshBasicMaterial,{visible:false});
+    const brush=texture("mount/brush-color.webp"),toolMarks=texture("mount/brush-normal.webp",false);
+    const bevel=standard({color:0xbc9e70,metalness:.55,roughness:.35,map:brush});
+    const edge=.004;
     rows.forEach(({title,action},i)=>{
       const y=top-i*pitch;
-      const face=standard({color:0x594938,roughness:.47,metalness:.38});
+      const face=standard({color:0x8a7559,roughness:.43,metalness:.42,map:brush,
+        normalMap:toolMarks,normalScale:new T.Vector2(.14,.14)});
+      const rim=new T.Mesh(new T.BoxGeometry(width+edge,height+edge,.010),bevel);
+      rim.position.set(pier.x,y,front+.032);root.add(rim);
       const plate=new T.Mesh(new T.BoxGeometry(width,height,.020),face);
       plate.position.set(pier.x,y,front+.028);root.add(plate);
       const c=document.createElement("canvas");c.width=960;c.height=205;

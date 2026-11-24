@@ -3,7 +3,7 @@ import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js?v=desk33";
 import * as T from "./vendor/three.module.js";
 import {mountRenderer, disposeMount} from "./mount-render.js?v=desk33";
-import { architecture } from "./architecture.js?v=entry43";
+import { architecture } from "./architecture.js?v=material45";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false) {
   const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";
   const canvasFont=(px,weight)=>weight+" "+px+"px "+family;
@@ -45,12 +45,11 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   cam.rotation.order = "YXZ";
   const station=new T.Vector3(0,1.65,2), entranceLook=new T.Vector3(0,1.65,-5);
   const building = architecture(scene, box, renderer, theme, halfWidth, halfDepth, roomHeight);
-  let markDrawn,surfaceReady=false,readinessLimit;
+  let markDrawn,surfaceReady=false;
   const ready=new Promise(resolve=>{markDrawn=resolve;});
   // Present the architecture as soon as it draws. Artwork resolves independently.
-  const surfaces=portalEntry ? Promise.race([building.ready,
-    new Promise(resolve=>{readinessLimit=setTimeout(resolve,250);})]) : building.ready;
-  surfaces.then(()=>{surfaceReady=true;clearTimeout(readinessLimit);});
+  const surfaces=Promise.race([building.previewReady,building.ready]);
+  surfaces.then(()=>{surfaceReady=true;});
   let reflection,
     disposed = false;
   building.ready
@@ -1116,7 +1115,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     home:resetView,
     focus,
     dispose() {
-      clearTimeout(readinessLimit);
       markDrawn?.();
       mounts.dispose();
       building.dispose?.();
