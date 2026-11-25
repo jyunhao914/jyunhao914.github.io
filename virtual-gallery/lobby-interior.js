@@ -1,3 +1,4 @@
+import {buildSkylight} from "./lobby-skylight.js?v=glazing63";
 import {mountPierLetters} from "./pier-lettering.js?v=wayfinding53";
 import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=depth61";
 import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
@@ -237,6 +238,11 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       vec3 l=diff*inversesqrt(d2);float cone=dot(-l,normalize(aim-fixture));
       return smoothstep(.70,.94,cone)*max(0.,dot(n,l))/(.55+.32*d2);
     }`;
+  const openSky=texture("atrium-pure-sky.webp",true,false),skyTurn=.66;
+  openSky.wrapS=T.RepeatWrapping;
+  const skylightSun=buildSkylight(T,root,{rim,mouth,soffitY:H,halfWidth:w,northWall:wallNorth,
+    southWall:d,sky:openSky,skyTurn,texture,material});
+
   function daylight(mat) {
     mat.onBeforeCompile=shader=>{
       shader.uniforms.treeShadow={value:canopy};
@@ -247,7 +253,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         westSky+=area/(area+dist2)*max(0.,dot(nWorld,unit))*max(0.,-unit.x);}`).join("\n");
       shader.vertexShader="varying vec3 lobbyPoint;\n"+shader.vertexShader.replace("#include <worldpos_vertex>",
         "#include <worldpos_vertex>\nlobbyPoint=(modelMatrix*vec4(transformed,1.)).xyz;");
-      shader.fragmentShader="varying vec3 lobbyPoint;uniform sampler2D treeShadow;\n"+partitionOcclusion+"\n"+shader.fragmentShader;
+      shader.fragmentShader="varying vec3 lobbyPoint;uniform sampler2D treeShadow;\n"+partitionOcclusion+"\n"+skylightSun+"\n"+shader.fragmentShader;
       if(mat===wallStone || mat===portalStone){
         // Metre-scale slab joints and a displaced sample of the same real scan in each cut.
         shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`
@@ -325,7 +331,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         windowLight=smoothstep(-.055,.055,slotMargin)*lowRoof;
         if(windowLight+beam>.001){
           float passing=partitionVisibility(p,vec3(sunTilt.x,1.,sunTilt.y),max(.1,6.5-p.y));
-          windowLight*=passing;beam*=passing;
+          windowLight*=passing;beam*=passing*skylightTransmission(p,sunTilt);
         }
         if(p.z<${(-d+1.6).toFixed(3)}){
           sky*=mix(.34,1.,partitionVisibility(p,skyDir,sqrt(sky2)));
@@ -405,8 +411,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     geo.dispose();
   }
   box(world,stone,2*w+.08,.16,d+.12-wallNorth,0,-.08,(d+.04+wallNorth-.08)/2,"lobby-reflective-black-stone");
-  // A single level soffit surrounds a splayed court. The floor, the light well, and
-  // the exterior roof are open on the same axis; no layer spans the aperture.
+  // The level soffit turns up into the stone light well beneath the rooflight.
   const courtMid=(mouth.north+mouth.south)/2,courtDepth=mouth.south-mouth.north;
   const leftSpan=w+.04-mouth.x;
   for(const side of [-1,1])box(world,soffit,leftSpan,.13,courtDepth,side*(mouth.x+leftSpan/2),H+.065,courtMid);
@@ -941,8 +946,6 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const radius=Math.max(48,3*Math.hypot(w,d));
   const panorama=texture("garden-canopy.webp",true,false);
   const backdrop=material(T.MeshBasicMaterial,{map:panorama,color:0xe3e9e7,side:T.BackSide,fog:false});
-  const openSky=texture("atrium-pure-sky.webp",true,false);
-  openSky.wrapS=T.RepeatWrapping;
   backdrop.onBeforeCompile=shader=>{
     shader.uniforms.atriumSky={value:openSky};
     shader.uniforms.atriumRim={value:new T.Vector4(rim.x+.025,rim.north-.025,rim.south+.025,rim.y)};
@@ -957,7 +960,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
       if(ray.y>0.001 && cameraPosition.y<atriumRim.w){
         vec3 crossing=cameraPosition+ray*((atriumRim.w-cameraPosition.y)/ray.y);
         if(abs(crossing.x)<atriumRim.x && crossing.z>atriumRim.y && crossing.z<atriumRim.z){
-          vec2 uvSky=vec2(atan(ray.z,ray.x)*0.159154943+0.41,
+          vec2 uvSky=vec2(atan(ray.z,ray.x)*0.159154943+${skyTurn.toFixed(3)},
                           asin(clamp(ray.y,-1.0,1.0))*0.318309886+0.5);
           gl_FragColor.rgb=texture2D(atriumSky,uvSky).rgb;
         }

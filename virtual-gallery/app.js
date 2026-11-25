@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=clear62";
+import {lobbyPage} from "./lobby-page.js?v=glazing63";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
@@ -508,7 +508,7 @@ function showCatalogue(visible) {
 let lastRoute, lastDoor;
 const doors=[];
 let incomingDoor;
-function loadRoomRenderer() {return import("./gallery.js?v=depth61");}
+function loadRoomRenderer() {return import("./gallery.js?v=glazing63");}
 const lobby=lobbyPage(door=>{
   incomingDoor=door;
   openRoom(door.show,door.room);

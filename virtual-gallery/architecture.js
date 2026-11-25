@@ -94,13 +94,19 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     const floor = facing(box(scene, w*2, .14, l*2, study ? 0xb4aca1 : theater ? 0x7e8083 : 0xb9b6b0, 0, -.07, 0,
       {...surface(study ? "boards" : "stone", 1, 1), roughness: study ? .54 : .56,
         normalScale: new T.Vector2(.15,.15)}), study ? 1.7 : 1.5);
+    const lightBays=Math.max(1,Math.round(l*2/2.95));
+    const bayPitch=l*2/lightBays;
+    const openingWidth=Math.min(2.30,bayPitch-.32);
     const walls = [
       box(scene, w*2, height, .12, tones[0], 0, height/2, -l, plaster),
       box(scene, w*2, height, .12, tones[1], 0, height/2, l, plaster),
-      box(scene, .12, height, l*2, tones[2], -w, height/2, 0, plaster),
+      ...(study ? [] : [box(scene, .12, height, l*2, tones[2], -w, height/2, 0, plaster)]),
       box(scene, .12, height, l*2, tones[3], w, height/2, 0, plaster),
     ];
     walls.forEach(wall => facing(wall,1.08));
+    if (study) {
+      walls.push(studyWindows(scene, texture, plaster, wood, tones[2], w, l, height, lightBays, bayPitch, openingWidth));
+    }
     const ceiling = facing(box(scene, w*2,.12,l*2, study ? 0xa19a8d : theater ? 0x494b50 : 0x87847d, 0,height,0,plaster),1.08);
     // A recessed dark skirting gives the floor a consistent junction with the
     // walls while leaving the artwork planes and circulation clear.
@@ -112,15 +118,15 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
       box(scene,.018,.020,l*2-.16,0x1d1c1a,side*(w-.069),.086,0);
       box(scene,w*2-.16,.020,.018,0x1d1c1a,0,.086,side*(l-.069));
     }
-    const lightBays=Math.max(1,Math.round(l*2/2.95));
-    const bayPitch=l*2/lightBays;
     const lampPitch=l*2/Math.max(1,Math.ceil(l*2/4.1));
+    const leafMask=study ? texture("canopy-light.webp") : null;
     // Broad reflected window light and occlusion at perpendicular surface joins.
     for (const mesh of [floor, ceiling, ...walls]) {
       mesh.material.onBeforeCompile = (shader) => {
+        if(study)shader.uniforms.studyLeafMask={value:leafMask};
         shader.vertexShader = "varying vec3 roomPoint;\n" + shader.vertexShader.replace(
           "#include <worldpos_vertex>", "#include <worldpos_vertex>\nroomPoint=(modelMatrix*vec4(transformed,1.)).xyz;");
-        shader.fragmentShader = "varying vec3 roomPoint;\n" + shader.fragmentShader.replace(
+        shader.fragmentShader = (study ? "uniform sampler2D studyLeafMask;\n" : "")+"varying vec3 roomPoint;\n"+shader.fragmentShader.replace(
           "#include <lights_fragment_end>", `#include <lights_fragment_end>
           vec2 edge=max(vec2(0.),vec2(${w.toFixed(3)},${l.toFixed(3)})-abs(roomPoint.xz));
           vec3 worldNormal=inverseTransformDirection(normal,viewMatrix);
@@ -135,10 +141,23 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
               float r=max(length(ray),.18);
               windowBounce+=max(0.,dot(worldNormal,ray/r))*max(0.,-ray.x/r)/(1.+r*r*.24);
             }
+            // Project the west aperture onto receivers with a broad penumbra,
+            // softened further by the trees between the sun and the gallery.
+            vec3 toGarden=normalize(vec3(-1.,.86,-.41));
+            float travel=max(0.,roomPoint.x+${(w+.206).toFixed(4)});
+            vec2 atGlass=roomPoint.yz+vec2(.86,-.41)*travel;
+            float bayZ=mod(atGlass.y+${l.toFixed(4)},${bayPitch.toFixed(4)})-${(bayPitch/2).toFixed(4)};
+            float aperture=min(${(openingWidth/2-.075).toFixed(4)}-abs(bayZ),min(atGlass.x-1.274,2.904-atGlass.x));
+            float penumbra=.035+.052*travel;
+            float beam=smoothstep(-penumbra,penumbra,aperture);
+            float meeting=abs(bayZ+${(openingWidth*.15).toFixed(4)});
+            beam*=.46+.54*smoothstep(0.,.033+penumbra,meeting);
+            float foliage=texture2D(studyLeafMask,atGlass.yx*vec2(.083,.16)+vec2(.23,.07)).r;
+            vec3 daylight=vec3(1.,.95,.82)*max(0.,dot(worldNormal,toGarden))*beam*(.28+foliage*.99);
             float lampOffset=(${height.toFixed(3)}-roomPoint.y-.53)/1.22;
             float grazing=max(0.,-worldNormal.x)*exp(-lampOffset*lampOffset)*
               smoothstep(0.,1.2,edge.y);
-            reflectedLight.indirectDiffuse+=diffuseColor.rgb*(vec3(.90,.94,1.)*windowBounce*.78+
+            reflectedLight.indirectDiffuse+=diffuseColor.rgb*(daylight+vec3(.90,.94,1.)*windowBounce*.96+
               vec3(1.,.85,.68)*grazing*.38);` : theater ? `
             float guidance=max(0.,worldNormal.y)*exp(-edge.x*2.7);
             float reflectedFill=max(0.,1.-abs(worldNormal.y))*smoothstep(.14,2.4,roomPoint.y);
@@ -167,29 +186,8 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     if (study) {
       const timberTone=0x78644e;
       const frame={...timber,roughness:.66,normalScale:new T.Vector2(.21,.21)};
-      // Build the screen as a timber casing with a softly lit paper insert.
-      // All screens and posts stay behind the inside face of the hanging work.
-      const panelWidth=Math.min(2.30,bayPitch-.32),panelHeight=1.57;
-      const paper={emissive:0xeadeca,emissiveIntensity:.46,color:0xc7bdab,roughness:.96};
       for (let bay=0;bay<lightBays;bay++) {
         const z=-l+(bay+.5)*bayPitch;
-        const opening=box(scene,.018,panelHeight,panelWidth,0xc7bdab,-w+.063,2.04,z,paper);
-        opening.material.onBeforeCompile=shader=>{
-          shader.vertexShader="varying vec2 screenUv;\n"+shader.vertexShader.replace(
-            "#include <uv_vertex>","#include <uv_vertex>\nscreenUv=uv;");
-          shader.fragmentShader="varying vec2 screenUv;\n"+shader.fragmentShader.replace(
-            "#include <emissivemap_fragment>",`#include <emissivemap_fragment>
-              float perimeter=min(min(screenUv.x,1.-screenUv.x),min(screenUv.y,1.-screenUv.y));
-              float falloff=.60+.40*smoothstep(0.,.19,perimeter);
-              float skyScreen=mix(.75,1.04,screenUv.y);
-              totalEmissiveRadiance*=falloff*skyScreen;`);
-        };
-        for(const offset of [-.5,-.25,0,.25,.5]){
-          const mullion=Math.abs(offset)===.5 ? .061 : .025;
-          facing(box(scene,.052,panelHeight+.046,mullion,timberTone,-w+.075,2.04,z+offset*panelWidth,frame),1.8);
-        }
-        for (const offset of [-.5,0,.5])
-          facing(box(scene,.060,.039,panelWidth+.055,timberTone,-w+.076,2.04+offset*panelHeight,z,frame),1.8);
         const beamZ=z+bayPitch/2;
         if(beamZ<l-.22)
           facing(box(scene,w*2-.12,.115,.167,timberTone,0,height-.119,beamZ,frame),1.8);
@@ -486,4 +484,173 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.normalBias = 0.012;
   return { floor, height:5.26, textures, wood, previewReady: Promise.all(previews).then(()=>sheet).then(image=>image || Promise.all(loads)), ready: Promise.all(loads) };
+}
+
+// The west wall of the calligraphy study overlooks one continuous planted court.
+// Batch the solid profiles by finish so adding a bay doesn't add draw calls.
+function studyWindows(scene, texture, plaster, wood, wallTone, halfWidth, halfDepth, height, count, pitch, width) {
+  const wallX=-halfWidth, sill=1.19, head=2.98, glassX=wallX-.206;
+  const reveals=[], lining=[], bronze=[], seals=[], paleStone=[], courtStone=[], paving=[];
+  const centres=Array.from({length:count},(_,i)=>-halfDepth+(i+.5)*pitch);
+  function block(batch,x0,x1,y0,y1,z0,z1) {
+    batch.push([x0,x1,y0,y1,z0,z1]);
+  }
+  const unit=new T.BoxGeometry(1,1,1);
+  function mesh(batch,name,finish,period=1) {
+    const pos=[],norm=[],uv=[],indices=[];
+    const {position:p,normal:n}=unit.attributes;
+    for(const [x0,x1,y0,y1,z0,z1] of batch) {
+      const offset=pos.length/3;
+      for(let i=0;i<p.count;i++) {
+        const x=x0+(p.getX(i)+.5)*(x1-x0);
+        const y=y0+(p.getY(i)+.5)*(y1-y0);
+        const z=z0+(p.getZ(i)+.5)*(z1-z0);
+        const nx=n.getX(i),ny=n.getY(i),nz=n.getZ(i);
+        pos.push(x,y,z);norm.push(nx,ny,nz);
+        const along=Math.abs(nx)>.5 ? z : x, across=Math.abs(ny)>.5 ? z : y;
+        if(batch===lining && y1-y0>z1-z0)uv.push(across/period,along/period);
+        else uv.push(along/period,across/period);
+      }
+      for(const id of unit.index.array)indices.push(offset+id);
+    }
+    const g=new T.BufferGeometry();
+    g.setIndex(indices);
+    for(const [key,data,size] of [["position",pos,3],["normal",norm,3],["uv",uv,2]])
+      g.setAttribute(key,new T.Float32BufferAttribute(data,size));
+    const object=new T.Mesh(g,new T.MeshStandardMaterial(finish));
+    if(batch!==reveals && batch!==seals){
+      // Sky entering from the court lifts the outside edge of the millwork.
+      // The liner, sill and floor meet without a painted-on window surround.
+      object.material.onBeforeCompile=shader=>{
+        shader.vertexShader="varying vec3 studyDetail;\n"+shader.vertexShader.replace(
+          "#include <worldpos_vertex>","#include <worldpos_vertex>\nstudyDetail=position;");
+        if(batch===lining)shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",
+          `#include <map_fragment>
+           float oak=dot(diffuseColor.rgb,vec3(.26,.62,.12));
+           diffuseColor.rgb=mix(diffuseColor.rgb,oak*vec3(1.57,1.28,.99),.65)+vec3(.027,.022,.014);`);
+        shader.fragmentShader="varying vec3 studyDetail;\n"+shader.fragmentShader.replace(
+          "#include <lights_fragment_end>",`#include <lights_fragment_end>
+          vec3 nStudy=inverseTransformDirection(normal,viewMatrix);
+          float exposure=1.-smoothstep(${(wallX-.21).toFixed(4)},${(wallX+.127).toFixed(4)},studyDetail.x);
+          float faceLight=.22+.72*max(0.,nStudy.y)+.27*abs(nStudy.z)+.22*max(0.,-nStudy.x);
+          float local=abs(mod(studyDetail.z+${halfDepth.toFixed(4)},${pitch.toFixed(4)})-${(pitch/2).toFixed(4)});
+          float corner=smoothstep(0.,.13,${(width/2).toFixed(4)}-local);
+          float revealAO=.70+.30*corner;
+          reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(.92,.97,1.03)*faceLight*(.54+1.12*exposure)*revealAO;`);
+      };
+      object.material.customProgramCacheKey=()=>"study-facing-"+name;
+    }
+    object.name="calligraphy-window-"+name;
+    object.receiveShadow=true;scene.add(object);
+    return object;
+  }
+  // Same interior plane as the continuous walls. The 36 cm masonry section is
+  // continuous around all four sides and remains visible from oblique views.
+  const inner=wallX+.06, outer=wallX-.30;
+  block(reveals,outer,inner,0,sill,-halfDepth,halfDepth);
+  block(reveals,outer,inner,head,height,-halfDepth,halfDepth);
+  let endsAt=-halfDepth;
+  const panes=[];
+  for(const z of centres){
+    const left=z-width/2,right=z+width/2,meeting=left+width*.35;
+    block(reveals,outer,inner,sill,head,endsAt,left);
+    endsAt=right;
+    // Oiled wood lining ends at the dark rebate. A honed sill extends 52 mm
+    // into the room with its own thinner drip lip on the landscape side.
+    for(const edge of [left,right-.033])
+      block(lining,glassX+.018,inner-.006,sill,head,edge,edge+.033);
+    block(lining,glassX+.018,inner-.006,head-.034,head,left+.033,right-.033);
+    block(paleStone,outer-.065,inner+.052,sill,sill+.042,left-.018,right+.018);
+    for(const edge of [left+.033,right-.075])
+      block(bronze,glassX-.038,glassX+.040,sill+.042,head-.034,edge,edge+.042);
+    for(const y of [sill+.042,head-.076])
+      block(bronze,glassX-.038,glassX+.040,y,y+.042,left+.075,right-.075);
+    block(bronze,glassX-.042,glassX+.038,sill+.084,head-.076,meeting-.022,meeting+.022);
+
+    // The narrow ventilator has its own recessed top light; the wide fixed
+    // pane gives the viewer an uninterrupted view across the court.
+    const rail=head-.432;
+    block(bronze,glassX-.026,glassX+.027,rail-.015,rail+.015,left+.075,meeting-.022);
+    const bays=[
+      [left+.075,meeting-.022,sill+.084,rail-.015],
+      [left+.075,meeting-.022,rail+.015,head-.076],
+      [meeting+.022,right-.075,sill+.084,head-.076],
+    ];
+    for(const [a,b,bottom,top] of bays){
+      const bead=.009;
+      for(const edge of [a,b-bead])block(seals,glassX-.009,glassX+.008,bottom,top,edge,edge+bead);
+      for(const y of [bottom,top-bead])block(seals,glassX-.009,glassX+.008,y,y+bead,a+bead,b-bead);
+      panes.push([a+bead,b-bead,bottom+bead,top-bead]);
+    }
+  }
+  block(reveals,outer,inner,sill,head,endsAt,halfDepth);
+  const wall=mesh(reveals,"reveals",{...plaster,color:wallTone},1.08);
+  mesh(lining,"oak-liners",{...wood,color:0xb1906f,normalScale:new T.Vector2(.11,.11),roughness:.53},1.4);
+  mesh(bronze,"bronze-sashes",{color:0x857763,metalness:.57,roughness:.37});
+  mesh(seals,"glazing-beads",{color:0x302d29,roughness:.78});
+  mesh(paleStone,"stone-sills",{...plaster,color:0xbcad94,roughness:.61},.65);
+
+  const outerLength=halfDepth+11, gardenEdge=wallX-4.3;
+  block(paving,gardenEdge,outer,-.22,-.06,-outerLength,outerLength);
+  block(courtStone,gardenEdge-.23,gardenEdge,-.16,.39,-outerLength,outerLength);
+  block(courtStone,gardenEdge-.27,gardenEdge+.035,.39,.441,-outerLength,outerLength);
+  mesh(courtStone,"garden-coping",{...plaster,color:0xb9ad94,roughness:.84},1.18);
+  mesh(paving,"terrace",{...plaster,color:0x968f7e,roughness:.92},1.1);
+  unit.dispose();
+
+  // The photographed trees are beyond the real sill and terraced garden wall.
+  // A finite panorama shares the same horizon across bays and allows parallax.
+  const garden=new T.Mesh(new T.SphereGeometry(1,64,32),new T.MeshBasicMaterial({
+    map:texture("woodland.webp",true),color:0xf8f7eb,side:T.BackSide,toneMapped:false,
+  }));
+  const detail=texture("study-garden-detail.webp",true);
+  detail.wrapS=detail.wrapT=T.ClampToEdgeWrapping;
+  garden.material.onBeforeCompile=shader=>{
+    shader.uniforms.studyGardenDetail={value:detail};
+    shader.fragmentShader="uniform sampler2D studyGardenDetail;\n"+shader.fragmentShader.replace(
+      "#include <map_fragment>",`#include <map_fragment>
+        vec2 inside=(vMapUv-vec2(2688./8192.,1.-2816./4096.))/vec2(4736./8192.,1760./4096.);
+        vec2 margin=min(inside,1.-inside);
+        float detailWeight=smoothstep(0.,.028,min(margin.x,margin.y));
+        if(detailWeight>0. && textureSize(studyGardenDetail,0).x>1)
+          diffuseColor.rgb=mix(diffuseColor.rgb,diffuse*texture2D(studyGardenDetail,inside).rgb,detailWeight);`);
+  };
+  const radius=Math.max(16,halfDepth+8);
+  garden.scale.setScalar(radius);garden.rotation.y=2.38;
+  garden.position.set(wallX-1.5,1.65,0);
+  garden.name="calligraphy-window-garden";scene.add(garden);
+
+  const glass=new T.MeshStandardMaterial({metalness:1,roughness:.095,color:0xffffff,transparent:true,depthWrite:false});
+  // Box-project the room's captured environment onto the actual glass position.
+  // Both the room and the photographic garden remain registered as the eye moves.
+  glass.onBeforeCompile=shader=>{
+    shader.vertexShader="varying vec3 windowPoint;\n"+shader.vertexShader.replace(
+      "#include <project_vertex>","#include <project_vertex>\nwindowPoint=(modelMatrix*instanceMatrix*vec4(transformed,1.)).xyz;");
+    shader.fragmentShader="varying vec3 windowPoint;\n"+shader.fragmentShader.replace(
+      "#include <opaque_fragment>",`vec3 sight=normalize(windowPoint-cameraPosition);
+        vec3 reflected=reflect(sight,vec3(1.,0.,0.));
+        vec3 direction=sign(reflected+vec3(1e-7))*max(abs(reflected),vec3(.0001));
+        vec3 farFace=mix(vec3(${wallX.toFixed(4)},0.,-${halfDepth.toFixed(4)}),
+          vec3(${halfWidth.toFixed(4)},${height.toFixed(4)},${halfDepth.toFixed(4)}),step(vec3(0.),direction));
+        vec3 dist=(farFace-windowPoint)/direction;
+        vec3 hit=windowPoint+reflected*max(0.,min(dist.x,min(dist.y,dist.z)));
+        vec3 roomReflection=vec3(.055,.064,.069);
+        #ifdef ENVMAP_TYPE_PMREM
+          vec3 corrected=normalize(hit-vec3(0.,1.7,0.));
+          roomReflection=textureLod(envMap,envMapRotation*corrected,roughnessToMip(.095)).rgb;
+        #endif
+        float grazes=pow(1.-clamp(abs(sight.x),0.,1.),5.);
+        diffuseColor.a=.095+.88*grazes;
+        outgoingLight=roomReflection*vec3(.96,.99,1.)+vec3(.004,.012,.011);
+        #include <opaque_fragment>`);
+  };
+  const glazing=new T.InstancedMesh(new T.PlaneGeometry(1,1),glass,panes.length);
+  const transform=new T.Object3D();
+  transform.rotation.y=Math.PI/2;
+  for(const [i,[a,b,bottom,top]] of panes.entries()){
+    transform.position.set(glassX,(bottom+top)/2,(a+b)/2);
+    transform.scale.set(b-a,top-bottom,1);transform.updateMatrix();glazing.setMatrixAt(i,transform.matrix);
+  }
+  glazing.name="calligraphy-window-glass";glazing.computeBoundingSphere();scene.add(glazing);
+  return wall;
 }

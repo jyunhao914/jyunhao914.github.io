@@ -5,7 +5,7 @@ let studio;
 async function show(value,provider) {
   await login(value,provider);
   $("key").value = "";
-  studio=await import("./studio.js?v=hall34");
+  studio=await import("./studio.js?v=glazing63");
   $("login").hidden = true;
   $("logout").hidden = false;
   $("status").textContent = deviceSaveFailed ? "已登入，瀏覽器未允許記住裝置。" : "已連線至私人作品庫";

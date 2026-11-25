@@ -87,3 +87,10 @@ from the matching 4K diffuse, OpenGL normal and roughness scans, excluding grout
 atrium-pure-sky.webp is a daylight colour grade of Kloofendal 38d Partly
 Cloudy (Pure Sky), by Greg Zaal and Jarod Guest, Poly Haven (CC0).
 https://polyhaven.com/a/kloofendal_38d_partly_cloudy_puresky
+
+atrium-interior-reflection.webp is a render of the public reception hall from
+the skylight curb, using the architectural surfaces credited above.
+
+Calligraphy study windows: study-garden-detail.webp is a cropped higher-resolution
+colour-matched derivative of the Shady Patch photograph by Greg Zaal (CC0), as
+credited above. It registers to woodland.webp in the visitors' sightline.
