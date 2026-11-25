@@ -2,10 +2,9 @@ import * as T from "./vendor/three.module.js";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=depth61";
 import {createFloorReflection} from "./lobby-floor-reflection.js?v=glass60";
-import { buildLobby } from "./lobby-interior.js?v=glazing63";
+import { buildLobby } from "./lobby-interior.js?v=plaques65";
 
 const eyeHeight = 1.60;
-const walkInRadius = .90;
 const arrivalPitch = .085;
 const receptionX=1.05, receptionPitch=.021;
 const receptionSetback=()=>matchMedia("(orientation:portrait)").matches ? -2.05 : .68;
@@ -29,12 +28,8 @@ function atDoor(door, depth, offset=0) {
 }
 
 
-function placeDoors(doors) {
-  return {doors:doors.map((door,index)=>({...door,index})),halfWidth:5.7,halfDepth:5.9};
-}
-
 export function createLobby(host, doors, onEnter, options = {}) {
-  const plan = placeDoors(doors);
+  const plan = {halfWidth:5.7,halfDepth:5.9};
   const mainDoor = {x:0,z:plan.halfDepth,nx:0,nz:1,yaw:0,width:4.8};
   const mainExit = {...mainDoor,nz:-1,yaw:Math.PI};
   const clearRadius = .16, opening = mainDoor.width/2-clearRadius;
@@ -59,10 +54,8 @@ export function createLobby(host, doors, onEnter, options = {}) {
   let floorReflection;
   let interior, grounds, stick, observer, zone;
   let disposed = false, paused = false, entering = false, space = false;
-  let drag = null, nearest, dirty = true, frame = 0, last = 0;
+  let drag = null, dirty = true, frame = 0, last = 0;
   let approach = null, hoverPosition=null, hovered=null;
-  let mouseHighlight=false,cardsAnimating=false,cardsExpanded=false;
-  let receptionTargets=[],expandedTargets=[];
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
   function invalidate() {
@@ -78,7 +71,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     stick?.release();
     if (drag && canvas.hasPointerCapture(drag.id)) canvas.releasePointerCapture(drag.id);
     drag = null;
-    setPointerHighlight(false,null);
+    setPointerHighlight(null);
     canvas.style.cursor = "grab";
   }
   function setPaused(value) {
@@ -94,10 +87,6 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const next = camera.position.z > plan.halfDepth ? "grounds" : "lobby";
     if(next!==zone) {
       zone=next;
-      if(zone==="grounds" && cardsExpanded) {
-        cardsExpanded=false;
-        options.onMenuOpen?.(false);
-      }
       options.onZone?.(zone);
     }
   }
@@ -113,48 +102,8 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const fov=T.MathUtils.lerp(T.MathUtils.lerp(61,wide,blend),interiorWidth,inside);
     if(Math.abs(fov-camera.fov)>.005) { camera.fov=fov; camera.updateProjectionMatrix(); }
   }
-  function menuIndex() {
-    const index=interior?.menuIndex?.();
-    return Number.isInteger(index) && plan.doors[index] ? index : null;
-  }
-  function setMenuOpen(value) {
-    if(disposed || paused || entering || approach || zone!=="lobby")return false;
-    const open=Boolean(value);
-    if(cardsExpanded!==open) {
-      cardsExpanded=open;
-      setPointerHighlight(false,null);
-      options.onMenuOpen?.(open);
-      invalidate();
-    }
-    return true;
-  }
   function receptionYaw(position) {
     return Math.atan2(position.x+.14,position.z+3.05);
-  }
-  function notifyNearest() {
-    // The visible deck defines selection independently of old exhibition locations.
-    const choice=zone==="lobby" ? menuIndex() : null;
-    if(choice!==nearest) {
-      nearest=choice;
-      options.onNearest?.(choice);
-    }
-  }
-  function cycleMenu(direction) {
-    if(disposed || paused || entering || approach || !cardsExpanded || zone!=="lobby" || !direction)return null;
-    const index=interior.shiftMenu?.(Math.sign(direction));
-    if(!Number.isInteger(index))return null;
-    setPointerHighlight(false,null);
-    notifyNearest();
-    invalidate();
-    return index;
-  }
-  function selectMenu(index) {
-    const from=menuIndex(),count=plan.doors.length;
-    if(from==null || from===index || !count)return;
-    const forward=(index-from+count)%count;
-    const steps=forward<=count/2 ? forward : forward-count;
-    for(let i=0;i<Math.abs(steps);i++)interior.shiftMenu(Math.sign(steps));
-    notifyNearest();
   }
   function cancelApproach() {
     if (!approach) return;
@@ -214,8 +163,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     return true;
   }
   function enter(index) {
-    if(!plan.doors[index] || disposed || paused || entering)return false;
-    selectMenu(index);
+    if(!doors[index] || disposed || paused || entering)return false;
     cancelApproach();
     clearInput();
     entering=true;
@@ -274,44 +222,25 @@ export function createLobby(host, doors, onEnter, options = {}) {
     }
     dirty = true;
   }
-  function finishApproach() {
-    options.onTravel?.(false);
-    approach=null;
-    notifyNearest();
-  }
-  function enterNearest() {
-    if (disposed || paused || entering) return false;
-    if(zone==="grounds")return enterMuseum();
-    if(!cardsExpanded)return setMenuOpen(true);
-    const active=menuIndex();
-    return active!=null && enter(active);
-  }
-  function faceDoorReturn(index, outdoors=false) {
-    const door = plan.doors[index];
-    if (!door && outdoors) {
+  function resetView(outdoors) {
+    if (outdoors) {
       const phone=matchMedia("(max-width:700px), (pointer:coarse) and (max-height:550px)").matches;
       camera.position.set(phone ? 10.6 : 10.5,eyeHeight,plan.halfDepth+(phone ? 23.6 : 20.7));
       camera.lookAt(phone ? -2.30 : -2.15,phone ? 3.47 : 4.05,plan.halfDepth+.36);
-    } else if (!door) {
+    } else {
       camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback());
       camera.rotation.set(receptionPitch,receptionYaw(camera.position),0,"YXZ");
-    } else {
-      selectMenu(index);
-      camera.position.set(receptionX,eyeHeight,plan.halfDepth-1.65+receptionSetback());
-      const at=interior.menuPoint?.(index);
-      camera.lookAt(at?.x ?? -1.56,at?.y ?? 1.30,at?.z ?? .49);
     }
     camera.updateMatrixWorld();
     syncZone();
-    if(zone==="lobby")setMenuOpen(Boolean(door));
-    fitView();notifyNearest();
+    fitView();
     invalidate();
   }
   function home() {
     if (disposed) return;
     clearInput();
     cancelApproach();
-    faceDoorReturn(undefined,zone==="grounds");
+    resetView(zone==="grounds");
     canvas.focus({preventScroll: true});
   }
   function turn(yaw, pitch) {
@@ -342,20 +271,6 @@ export function createLobby(host, doors, onEnter, options = {}) {
     const nextX=clamp(x,-plan.halfWidth+.33,plan.halfWidth-.33);
     const nextZ=clamp(z,-plan.halfDepth-4+.27,plan.halfDepth-.33);
     const next=interior.constrainLobbyStep?.(pos.x,pos.z,nextX,nextZ) || {x:nextX,z:nextZ};
-    const active=cardsExpanded ? menuIndex() : null,card=active==null ? null : interior.menuPoint?.(active);
-    if(card && forward>0) {
-      const vx=card.x-pos.x,vz=card.z-pos.z;
-      const before=Math.hypot(vx,vz),after=Math.hypot(card.x-next.x,card.z-next.z);
-      const dx=next.x-pos.x,dz=next.z-pos.z;
-      const movement=Math.hypot(dx,dz),facing=-Math.sin(yaw)*vx-Math.cos(yaw)*vz;
-      if(before>walkInRadius && after<=walkInRadius && facing>.979*before &&
-        dx*vx+dz*vz>.979*movement*before &&
-        interior.hits.some(hit=>hit.userData.doorIndex===active && hit.userData.pickable===true) &&
-        Math.abs(card.clone().project(camera).y)<1) {
-        pos.set(next.x,eyeHeight,next.z);
-        if(enter(active))return;
-      }
-    }
     pos.x=next.x;pos.z=next.z;
     invalidate();
   }
@@ -375,7 +290,8 @@ export function createLobby(host, doors, onEnter, options = {}) {
     last = now;
     if (approach?.arrived) {
       // Keep one complete frame at the destination before switching scenes.
-      finishApproach();
+      approach=null;
+      options.onTravel?.(false);
       frame = 0;
       if (!disposed && !paused) invalidate();
       return;
@@ -403,22 +319,15 @@ export function createLobby(host, doors, onEnter, options = {}) {
       moveOrTurn(side, forward, limit, space);
     }
     if (disposed || paused) { frame = 0; return; }
-    if (dirty || cardsAnimating) {
-      if(dirty) {
-        dirty=false;
-        camera.updateMatrixWorld();
-        syncZone();fitView();notifyNearest();
-        if(hoverPosition)updateHover(pick(hoverPosition));
-      }
-      const highlighted=mouseHighlight ? hovered : (cardsExpanded ? nearest : null);
-      const easing=interior.updateWaypoints?.(camera,highlighted,Math.min(.12,elapsed),cardsExpanded,drag && !drag.moved ? drag.card : null);
-      cardsAnimating=Boolean(easing) && !reducedMotion.matches && zone==="lobby";
-      if (!disposed) {
-        floorReflection?.render(camera,zone==="lobby",now);
-        renderer.render(scene,camera);
-      }
+    if (dirty) {
+      dirty=false;
+      camera.updateMatrixWorld();
+      syncZone();fitView();
+      if(hoverPosition)updateHover(pick(hoverPosition));
+      floorReflection?.render(camera,zone==="lobby",now);
+      renderer.render(scene,camera);
     }
-    const needsFrame=dirty || cardsAnimating || approach || keys.size || joy?.lengthSq();
+    const needsFrame=dirty || approach || keys.size || joy?.lengthSq();
     frame = !disposed && !paused && !document.hidden && needsFrame ? requestAnimationFrame(tick) : 0;
   }
   function keydown(e) {
@@ -427,13 +336,12 @@ export function createLobby(host, doors, onEnter, options = {}) {
     if (active && !active.closest(".walk-stick") && active.getClientRects().length) return;
     const rect=host.getBoundingClientRect();
     if (!rect.width || !rect.height || rect.bottom<=0 || rect.top>=innerHeight) return;
-    if(movementKeys.has(e.code) || e.code==="Space" || e.code==="Enter")setPointerHighlight(false,null);
+    if(movementKeys.has(e.code) || e.code==="Space" || e.code==="Enter")setPointerHighlight(null);
     if (approach && movementKeys.has(e.code)) {
       if (e.repeat) {e.preventDefault();return;}
       cancelApproach();
     }
     if (e.code === "Escape" && approach) {e.preventDefault();cancelApproach();return;}
-    if (e.code === "Escape" && cardsExpanded && setMenuOpen(false)) {e.preventDefault();return;}
     if (e.code === "Space") {
       e.preventDefault();
       space = true;
@@ -441,8 +349,9 @@ export function createLobby(host, doors, onEnter, options = {}) {
       e.preventDefault();
       if (!keys.has(e.code)) keys.set(e.code, {start: performance.now(), travel: 0, turn: space, mixed: false});
       invalidate();
-    } else if (!e.repeat && e.code === "Enter" && enterNearest()) e.preventDefault();
-    else if (!e.repeat && e.code === "KeyR") { e.preventDefault(); home(); }
+    } else if (!e.repeat && e.code === "Enter" && !approach) {
+      if(zone==="grounds" ? enterMuseum() : activate(pickAt(point.set(0,0))))e.preventDefault();
+    } else if (!e.repeat && e.code === "KeyR") { e.preventDefault(); home(); }
   }
   function keyup(e) {
     if (e.code === "Space") { space = false; return; }
@@ -455,8 +364,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     }
   }
   function blockedAt(distance) {
-    // Only test architecture after a selectable surface was actually hit.
-    // World-space bounds are static. Stop the ray just short of the card.
+    // Stop the occlusion ray just before the sign so its own letters do not block it.
     raycaster.far=Math.max(0,distance-.008);
     const ray=raycaster.ray,limitSquared=raycaster.far*raycaster.far;
     let blocked=false;
@@ -473,22 +381,22 @@ export function createLobby(host, doors, onEnter, options = {}) {
   function pick(e) {
     const bounds = canvas.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return null;
-    point.set(2 * (e.clientX - bounds.left) / bounds.width - 1, 1 - 2 * (e.clientY - bounds.top) / bounds.height);
+    return pickAt(point.set(2 * (e.clientX - bounds.left) / bounds.width - 1, 1 - 2 * (e.clientY - bounds.top) / bounds.height));
+  }
+  function pickAt(screenPoint) {
     camera.updateMatrixWorld();
-    raycaster.setFromCamera(point, camera);
-    const targets=zone==="grounds" ? grounds.hits : (cardsExpanded ? expandedTargets : receptionTargets);
-    for(const target of targets)target.updateWorldMatrix(true,false);
-    const hit=raycaster.intersectObjects(targets,true).find(({object})=>object.userData.pickable!==false);
+    raycaster.setFromCamera(screenPoint, camera);
+    const targets=zone==="grounds" ? grounds.hits : interior.signHits;
+    const hit=raycaster.intersectObjects(targets,false)[0];
     if(!hit || blockedAt(hit.distance))return null;
-    if(zone==="grounds")return "entrance";
-    let object = hit.object;
-    while (object) {
-      if(object.userData.signAction)return object.userData.signAction;
-      if(object.userData.receptionDesk)return "reception";
-      if (Number.isInteger(object.userData.doorIndex)) return object.userData.doorIndex;
-      object = object.parent;
-    }
-    return null;
+    return zone==="grounds" ? "entrance" : hit.object.userData.signAction;
+  }
+  function activate(action) {
+    if(action==="entrance")return enterMuseum();
+    if(action==="first-hall")return enter(0);
+    if(action==="directory"){options.onDirectory?.();return true;}
+    if(action?.startsWith("sign:"))return enter(Number(action.slice(5)));
+    return false;
   }
   function updateHover(hit) {
     if(hit===hovered)return;
@@ -497,13 +405,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     canvas.style.cursor=hit==null ? "grab" : "pointer";
     invalidate();
   }
-  // Blank mouse hover stays blank. Keyboard and joystick navigation instead
-  // highlight the nearest landmark in front of the moving camera.
-  function setPointerHighlight(enabled,position) {
-    if(mouseHighlight!==enabled) {
-      mouseHighlight=enabled;
-      invalidate();
-    }
+  function setPointerHighlight(position) {
     hoverPosition=position;
     updateHover(position ? pick(position) : null);
   }
@@ -513,17 +415,17 @@ export function createLobby(host, doors, onEnter, options = {}) {
       return;
     }
     canvas.focus({preventScroll: true});
-    setPointerHighlight(e.pointerType==="mouse",null);
+    setPointerHighlight(null);
     canvas.setPointerCapture(e.pointerId);
     drag = {id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,
-      moved:false,cycled:false,card:zone==="lobby" ? pick(e) : null};
+      moved:false,action:pick(e)};
     invalidate();
   }
   function pointermove(e) {
     if(paused || disposed)return;
     if(!drag) {
       if(e.pointerType==="mouse" && !approach && !keys.size)
-        setPointerHighlight(true,{clientX:e.clientX,clientY:e.clientY});
+        setPointerHighlight({clientX:e.clientX,clientY:e.clientY});
       return;
     }
     if(e.pointerId!==drag.id)return;
@@ -531,14 +433,6 @@ export function createLobby(host, doors, onEnter, options = {}) {
     drag.moved = true;
     invalidate();
     cancelApproach();
-    if(Number.isInteger(drag.card)) {
-      const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
-      if(!drag.cycled && Math.abs(dx)>=30 && Math.abs(dx)>Math.abs(dy)*1.25) {
-        cycleMenu(dx<0 ? 1 : -1);
-        drag.cycled=true;
-      }
-      return;
-    }
     canvas.style.cursor = "grabbing";
     turn(-(e.clientX - drag.x) * .0034, -(e.clientY - drag.y) * .0034);
     drag.x = e.clientX;
@@ -547,25 +441,18 @@ export function createLobby(host, doors, onEnter, options = {}) {
   function pointerend(e) {
     if (e.pointerId !== drag?.id) return;
     const tap = e.type === "pointerup" && !drag.moved && !paused;
-    const card=drag.card;
+    const action=drag.action;
     invalidate();
     drag = null;
     canvas.style.cursor = "grab";
     if (!tap) return;
-    const index=zone==="lobby" ? card : pick(e);
-    if (index == null) host.dispatchEvent(new Event("lobbyblanktap"));
-    else if(index==="entrance") { if(zone==="grounds")enterMuseum(); else exitMuseum(); }
-    else if(index==="first-hall")enter(0);
-    else if(index==="directory")options.onDirectory?.();
-    else if(typeof index==="string" && index.startsWith("sign:"))enter(Number(index.slice(5)));
-    else if(index==="reception")setMenuOpen(true);
-    else if(cardsExpanded)enter(index);
+    if(action===null)host.dispatchEvent(new Event("lobbyblanktap"));
+    else if(action===pick(e))activate(action);
   }
   function resize() {
     const width = host.clientWidth, height = host.clientHeight;
     if (!(width && height)) return;
     renderer.setSize(width, height, false);
-    scene.userData.viewportHeight=height;
     camera.aspect = width / height;
     fitView();camera.updateProjectionMatrix();
     invalidate();
@@ -587,11 +474,9 @@ export function createLobby(host, doors, onEnter, options = {}) {
     canvas.remove();
   }
   try {
-    interior = buildLobby(T, scene, plan.doors, {...plan, invalidate});
+    interior = buildLobby(T, scene, doors, {...plan, invalidate});
     floorReflection=createFloorReflection(T,renderer,scene,interior.reflectionFloor,invalidate);
     grounds = buildMuseumGrounds(T,scene,{halfWidth:plan.halfWidth,halfDepth:plan.halfDepth,panorama:interior.panorama,invalidate});
-    receptionTargets=[...interior.deskHits,...interior.signHits];
-    expandedTargets=[...interior.hits,...interior.signHits];
     scene.updateMatrixWorld(true);
     scene.traverseVisible(mesh=>{
       if(!mesh.isMesh || !mesh.geometry || !camera.layers.test(mesh.layers))return;
@@ -619,11 +504,11 @@ export function createLobby(host, doors, onEnter, options = {}) {
     listen(host, "entrylook", e => earlyInput(e.detail));
     listen(canvas, "pointerdown", pointerdown);
     listen(canvas, "pointermove", pointermove);
-    listen(canvas, "pointerleave", () => {if(mouseHighlight)setPointerHighlight(true,null);});
+    listen(canvas, "pointerleave", () => {if(hoverPosition)setPointerHighlight(null);});
     for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) listen(canvas, type, pointerend);
     listen(host, "pointerdown", e => {
       if (e.target.closest(".walk-stick")) {
-        setPointerHighlight(false,null);
+        setPointerHighlight(null);
         cancelApproach();
       }
       invalidate();
@@ -642,11 +527,11 @@ export function createLobby(host, doors, onEnter, options = {}) {
     observer = new ResizeObserver(resize);
     observer.observe(host);
     resize();
-    faceDoorReturn(options.returnDoorIndex, options.startZone!=="lobby");
+    resetView(options.startZone!=="lobby");
     host.dispatchEvent(new CustomEvent("viewerready", {detail:earlyInput}));
   } catch (error) {
     dispose();
     throw error;
   }
-  return { dispose,setPaused,enterNearest,enterDoor:enter,menuIndex,cycleMenu,setMenuOpen,enterMuseum,exitMuseum,home };
+  return { dispose,setPaused,enterDoor:enter,enterMuseum,exitMuseum,home };
 }

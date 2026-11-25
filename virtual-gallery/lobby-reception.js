@@ -6,7 +6,6 @@ export const furnitureObstacles=Object.freeze([
 ]);
 
 export function buildReception(T,root,{texture,materials,stoneMap,stoneNormal}){
-  const deskHits=[];
   function finish(settings){
     const m=new T.MeshStandardMaterial(settings);materials.push(m);return m;
   }
@@ -79,8 +78,7 @@ export function buildReception(T,root,{texture,materials,stoneMap,stoneNormal}){
     const sheet=add(parent,new T.PlaneGeometry(extW,extD),mat,0,.005,0);
     sheet.rotation.x=-Math.PI/2;sheet.raycast=()=>{};sheet.renderOrder=2;
   }
-  // Join the static joinery by finish. Picking still tests the actual counter
-  // triangles, while the browser draws the whole piece in a handful of calls.
+  // Batch each piece of furniture by finish to keep draw calls low.
   function batchJoinery(parent){
     parent.updateWorldMatrix(true,true);
     const inverse=parent.matrixWorld.clone().invert(),batches=new Map(),original=[];
@@ -95,13 +93,11 @@ export function buildReception(T,root,{texture,materials,stoneMap,stoneNormal}){
       original.push(o);
     });
     for(const o of original){o.removeFromParent();o.geometry.dispose();}
-    const meshes=[];
     for(const [m,b] of batches){
       const geo=new T.BufferGeometry();
       for(const [key,stride] of [["position",3],["normal",3],["uv",2]])geo.setAttribute(key,new T.Float32BufferAttribute(b[key],stride));
-      geo.setIndex(b.indices);geo.computeBoundingSphere();meshes.push(add(parent,geo,m,0,0,0));
+      geo.setIndex(b.indices);geo.computeBoundingSphere();add(parent,geo,m,0,0,0);
     }
-    return meshes;
   }
   const desk=group("museum-reception-counter",furnitureObstacles[0]);
   desk.scale.x=-1;
@@ -144,13 +140,12 @@ export function buildReception(T,root,{texture,materials,stoneMap,stoneNormal}){
   const lamp=slab(desk,device,-1.18,1.242,-.083,.148,.024,.071,.020);
   lamp.rotation.y=-.16;
   block(desk,diffuser,-1.18,1.241,-.081,.114,.004,.046);
-  // A slim visitor-facing touch terminal occupies only the far edge of the
-  // 76 cm return. The entire public counter and both terminals open the guide.
+  // A slim visitor-facing terminal sits on the far edge of the 76 cm return.
   const consoleGroup=new T.Group();consoleGroup.position.set(1.28,.807,-.196);consoleGroup.rotation.x=-.50;desk.add(consoleGroup);
   block(consoleGroup,device,0,0,0,.235,.132,.017);
   block(consoleGroup,glass,0,0,.009,.209,.108,.003);
   block(desk,brass,1.28,.781,-.221,.104,.031,.075);
-  for(const mesh of batchJoinery(desk)){mesh.userData.receptionDesk=true;deskHits.push(mesh);}
+  batchJoinery(desk);
 
   // A narrow suspended task light marks the staffed side. Its physical light
   // reaches the work surface; the short falloff ends inside the reception bay.
@@ -181,5 +176,4 @@ export function buildReception(T,root,{texture,materials,stoneMap,stoneNormal}){
   slab(bench,ash,0,.334,0,2.52,.081,.57,.051);
   for(const x of [-.817,0,.817])slab(bench,pad,x,.416,.002,.805,.046,.525,.060,.008);
   batchJoinery(bench);
-  return deskHits;
 }

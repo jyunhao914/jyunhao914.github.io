@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=glazing63";
+import {lobbyPage} from "./lobby-page.js?v=plaques65";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
@@ -204,8 +204,7 @@ function offerCatalogue(message) {
 async function enter(workId,throughDoor=false) {
   const target=current.works.find(work=>work.id===workId);
   if(target)$("room").value=target.room;
-  if(!privatePreview)lastDoor=Array.from($("hallList").children).find(card=>
-    card.dataset.show===current.id && card.dataset.room===$("room").value);
+  if(!privatePreview)returningFromHall=true;
   let n = ++seq;
   viewer?.dispose();
   viewer = null;
@@ -505,7 +504,7 @@ function showCatalogue(visible) {
   }
   for(const el of [hero,$("exhibits"),$("works"),$("cards"),$("worksLink")])el.hidden=!visible;
 }
-let lastRoute, lastDoor;
+let lastRoute, returningFromHall=false;
 const doors=[];
 let incomingDoor;
 function loadRoomRenderer() {return import("./gallery.js?v=garden64");}
@@ -527,7 +526,7 @@ function showEntrance() {
   $("hallEntrance").hidden=false;
   document.title="展場大廳｜虛擬策展工作室";
   $("entranceLink").setAttribute("aria-current","page");
-  lobby.open(doors,Array.from($("hallList").children).indexOf(lastDoor),exit,expanded);
+  lobby.open(doors,returningFromHall,exit,expanded);
 }
 function restorePageFocus(target,exit) {
   const focus=()=>{if(target.getClientRects().length)target.focus({preventScroll:true});};
@@ -621,9 +620,15 @@ function drawEntrance() {
   }
   $("hallStatus").textContent="開放參觀 · "+list.childElementCount+" 個展廳";
 }
-$("entranceLink").href=visitUrl();
-$("entranceLink").onclick=e=>linkAction(e,()=>{lastDoor=null;go(visitUrl());});
-$("backToEntrance").onclick=()=>go(visitUrl());
+function entranceUrl(inside){
+  const url=visitUrl();
+  if(inside)url.searchParams.set("entry","lobby");
+  else url.searchParams.delete("entry");
+  return url;
+}
+$("entranceLink").href=entranceUrl(false);
+$("entranceLink").onclick=e=>linkAction(e,()=>{returningFromHall=false;go(entranceUrl(false));});
+$("backToEntrance").onclick=()=>go(entranceUrl(true));
 $("portalBack").onclick=()=>history.back();
 $("worksLink").onclick=e=>linkAction(e,()=>$("works").scrollIntoView());
 window.addEventListener("popstate",applyRoute);

@@ -1,7 +1,6 @@
 import {buildSkylight} from "./lobby-skylight.js?v=glazing63";
 import {mountPierLetters} from "./pier-lettering.js?v=wayfinding53";
-import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=depth61";
-import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
+import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=plaques65";
 
 // One sampled centreline is shared by the masonry, the contact shadow, and walking.
 function partitionPlan(w,d,obstacles){
@@ -109,7 +108,7 @@ function partitionPlan(w,d,obstacles){
 // Coordinates are metres. Exhibit destinations are placed by the navigation controller.
 export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={}) {
   const w=halfWidth ?? 5.7, d=halfDepth ?? 5.9, H=4.10;
-  const root=new T.Group(), hits=[], textures=[], materials=[], batches=new Map();
+  const root=new T.Group(), textures=[], materials=[], batches=new Map();
   root.name="lobby-interior";
   scene.add(root);
   let disposed=false;
@@ -1009,10 +1008,9 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   function highlightSign(action){
     for(const row of signRows)row.face.emissive.setHex(row.action===action?0x22180c:0);
   }
-  const deskHits=buildReception(T,root,{texture,materials,stoneMap,stoneNormal});
-  const updateWaypoints=buildWaypoints(T,root,doors,{materials,textures,hits,halfDepth:d});
+  buildReception(T,root,{texture,materials,stoneMap,stoneNormal});
   root.updateMatrixWorld(true);
-  return {hits,deskHits,signHits,highlightSign,reflectionFloor,floorMaterial:stone,panorama,updateWaypoints,constrainLobbyStep:partition.constrainLobbyStep,lobbyRoute:partition.lobbyRoute,shiftMenu:updateWaypoints.shiftMenu,menuIndex:updateWaypoints.menuIndex,menuPoint:updateWaypoints.menuPoint,dispose(){
+  return {signHits,highlightSign,reflectionFloor,floorMaterial:stone,panorama,constrainLobbyStep:partition.constrainLobbyStep,lobbyRoute:partition.lobbyRoute,dispose(){
     disposed=true;root.removeFromParent();
     root.traverse(node=>node.geometry?.dispose());
     materials.forEach(mat=>mat.dispose());textures.forEach(tex=>tex.dispose());

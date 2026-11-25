@@ -559,7 +559,7 @@ body.in-lobby > :is(header,footer) {display:none}
 #lobbyStage canvas {outline:none;cursor:grab}
 #lobbyStage canvas:active {cursor:grabbing}
 #hallEntrance.portal-outgoing {z-index:14}
-#hallEntrance:is(.portal-approach,.portal-outgoing,.portal-walking) :is(.lobby-head,.lobby-wayfinding,.walk-pad),
+#hallEntrance:is(.portal-approach,.portal-outgoing,.portal-walking) :is(.lobby-head,#lobbyEnterDoor,.walk-pad),
 #visit[inert] :is(.museum-head,.reading-hud,.walk-pad) {opacity:0;visibility:hidden}
 #portalWait {
   position:absolute;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
@@ -595,24 +595,9 @@ body.in-lobby > :is(header,footer) {display:none}
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;padding:9px 16px;
   background:#25302ded;color:#fff;border-radius:4px;text-align:center;pointer-events:none;
 }
-.lobby-wayfinding {
+#lobbyEnterDoor {
   position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));
-  max-width:calc(100% - 118px);pointer-events:none;
-}
-.lobby-wayfinding button {
-  position:relative;display:block;max-width:100%;min-height:44px;padding:8px 21px 8px 8px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:transparent;
-  border:0;color:#fff;font-weight:550;
-  text-shadow:-1px 0 2px #102b35,1px 0 2px #102b35,0 -1px 2px #102b35,0 1px 2px #102b35,0 2px 5px #102b35;
-  pointer-events:auto;
-}
-.lobby-wayfinding button::after {
-  position:absolute;content:"";right:6px;top:50%;width:7px;height:7px;margin-top:-4px;
-  border:solid currentColor;border-width:1.4px 1.4px 0 0;transform:rotate(45deg);
-  filter:drop-shadow(0 1px 1px #102b35);
-}
-.lobby-wayfinding button:is(:hover,:focus-visible) {
-  background:transparent;text-decoration:underline;text-underline-offset:.3em;
+  width:50px;height:50px;padding:0;border:0;background:transparent;color:#fff;
 }
 .lobby-tools svg {display:none}
 #hallEntrance .lobby-head {justify-content:flex-end;background:transparent}
@@ -631,44 +616,21 @@ body.in-lobby > :is(header,footer) {display:none}
   filter:drop-shadow(0 0 1px #102b35) drop-shadow(0 1px 2px #102b35);
 }
 #lobbyExpand[aria-pressed="false"] .collapse-icon,#lobbyExpand[aria-pressed="true"] .expand-icon {display:none}
-#hallEntrance[data-zone="grounds"] #lobbyEnterDoor {width:50px;height:50px;padding:0}
-#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::before,
-#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::after {
+#lobbyEnterDoor::before,
+#lobbyEnterDoor::after {
   content:"";position:absolute;display:block;filter:drop-shadow(0 1px 2px #163037) drop-shadow(0 0 1px #162b30);
 }
-#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::before {
+#lobbyEnterDoor::before {
   top:13px;left:24px;height:25px;border-left:2px solid currentColor;
 }
-#hallEntrance[data-zone="grounds"] #lobbyEnterDoor::after {
-  left:18px;top:14px;width:12px;height:12px;margin:0;border-width:2px 2px 0 0;transform:rotate(-45deg);
+#lobbyEnterDoor::after {
+  left:18px;top:14px;width:12px;height:12px;border:solid currentColor;border-width:2px 2px 0 0;transform:rotate(-45deg);
 }
-#hallEntrance[data-zone="lobby"] #lobbyMenuNav {
-  display:flex;align-items:stretch;gap:0;max-width:calc(100% - 120px);
-  overflow:hidden;border:1px solid #c2d7d344;border-radius:8px;
-  background:linear-gradient(145deg,#273531d4,#17211fdf);box-shadow:0 2px 9px #12231c25;
-}
-#hallEntrance[data-zone="lobby"] #lobbyMenuNav button {
-  height:44px;min-width:0;color:#f0f6f0;border:0;border-radius:0;text-shadow:none;
-}
-#hallEntrance[data-zone="lobby"] #lobbyMenuNav button::after {display:none}
-#hallEntrance[data-zone="lobby"] #lobbyMenuNav button:hover {background:#e2f5eb16}
-#hallEntrance[data-zone="lobby"] #lobbyMenuNav button:focus-visible {outline-offset:-4px}
-#hallEntrance[data-zone="lobby"] #lobbyEnterDoor {flex:0 1 auto;padding:0 9px;overflow:hidden;text-overflow:ellipsis}
-#hallEntrance[data-zone="lobby"] #lobbyMenuNav .lobby-carousel-step {flex:0 0 44px;width:44px;display:grid;place-items:center;padding:0}
-.lobby-carousel-step svg {display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-#hallEntrance[data-zone="lobby"][data-card-menu="closed"] #lobbyMenuNav {display:none}
-#hallEntrance[data-zone="lobby"] #lobbyMenuNav #lobbyCloseCards {border-left:1px solid #d5e1db44}
-@media(max-width:405px) {
-  #hallEntrance[data-zone="lobby"] #lobbyMenuNav {
-    bottom:max(12px,env(safe-area-inset-bottom));right:max(7px,env(safe-area-inset-right));max-width:calc(100% - 95px);
-  }
-  #hallEntrance[data-zone="lobby"] #lobbyMenuNav #lobbyEnterDoor {padding-inline:4px}
-}
-#lobbyHint.visually-hidden,.lobby-sr {
+#lobbyHint.visually-hidden {
   position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
   clip-path:inset(50%);white-space:nowrap;border:0;
 }
-.lobby-quiet .lobby-head,.lobby-quiet .lobby-wayfinding {visibility:hidden;opacity:0}
+.lobby-quiet .lobby-head,.lobby-quiet #lobbyEnterDoor {visibility:hidden;opacity:0}
 .lobby-quiet .walk-pad {opacity:0}
 .lobby-quiet.stick-active .walk-pad,.lobby-quiet .walk-pad:focus-within {opacity:1}
 #lobbyDirectoryPanel {
