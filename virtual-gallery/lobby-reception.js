@@ -14,7 +14,13 @@ export function buildReception(T,root,{texture,materials,stoneMap,stoneNormal}){
   const walnut=finish({color:0x6b503d,map:walnutMap,roughness:.52});
   const ash=finish({color:0xa48b6b,map:ashMap,roughness:.55});
   const endGrain=finish({color:0x6c513f,map:walnutMap,roughness:.63});
-  const stone=finish({color:0xcbbfae,map:texture("reception-counter-stone.webp"),normalMap:stoneNormal,normalScale:new T.Vector2(.047,.047),roughness:.30});
+  const stone=finish({color:0xc7beb2,map:texture("reception-counter-stone.webp"),normalMap:stoneNormal,normalScale:new T.Vector2(.041,.041),roughness:.51});
+  stone.onBeforeCompile=shader=>{
+    shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`#include <map_fragment>
+      vec3 quarry=diffuseColor.rgb/max(vec3(.001),diffuse);
+      float tone=dot(quarry,vec3(.22,.70,.08));
+      diffuseColor.rgb=diffuse*mix(vec3(.43,.415,.399),vec3(tone),.40);`);
+  };
   const footStone=finish({color:0x928879,map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.12,.12),roughness:.66});
   const deep=finish({color:0x373a34,roughness:.61});
   const brass=finish({color:0x998569,metalness:.36,roughness:.39});
@@ -36,7 +42,7 @@ export function buildReception(T,root,{texture,materials,stoneMap,stoneNormal}){
     for(let i=0;i<pos.count;i++){
       const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);
       const along=Math.abs(norm.getX(i))>.77 ? z : x;
-      if(m===stone)uv.setXY(i,(along+.15)/.89,(Math.abs(norm.getY(i))>.62?z:y)/.67);
+      if(m===stone)uv.setXY(i,.5+along/3.95,.5+(Math.abs(norm.getY(i))>.62?z:y)/1.20);
       else uv.setXY(i,(along+.42)/1.84,(Math.abs(norm.getY(i))>.62?z:y)/.42);
     }
     return g;

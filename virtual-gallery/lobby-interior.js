@@ -1,6 +1,6 @@
-import {mountReceptionRelief} from "./lobby-wall-installation.js";
+import {mountReceptionRelief,mountCorridorReliefs} from "./lobby-wall-installation.js?v=depth61";
 import {mountPierLetters} from "./pier-lettering.js?v=wayfinding53";
-import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=reception41";
+import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=depth61";
 import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
 
 // One sampled centreline is shared by the masonry, the contact shadow, and walking.
@@ -149,18 +149,18 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   const stone=standard({map:slabMap,normalMap:slabNormals,roughnessMap:texture("reception-granite-rough.webp",false),
     normalScale:new T.Vector2(.13,.13),color:0xffffff,metalness:0,roughness:1});
   const limestone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.25,.25),color:0x77705f,roughness:.81,side:T.DoubleSide});
-  const soffit=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.10,.10),color:0x676b64,roughness:.87});
-  const splay=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.085,.085),color:0xad9475,roughness:.84,side:T.DoubleSide});
+  const soffit=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.12,.12),color:0x888881,roughness:.91});
+  const splay=standard({map:plasterMap,normalMap:plasterNormal,normalScale:new T.Vector2(.085,.085),color:0xb3a48e,roughness:.88,side:T.DoubleSide});
   const timberVeneer=standard({color:0xaa8e73,map:oakMap,normalMap:oakNormal,normalScale:new T.Vector2(.10,.10),roughness:.52});
   const pierStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.13,.13),color:0xb9b5a5,roughness:.68});
   stone.name="lobby-polished-black-stone";
-  const portalStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.25,.25),color:0x978673,roughness:.61});
+  const portalStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.13,.13),color:0x9a9385,roughness:.73});
   const innerStone=standard({map:stoneMap,normalMap:stoneNormal,normalScale:new T.Vector2(.13,.13),color:0xa99c88,roughness:.59});
   const galleryDeck=standard({map:plasterMap,color:0xb1aa9a,roughness:.82});
   const walnut=texture("mount/walnut-color.webp"),walnutNormal=texture("mount/walnut-normal.webp",false);
   const darkVeneer=standard({map:walnut,normalMap:walnutNormal,roughnessMap:texture("mount/walnut-rough.webp",false),
-    normalScale:new T.Vector2(.20,.20),color:0x69482f,roughness:.80});
-  const ribOak=standard({map:oakMap,color:0xad8a62,roughness:.60});
+    normalScale:new T.Vector2(.15,.15),color:0x695344,roughness:.72});
+  const ribOak=standard({map:oakMap,normalMap:oakNormal,normalScale:new T.Vector2(.09,.09),color:0x9d876d,roughness:.68});
   const warmCut=standard({color:0xe5b57b,emissive:0xffbc74,emissiveIntensity:1.16,roughness:.70});
   const bronze=standard({color:0x8d7862,metalness:.44,roughness:.47});
   const metal=standard({color:0x706653,metalness:.32,roughness:.57});
@@ -258,16 +258,18 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
           float variation=fract(sin(dot(slab,vec2(15.73,61.39)))*15017.36);
           vec2 albedoUv=vMapUv*vec2(.88,1.23)+vec2(variation,.23*slab.x+.31*slab.y);
           vec3 grain=texture2D(map,albedoUv).rgb;
-          float value=dot(grain,vec3(.24,.61,.15)),mineral=.529+(value-.529)*.63;
-          diffuseColor.rgb*=mix(vec3(mineral*1.045,mineral*1.008,mineral*.948),grain,.28)*(.950+.074*variation);
+          float value=dot(grain,vec3(.24,.61,.15)),mineral=.529+(value-.529)*.52;
+          diffuseColor.rgb*=mix(vec3(mineral*1.035,mineral*1.012,mineral*.960),grain,.21)*(.966+.068*variation);
           vec2 edge=min(within,1.-within)*vec2(2.14,1.02);
           float gap=min(edge.x,edge.y),aa=max(.0006,fwidth(gap));
           float joint=1.-smoothstep(.0012-aa,.0033+aa,gap);
-          diffuseColor.rgb*=1.-.40*joint;`);
+          float arris=smoothstep(.002-aa,.004+aa,gap)*(1.-smoothstep(.005-aa,.009+aa,gap));
+          diffuseColor.rgb*=1.-.43*joint+.055*arris;`);
       } else if(mat===stone){
         shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`
           #include <map_fragment>
-          vec2 cutGrid=lobbyPoint.xz/vec2(1.85,1.05);
+          vec2 paving=lobbyPoint.z<${doorZ.toFixed(3)} ? vec2(lobbyPoint.z-(${doorZ.toFixed(3)}),lobbyPoint.x-${doorLeft.toFixed(3)}) : lobbyPoint.xz;
+          vec2 cutGrid=paving/vec2(1.85,1.05);
           cutGrid.x+=.5*mod(floor(cutGrid.y),2.);
           vec2 edge=min(fract(cutGrid),1.-fract(cutGrid))*vec2(1.85,1.05);
           float gap=min(edge.x,edge.y),aa=max(.00045,fwidth(gap));
@@ -297,7 +299,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         float beam=smoothstep(-pn,pn,min(freeRay.x,freeRay.y))*step(p.y,${H.toFixed(4)}+.002);
         // Soft branch shadows from the measured park canopy, projected along the same ray as the roof.
         float leaves=texture2D(treeShadow,(hi-upperCenter)*vec2(.116,.139)+vec2(.37,.64)).r;
-        float dapple=mix(.71,1.,smoothstep(.05,.91,leaves));
+        float dapple=mix(.48,1.,smoothstep(.14,.83,leaves));
         float sunFacing=max(0.,dot(nWorld,normalize(vec3(sunTilt.x,1.,sunTilt.y))));
         vec3 toSky=vec3(upperCenter.x,${rim.y.toFixed(4)},upperCenter.y)-p;
         float sky2=max(.05,dot(toSky,toSky));vec3 skyDir=toSky*inversesqrt(sky2);
@@ -333,7 +335,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
         float wallEdge=min(${w.toFixed(4)}-abs(p.x),min(p.z-(${wallNorth.toFixed(3)}),${d.toFixed(4)}-p.z));
         float actualHead=${H.toFixed(4)}+2.32*clamp((${pitchStart.toFixed(3)}-p.z)/${(pitchStart-wallNorth).toFixed(3)},0.,1.);
         float contact=abs(nWorld.y)>.55 ? wallEdge : min(p.y,actualHead-p.y);
-        float ao=mix(.75,1.,smoothstep(-.015,.37,contact));
+        float ao=mix(.62,1.,smoothstep(-.015,.46,contact));
         ${mat===stone?`float footDistance=100.;
           ${[8,16,24,32,40].map(i=>{const a=partition.line[i-8],b=partition.line[i];return `{
             vec2 start=vec2(${a.x.toFixed(4)},${a.z.toFixed(4)}),v=vec2(${(b.x-a.x).toFixed(4)},${(b.z-a.z).toFixed(4)});
@@ -341,11 +343,12 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
           ao*=.58+.42*smoothstep(.17,.70,footDistance);`:""}
 
         reflectedLight.directDiffuse*=.36+.24*windowLight+.46*beam*dapple;
-        reflectedLight.indirectDiffuse*=ao*(.74+.16*skyVisible);
-        reflectedLight.indirectDiffuse+=diffuseColor.rgb*(vec3(.92,1.01,1.11)*(1.25*westSky+gardenFactor*1.65)+vec3(.86,1.03,1.22)*sky*3.1+
-          vec3(1.,.80,.57)*bounce*.91+vec3(1.,.88,.68)*sunFacing*(1.19*windowLight+2.66*beam*dapple));
+        reflectedLight.indirectDiffuse*=ao*(.67+.19*skyVisible);
+        reflectedLight.indirectDiffuse+=diffuseColor.rgb*(vec3(.91,1.01,1.14)*(1.48*westSky+gardenFactor*1.57)+vec3(.84,1.01,1.24)*sky*3.38+
+          vec3(1.,.85,.67)*bounce*.76+vec3(1.,.92,.79)*sunFacing*(1.22*windowLight+3.02*beam*dapple));
         bool inGallery=p.x>.42 && p.z<${(entryZ-entryDepth+.045).toFixed(4)} && p.y<3.54;
-        if(inGallery){
+        if(inGallery && p.z>=${doorZ.toFixed(3)}){
+
           // This gallery has its own low ceiling, recessed luminaires and end-wall wash.
           // Its slit view above the ceiling does not act as a light source below it.
           float spots=warmSpot(p,nWorld,vec3(2.15,3.27,-4.35),vec3(1.40,.18,-5.63))+
@@ -355,11 +358,20 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
           reflectedLight.indirectDiffuse*=.70;
           reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.82,.61)*(.38+spots*2.3);
         }
+        // The black stone continues beneath the glazing. Keep artificial
+        // pools in the passage distinct from the near lobby's skylight wash.
+        ${mat===stone?`if(p.z<${doorZ.toFixed(3)}){
+          float depth=${doorZ.toFixed(3)}-p.z;
+          float luminous=smoothstep(.42,8.6,depth);
+          float footing=.67+.33*smoothstep(.0,.40,min(p.x-${doorLeft.toFixed(3)},${doorRight.toFixed(3)}-p.x));
+          reflectedLight.directDiffuse*=2.30*footing;
+          reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.06,.89,.68)*(.068+.36*luminous)*footing;
+        }`:""}
         float leftStrip=1.-smoothstep(.10,.69,abs(p.z+4.48));
         float westStrip=1.-smoothstep(.10,.62,abs(p.x+${(w-.064).toFixed(3)}));
         float vertical=smoothstep(2.93,3.08,p.y)*(1.-smoothstep(3.12,4.23,p.y));
         float cove=vertical*max(leftStrip*step(p.x,.34),westStrip*step(-4.62,p.z)*step(p.z,1.96));
-        reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.70,.40)*cove*1.95;
+        reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.77,.52)*cove*1.63;
         ${mat===soffit?`vec2 fromCourt=max(vec2(0.),abs(p.xz-lowerCenter)-lowerHalf);
           float returnGlow=exp(-length(fromCourt)*.65);
           reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(.72,.67,.55)*(.06+.46*returnGlow);`:""}
@@ -650,97 +662,92 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     box(world,finish,leaf.width,leaf.height,leaf.depth,leaf.x,leaf.height/2,leaf.z,leaf.name);
     box(world,bronze,.022,3.12,.028,edgeX,1.57,leaf.z+(leaf.depth-.028)/2);
   }
-  // Beyond the clear glass, floor and ceiling actually continue through the
-  // wall. Light pools recede towards the turned entrance of the first gallery.
-  const vestibuleBack=exterior-10.75,vestibuleLength=doorZ-vestibuleBack;
-  const vestibuleMid=(vestibuleBack+doorZ)/2,vestibuleCeiling=2.96;
+  // The passage beyond the glazing narrows at a deep stone reveal, then
+  // changes axis again before turning out of sight. All reveals have returns.
+  const firstTurn={z:exterior-7.02,left:1.49,right:4.28,head:2.64};
+  const secondTurn={z:exterior-9.13,left:2.28,right:doorRight+.08,head:2.72};
+  const vestibuleBack=exterior-11.85,nearHead=2.98,farHead=3.14;
   const vestibuleWalls=standard({map:plasterMap,normalMap:plasterNormal,
-    normalScale:new T.Vector2(.11,.11),color:0xbfb9a9,roughness:.86});
-  const vestibuleFloor=standard({map:slabMap,normalMap:slabNormals,
-    normalScale:new T.Vector2(.12,.12),color:0xc5bdaa,roughness:.76});
+    normalScale:new T.Vector2(.16,.16),color:0xa39885,roughness:.88});
+  const passageStone=standard({map:stoneMap,normalMap:stoneNormal,
+    normalScale:new T.Vector2(.15,.15),color:0x999180,roughness:.72});
+  const returnWall=standard({map:plasterMap,color:0x5e645e,roughness:.91});
+  const ceilingFinish=standard({map:plasterMap,normalMap:plasterNormal,
+    normalScale:new T.Vector2(.09,.09),color:0x82786b,roughness:.86});
   const jambFinish=standard({color:0x34312d,metalness:.41,roughness:.43});
   const pullFinish=standard({color:0xb6a188,metalness:.59,roughness:.33});
-  const lightStrip=standard({color:0xf6ebd6,emissive:0xf4d7a9,
-    emissiveIntensity:1.40,roughness:.80});
-  box(world,vestibuleFloor,doorSpan+.20,.14,vestibuleLength,doorX,-.070,vestibuleMid,"lobby-glass-vestibule-floor");
-  box(world,vestibuleWalls,doorSpan+.28,.14,vestibuleLength,doorX,vestibuleCeiling+.07,vestibuleMid,"lobby-glass-vestibule-ceiling");
-  const stoneJoint=standard({color:0x322f2a,roughness:.86});
-  for(let i=1;i<8;i++){
-    const z=doorZ-i*vestibuleLength/8;
-    box(world,stoneJoint,doorSpan,.001,.004,doorX,.0005,z);
-    const offset=(i%2 ? -.17 : .18)*doorSpan;
-    box(world,stoneJoint,.004,.001,vestibuleLength/8,doorX+offset,.0005,z+vestibuleLength/16);
-  }
-  for(const x of [doorLeft-.08,doorRight+.08]){
-    box(world,vestibuleWalls,.16,vestibuleCeiling,vestibuleLength,x,vestibuleCeiling/2,vestibuleMid,"lobby-glass-vestibule-side");
-    const innerX=x+(x<doorX ? .082 : -.082);
-    box(world,jambFinish,.036,.073,vestibuleLength,innerX,.036,vestibuleMid);
-    for(const z of [exterior-2.05,exterior-4.60,exterior-7.24,exterior-9.05])
-      box(world,innerStone,.13,vestibuleCeiling,.16,innerX,vestibuleCeiling/2,z);
-    const railX=innerX+(x<doorX ? .14 : -.14);
-    box(world,jambFinish,.090,.024,vestibuleLength-.65,railX,vestibuleCeiling-.006,vestibuleMid);
-    box(world,lightStrip,.035,.009,vestibuleLength-.78,railX,vestibuleCeiling-.021,vestibuleMid);
-  }
-  box(world,vestibuleWalls,doorSpan+.24,vestibuleCeiling,.18,doorX,vestibuleCeiling/2,vestibuleBack,"lobby-glass-vestibule-rear");
-  // A return before the far wall creates a side reveal, with light grazing its
-  // leading edge. From the lobby the background shifts naturally with parallax.
-  const returnZ=vestibuleBack+.55,returnWidth=doorSpan*.28;
-  box(world,innerStone,returnWidth,2.67,.16,doorRight-returnWidth/2,1.335,returnZ,"lobby-glass-vestibule-return");
-  box(world,jambFinish,returnWidth,.012,.025,doorRight-returnWidth/2,2.68,returnZ+.028);
-  box(world,lightStrip,.020,2.40,.027,doorRight-returnWidth+.008,1.40,returnZ-.086);
-  // Each ceiling bay has its own light pool, gradually shifting nearer the
-  // centre of the aisle. A broad wash lifts the distant threshold and floor.
-  const bays=[{z:1.1,offset:-.78,power:11},{z:3.55,offset:-.47,power:14},
-    {z:6.18,offset:-.17,power:22},{z:8.68,offset:.36,power:32}];
-  for(const bay of bays){
-    const z=exterior-bay.z,x=doorX+bay.offset;
-    box(world,jambFinish,.085,.040,1.25,x,vestibuleCeiling-.012,z);
-    box(world,lightStrip,.044,.012,1.12,x,vestibuleCeiling-.036,z);
-    const pool=new T.SpotLight(0xffebd0,bay.power,5.6,.77,.82,2);
-    pool.position.set(x,vestibuleCeiling-.07,z);
-    pool.target.position.set(doorX-.52,.06,z-.58);
-    root.add(pool,pool.target);
-  }
-  const farWash=new T.SpotLight(0xffe7c4,12,5.4,.78,.89,2);
-  farWash.position.set(doorLeft+1.24,vestibuleCeiling-.19,vestibuleBack+1.90);
-  farWash.target.position.set(doorLeft+1.52,.80,vestibuleBack);
-  root.add(farWash,farWash.target);
+  const lightLens=standard({color:0xdec9aa,emissive:0xffdda6,
+    emissiveIntensity:1.18,roughness:.58});
+  const floorName="lobby-reflective-black-stone";
+  const floorStart=wallNorth-.08;
+  box(world,stone,doorSpan+.16,.16,floorStart-secondTurn.z,doorX,-.08,(floorStart+secondTurn.z)/2,floorName);
+  const farLeft=1.74,farRight=doorRight+.19;
+  box(world,stone,farRight-farLeft+.16,.16,secondTurn.z-vestibuleBack+.08,(farLeft+farRight)/2,-.08,
+    (secondTurn.z+vestibuleBack-.08)/2,floorName);
 
-  // Original low reliefs sit sideways within two bays. Neither interferes
-  // with the door raycast or faces someone looking straight down the aisle.
-  const backer=standard({map:plasterMap,normalMap:plasterNormal,color:0xb9aa92,
-    normalScale:new T.Vector2(.11,.11),roughness:.91});
-  const darkBacker=standard({map:plasterMap,normalMap:plasterNormal,color:0x71695e,
-    normalScale:new T.Vector2(.10,.10),roughness:.88});
-  const ochre=standard({color:0xa38150,roughness:.75,metalness:.07});
-  const sandstone=standard({color:0xc9b791,roughness:.89});
-  const graphite=standard({color:0x4f4d46,roughness:.79});
-  function sideRelief(index,left,z){
-    const group=new T.Group();
-    group.name="lobby-glass-side-relief-"+index;
-    group.position.set(left?doorLeft+.007:doorRight-.007,1.58,z);
-    group.rotation.y=left ? Math.PI/2 : -Math.PI/2;
-    root.add(group);
-    const carrier=new T.Mesh(new T.BoxGeometry(.86,.97,.035),jambFinish);
-    carrier.position.z=.018;group.add(carrier);
-    const surface=new T.Mesh(new T.BoxGeometry(.795,.90,.031),left?backer:darkBacker);
-    surface.position.z=.025;group.add(surface);
-    for(let i=0;i<5;i++){
-      const offset=(i-2)*.095,turn=left ? 1 : -1;
-      const ridge=new T.Shape();
-      ridge.moveTo(-.34,offset-.11);
-      ridge.bezierCurveTo(-.13,offset+.20,.12,offset-.078,.33,offset+.12);
-      ridge.bezierCurveTo(.10,offset-.112,-.13,offset+.177,-.34,offset-.142);
-      ridge.closePath();
-      const geo=new T.ExtrudeGeometry(ridge,{depth:.013,steps:1,curveSegments:16,
-        bevelEnabled:true,bevelThickness:.002,bevelSize:.002,bevelSegments:1});
-      const item=new T.Mesh(geo,i%3===0 ? graphite : (left?ochre:sandstone));
-      item.position.z=.041+i*.001;
-      item.rotation.z=turn*.37;group.add(item);
+  function wallRun(left,right,front,back,height,mat){
+    const length=front-back,mid=(front+back)/2;
+    for(const side of [-1,1]){
+      const x=side<0?left:right;
+      box(world,mat,.17,height,length,x+side*.085,height/2,mid,"lobby-glass-vestibule-side");
+      box(world,jambFinish,.022,.065,length,x-side*.005,.032,mid);
     }
   }
-  sideRelief(1,true,exterior-3.31);
-  sideRelief(2,false,exterior-5.97);
+  wallRun(doorLeft,doorRight,doorZ,secondTurn.z-.10,nearHead,vestibuleWalls);
+  wallRun(farLeft,farRight,secondTurn.z-.10,vestibuleBack,farHead,passageStone);
+
+  function reveal({z,left,right,head},outerLeft,outerRight,ceiling,depth,name){
+    for(const [a,b] of [[outerLeft,left],[right,outerRight]])
+      box(world,passageStone,b-a,head,depth,(a+b)/2,head/2,z,name);
+    box(world,passageStone,outerRight-outerLeft,ceiling-head,depth,
+      (outerRight+outerLeft)/2,(head+ceiling)/2,z,name);
+    for(const x of [left,right])box(world,jambFinish,.017,head-.016,.042,x,head/2,z+depth/2+.005);
+  }
+  reveal(firstTurn,doorLeft,doorRight,nearHead,.46,"lobby-vestibule-first-reveal");
+  reveal(secondTurn,doorLeft,farRight,farHead,.53,"lobby-vestibule-second-reveal");
+  // The short return is separated from the back face by a real setback.
+  const returnZ=vestibuleBack+.68,returnRight=3.59;
+  box(world,returnWall,returnRight-farLeft,farHead,.29,(farLeft+returnRight)/2,farHead/2,returnZ,
+    "lobby-glass-vestibule-return");
+  box(world,returnWall,farRight-farLeft,farHead,.19,(farLeft+farRight)/2,farHead/2,vestibuleBack,
+    "lobby-glass-vestibule-rear");
+
+  function ceilingBay(left,right,front,back,height,trackX){
+    const length=front-back,mid=(front+back)/2,halfSlot=.067;
+    for(const [a,b] of [[left,trackX-halfSlot],[trackX+halfSlot,right]])
+      box(world,ceilingFinish,b-a,.15,length,(a+b)/2,height+.075,mid,"lobby-glass-vestibule-ceiling");
+    box(world,jambFinish,2*halfSlot,.027,length,trackX,height+.076,mid);
+    for(const x of [trackX-halfSlot,trackX+halfSlot])
+      box(world,jambFinish,.011,.073,length,x,height+.036,mid);
+  }
+  ceilingBay(doorLeft,doorRight,doorZ,firstTurn.z+.22,nearHead,doorX-.33);
+  // A closed stone end cap finishes the lighting recess behind the door head.
+  box(world,ceilingFinish,.136,.15,.42,doorX-.33,nearHead+.075,doorZ-.21);
+  ceilingBay(doorLeft,doorRight,firstTurn.z+.22,secondTurn.z+.25,nearHead,doorX+.18);
+  ceilingBay(farLeft,farRight,secondTurn.z+.25,vestibuleBack,farHead,3.82);
+  const lensGeometry=new T.CylinderGeometry(.038,.038,.009,20);
+  const canGeometry=new T.CylinderGeometry(.053,.050,.052,18);
+  // Coherent patches of luminance under real recessed fixtures guide the eye
+  // along the stone, across each opening, and towards the lateral turn.
+  const fixtures=[
+    {x:doorX-.33,z:exterior-1.30,h:nearHead,power:19,aim:[doorLeft+.85,.02,-2.14]},
+    {x:doorX-.33,z:exterior-4.03,h:nearHead,power:27,aim:[doorRight-.49,.82,-4.62]},
+    {x:doorX-.33,z:exterior-6.00,h:nearHead,power:23,aim:[doorLeft+.92,.03,-6.68]},
+    {x:doorX+.18,z:exterior-8.10,h:nearHead,power:31,aim:[doorX+.37,.13,-8.85]},
+    {x:3.82,z:exterior-10.43,h:farHead,power:40,aim:[4.63,.25,-11.57]}
+  ];
+  for(const [i,f] of fixtures.entries()){
+    const housing=new T.Mesh(i===0?canGeometry:canGeometry.clone(),jambFinish);
+    housing.position.set(f.x,f.h+.039,f.z);root.add(housing);
+    const lens=new T.Mesh(i===0?lensGeometry:lensGeometry.clone(),lightLens);
+    lens.position.set(f.x,f.h+.010,f.z);root.add(lens);
+    const pool=new T.SpotLight(0xffe6c4,f.power,5.25,.73,.86,2);
+    pool.position.set(f.x,f.h-.018,f.z);
+    pool.target.position.set(f.aim[0],f.aim[1],exterior+f.aim[2]);
+    root.add(pool,pool.target);
+  }
+
+  mountCorridorReliefs(T,root,materials,{doorLeft,doorRight,exterior,plasterNormal,plasterMap});
 
   // The low-iron glass shows the space beyond through nearly clear normal
   // incidence. At a slant it picks up the real corridor's ceiling light axis.
@@ -1002,7 +1009,7 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   function highlightSign(action){
     for(const row of signRows)row.face.emissive.setHex(row.action===action?0x22180c:0);
   }
-  mountReceptionRelief(T,root,materials);
+  mountReceptionRelief(T,root,materials,plasterNormal,plasterMap);
   const deskHits=buildReception(T,root,{texture,materials,stoneMap,stoneNormal});
   const updateWaypoints=buildWaypoints(T,root,doors,{materials,textures,hits,halfDepth:d});
   root.updateMatrixWorld(true);

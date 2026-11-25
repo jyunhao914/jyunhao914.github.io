@@ -15,6 +15,7 @@ export function buildMuseumGrounds(T,scene,{halfWidth:w,halfDepth:d,invalidate,p
       if(!disposed)invalidate();
     });
     t.wrapS=t.wrapT=T.RepeatWrapping;
+    t.anisotropy=4;
     if(color)t.colorSpace=T.SRGBColorSpace;
     textures.push(t);
     return t;
@@ -81,8 +82,12 @@ export function buildMuseumGrounds(T,scene,{halfWidth:w,halfDepth:d,invalidate,p
       if(m===lawn) {
         s.fragmentShader=s.fragmentShader.replace("#include <map_fragment>", `#include <map_fragment>
           float grassValue=dot(sampledDiffuseColor.rgb,vec3(.2126,.7152,.0722));
-          float moisture=smoothstep(.026,.37,grassValue);
-          diffuseColor.rgb=mix(vec3(.052,.089,.025),vec3(.279,.337,.113),moisture);`);
+          // A second, rotated sample changes the distribution of dry and cool
+          // turf over several metres without tying the pattern to the sunlight.
+          vec2 soilUV=mat2(.83,.56,-.56,.83)*vMapUv*.239;
+          float soil=dot(texture2D(map,soilUV).rgb,vec3(.2126,.7152,.0722));
+          float moisture=smoothstep(.026,.37,grassValue)*.78+.22*smoothstep(.035,.34,soil);
+          diffuseColor.rgb=mix(vec3(.045,.075,.027),vec3(.29,.32,.135),moisture);`);
       }
       s.fragmentShader="varying vec3 groundPoint;uniform sampler2D leafLight;\n"+s.fragmentShader.replace("#include <lights_fragment_end>",`#include <lights_fragment_end>
         vec3 p=groundPoint-vec3(0.,0.,${d.toFixed(3)});
@@ -126,12 +131,26 @@ export function buildMuseumGrounds(T,scene,{halfWidth:w,halfDepth:d,invalidate,p
   const pathWidth=z=>4.86-2.23*T.MathUtils.smoothstep(z,1,8);
   function flagstone(z0,z1,u0,u1,tone) {
     const data=batch(pale),first=data.p.length/3;
+    // Independent quarry cuts retain the same scale and grain direction.
+    const stoneU=2.3*Math.sin(z0*12.7+u0*4.3),stoneV=3.1*Math.cos(z0*7.2+u0*5.4);
     for(const [z,u] of [[z0,u0],[z1,u0],[z1,u1],[z0,u1]]) {
       const x=pathCenter(z)+(u-.5)*pathWidth(z);
-      data.p.push(x,-.001,z);data.n.push(0,1,0);data.uv.push((x+.09*tone)/1.88,z/1.88);
+      data.p.push(x,-.001,z);data.n.push(0,1,0);data.uv.push(x/1.88+stoneU,z/1.88+stoneV);
       data.color.push(tone,tone,tone);
     }
     data.idx.push(first,first+1,first+2,first,first+2,first+3);
+    // A 45 mm dressed edge makes the raised walk meet the lawn and pond.
+    // Preserve the actual curved plan as the path opens at the threshold.
+    for(const [a,b] of [[0,1],[1,2],[2,3],[3,0]]){
+      const start=(first+a)*3,end=(first+b)*3;
+      const ax=data.p[start],az=data.p[start+2],bx=data.p[end],bz=data.p[end+2];
+      const ox=az-bz,oz=bx-ax,length=Math.hypot(ox,oz),side=data.p.length/3;
+      for(const [x,y,z,u] of [[ax,-.001,az,0],[bx,-.001,bz,length],[bx,-.049,bz,length],[ax,-.049,az,0]]){
+        data.p.push(x,y,z);data.n.push(ox/length,0,oz/length);
+        data.uv.push(stoneU+u/1.88,stoneV+y/1.88);data.color.push(tone*.92,tone*.92,tone*.92);
+      }
+      data.idx.push(side,side+2,side+1,side,side+3,side+2);
+    }
   }
   for(let z=.008,row=0;z<32;row++){
     const depth=[1.34,1.76,1.47,1.56][row%4],split=[.62,.38,.74,.47][row%4];

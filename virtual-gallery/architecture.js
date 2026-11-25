@@ -114,6 +114,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     }
     const lightBays=Math.max(1,Math.round(l*2/2.95));
     const bayPitch=l*2/lightBays;
+    const lampPitch=l*2/Math.max(1,Math.ceil(l*2/4.1));
     // Broad reflected window light and occlusion at perpendicular surface joins.
     for (const mesh of [floor, ceiling, ...walls]) {
       mesh.material.onBeforeCompile = (shader) => {
@@ -127,6 +128,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
           float corner=${mesh===floor||mesh===ceiling ? "max(edge.x,edge.y)" : "abs(worldNormal.x)>.5?edge.y:edge.x"};
           reflectedLight.indirectDiffuse *= (.60 + .40*smoothstep(0.,.49,join)) *
             (.79+.21*smoothstep(0.,.63,corner));
+          reflectedLight.indirectSpecular*=.53+.47*smoothstep(0.,.60,join);
           ${study ? `float windowBounce=0.;
             for(int bay=0;bay<${lightBays};bay++){
               vec3 ray=vec3(-${(w+.06).toFixed(3)},2.04,${(-l+bayPitch/2).toFixed(4)}+${bayPitch.toFixed(4)}*float(bay))-roomPoint;
@@ -137,12 +139,22 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
             float grazing=max(0.,-worldNormal.x)*exp(-lampOffset*lampOffset)*
               smoothstep(0.,1.2,edge.y);
             reflectedLight.indirectDiffuse+=diffuseColor.rgb*(vec3(.90,.94,1.)*windowBounce*.78+
-              vec3(1.,.85,.68)*grazing*.38);` : `
-            vec2 lampOffset=roomPoint.xz/vec2(${(w*.79).toFixed(3)},${(l*.90).toFixed(3)});
-            float overhead=exp(-dot(lampOffset,lampOffset));
-            float wash=max(0.,worldNormal.y)*overhead*.14;
-            wash+=max(0.,1.-abs(worldNormal.y))*smoothstep(.18,2.,roomPoint.y)*overhead*${theater ? ".19" : ".10"};
-            reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.93,.85)*wash;
+              vec3(1.,.85,.68)*grazing*.38);` : theater ? `
+            float guidance=max(0.,worldNormal.y)*exp(-edge.x*2.7);
+            float reflectedFill=max(0.,1.-abs(worldNormal.y))*smoothstep(.14,2.4,roomPoint.y);
+            reflectedLight.indirectDiffuse+=diffuseColor.rgb*(vec3(.88,.91,1.)*reflectedFill*.16+
+              vec3(1.,.76,.48)*guidance*.12);
+          ` : `
+            float bayOffset=mod(roomPoint.z+${l.toFixed(3)},${lampPitch.toFixed(4)})-${(lampPitch*.5).toFixed(4)};
+            float lampZ=roomPoint.z-bayOffset+clamp(bayOffset,-${((lampPitch-.54)*.5).toFixed(4)},${((lampPitch-.54)*.5).toFixed(4)});
+            float wash=0.;
+            for(int rail=-1;rail<=1;rail++){
+              vec3 toLamp=vec3(float(rail)*${(w*.55).toFixed(3)},${(height-.119).toFixed(3)},lampZ)-roomPoint;
+              float dist2=max(.12,dot(toLamp,toLamp));
+              vec3 ray=toLamp*inversesqrt(dist2);
+              wash+=max(0.,dot(worldNormal,ray))*max(0.,ray.y)/(1.+dist2*.27);
+            }
+            reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(1.,.93,.87)*wash*.44;
           `}
           `);
         if(mesh!==floor)
@@ -193,7 +205,6 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
         box(scene,.023,.012,l*2-.46,0x947b63,side*(w-.071),.154,0,aisleLight);
       }
     } else {
-      const lampPitch=l*2/Math.max(1,Math.ceil(l*2/4.1));
       for (const x of [-w*.55,0,w*.55]){
         box(scene,.32,.048,l*2-.44,0x393632,x,height-.080,0,skirting);
         for(let z=-l+lampPitch/2;z<l;z+=lampPitch)
