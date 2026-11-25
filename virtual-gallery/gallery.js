@@ -2,8 +2,9 @@ import {mountFields} from "./mount-fields.js?v=desk33";
 import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js?v=desk33";
 import * as T from "./vendor/three.module.js";
-import {mountRenderer, disposeMount} from "./mount-render.js?v=desk33";
-import { architecture } from "./architecture.js?v=arrival55";
+import {mountRenderer, disposeMount} from "./mount-render.js?v=floor59";
+import { architecture } from "./architecture.js?v=floor59";
+import { createFloorReflection } from "./lobby-floor-reflection.js?v=glass60";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false) {
   const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";
   const canvasFont=(px,weight)=>weight+" "+px+"px "+family;
@@ -39,17 +40,26 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   renderer.shadowMap.needsUpdate = true;
   renderer.shadowMap.type = T.PCFShadowMap;
   const {theme,width:halfWidth,depth:halfDepth,height:roomHeight}=roomSize(works);
-  const mounts=mountRenderer(renderer), mounted=new Map();
+  let reflectionDirty=true;
+  const invalidateReflection=()=>{reflectionDirty=true;};
+  const mounts=mountRenderer(renderer,invalidateReflection), mounted=new Map();
   const hasBench = theme === "ink" || !theme;
   cam.far = Math.max(80,4*(halfWidth+halfDepth));
   cam.rotation.order = "YXZ";
   const station=new T.Vector3(0,1.65,2), entranceLook=new T.Vector3(0,1.65,-5);
   const building = architecture(scene, box, renderer, theme, halfWidth, halfDepth, roomHeight);
+  const floorFinish=theme==="calligraphy" ? 1.28 : theme==="projection" ? 1.25 : 1.32;
+  const floorReflection=createFloorReflection(T,renderer,scene,building.floor,undefined,{
+    strength:floorFinish,name:"gallery-floor-reflection",maxSize:520,edgeFade:.27,
+  });
+  const reflectedPosition=new T.Vector3(Infinity,Infinity,Infinity),reflectedRotation=new T.Quaternion();
+  let lastReflection=-Infinity;
+  canvas.addEventListener("webglcontextrestored",invalidateReflection);
   let markDrawn,surfaceReady=false;
   const ready=new Promise(resolve=>{markDrawn=resolve;});
   // Present the architecture as soon as it draws. Artwork resolves independently.
   const surfaces=Promise.race([building.previewReady,building.ready]);
-  surfaces.then(()=>{surfaceReady=true;});
+  surfaces.then(()=>{surfaceReady=true;invalidateReflection();});
   let reflection,
     disposed = false;
   building.ready
@@ -58,11 +68,13 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       const cube = new T.WebGLCubeRenderTarget(64, { type: T.HalfFloatType });
       const probe = new T.CubeCamera(0.08, 78, cube);
       probe.position.copy(new T.Vector3(0, 1.7, 0));
+      floorReflection.render(cam,false,0);
       probe.update(renderer, scene);
       const pmrem = new T.PMREMGenerator(renderer);
       reflection = pmrem.fromCubemap(cube.texture);
       scene.environment = reflection.texture;
       scene.environmentIntensity = 0.28;
+      invalidateReflection();
       cube.dispose();
       pmrem.dispose();
     })
@@ -98,6 +110,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
         texture.dispose();
       texture.image=image;
       texture.needsUpdate=true;
+      invalidateReflection();
     }
     if(preview)request(preview,image=>{
       if(texture.image)return;
@@ -112,6 +125,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   }
   const walls = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
   function layout(g, a) {
+    invalidateReflection();
     renderer.shadowMap.needsUpdate = true;
     let ang = walls[a.wall || 0];
     g.rotation.set(0, ang, 0);
@@ -301,6 +315,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     light.target = face;
   });
   function setLight(light,art) {
+    invalidateReflection();
     const t=(art.kelvin-2500)/4500;
     light.color.setRGB(1,.72+.26*t,.46+.54*t);
     light.intensity=art.power;
@@ -859,6 +874,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     let w = host.clientWidth,
       h = host.clientHeight;
     renderer.setSize(w, h, false);
+    invalidateReflection();
     cam.aspect = w / h;
     cam.updateProjectionMatrix();
     if(zoomed) {
@@ -962,6 +978,15 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     }
     if(wheelZoom)advanceWheel(now);
     if (!travel) marker.visible = false;
+    const cameraChanged=!cam.position.equals(reflectedPosition)||!cam.quaternion.equals(reflectedRotation);
+    const movingArtwork=animated.length || videos.some(video=>video.readyState>=2&&!video.paused);
+    if (surfaceReady && (reflectionDirty || cameraChanged || (movingArtwork && now-lastReflection>=42))
+      && floorReflection.render(cam,true,now)) {
+      reflectedPosition.copy(cam.position);
+      reflectedRotation.copy(cam.quaternion);
+      lastReflection=now;
+      reflectionDirty=false;
+    }
     renderer.render(scene, cam);
     if(surfaceReady && arrivalArtworkReady && markDrawn && !renderer.getContext().isContextLost()) {
       markDrawn();
@@ -1172,6 +1197,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       if(next.width!=null)a.width=next.width;
       if(next.height!=null)a.height=next.height;
       const replacement=mounts.build(a), spec=replacement.userData.spec;
+      invalidateReflection();
       disposeMount(entry.mount);
       entry.mount=replacement;
       g.add(replacement);
@@ -1238,6 +1264,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       }
       pendingStills.clear();
       for(const {img} of animated)img.removeAttribute("src");
+      floorReflection.dispose();
       reflection?.dispose();
       renderer.setAnimationLoop(null);
       ro.disconnect();

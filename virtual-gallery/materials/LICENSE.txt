@@ -83,3 +83,7 @@ Directory plaques: Granite Tile by Charlotte Baglioni, Poly Haven (CC0).
 https://polyhaven.com/a/granite_tile
 directory-granite-{color,normal,rough}.webp contain six separate interior cuts
 from the matching 4K diffuse, OpenGL normal and roughness scans, excluding grout.
+
+atrium-pure-sky.webp is a daylight colour grade of Kloofendal 38d Partly
+Cloudy (Pure Sky), by Greg Zaal and Jarod Guest, Poly Haven (CC0).
+https://polyhaven.com/a/kloofendal_38d_partly_cloudy_puresky

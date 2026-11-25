@@ -61,13 +61,13 @@ function panel(w,h,z,tile) {
   return g;
 }
 
-export function mountRenderer(renderer) {
+export function mountRenderer(renderer,onTextureLoad) {
   const textures=new Map(), loader=new T.TextureLoader(), anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);
   function map(kind,channel) {
     const key=kind+"-"+channel;
     if(!textures.has(key)) {
       const file=kind==="brocade" && channel!=="color" ? key+".webp" : "mount/"+key+".webp";
-      const texture=loader.load(new URL("./materials/"+file,import.meta.url).href);
+      const texture=loader.load(new URL("./materials/"+file,import.meta.url).href,onTextureLoad);
       if(channel==="color")texture.colorSpace=T.SRGBColorSpace;
       texture.wrapS=texture.wrapT=T.RepeatWrapping;
       texture.anisotropy=anisotropy; textures.set(key,texture);

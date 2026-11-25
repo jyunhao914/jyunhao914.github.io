@@ -92,8 +92,8 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
       return mesh;
     }
     const floor = facing(box(scene, w*2, .14, l*2, study ? 0xb4aca1 : theater ? 0x7e8083 : 0xb9b6b0, 0, -.07, 0,
-      {...surface(study ? "boards" : "stone", 1, 1), roughness: study ? .74 : .82,
-        normalScale: new T.Vector2(.21,.21)}), study ? 1.7 : 1.5);
+      {...surface(study ? "boards" : "stone", 1, 1), roughness: study ? .54 : .56,
+        normalScale: new T.Vector2(.15,.15)}), study ? 1.7 : 1.5);
     const walls = [
       box(scene, w*2, height, .12, tones[0], 0, height/2, -l, plaster),
       box(scene, w*2, height, .12, tones[1], 0, height/2, l, plaster),
@@ -269,8 +269,8 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     new T.MeshStandardMaterial({
       ...stone,
       color: dark ? 0x696963 : 0xc4c3b9,
-      roughness: 0.74,
-      normalScale: new T.Vector2(0.19, 0.19),
+      roughness: 0.54,
+      normalScale: new T.Vector2(0.13, 0.13),
     }),
   );
   floor.rotation.x = -Math.PI / 2;
