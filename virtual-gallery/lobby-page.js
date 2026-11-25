@@ -7,7 +7,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
     el("lobbyAdminLink").href="/";
     el("lobbyDownload").hidden=true;
   }
-  let scene, generation=0, active=false, unavailable=false, fallbackFull=false, quietTimer, zone="grounds";
+  let scene, sceneEvents, generation=0, active=false, unavailable=false, fallbackFull=false, quietTimer, zone="grounds";
   let rooms=[], returningFromHall=false, pointer, crossing=false, waitTimer, blend;
   const fullscreen=()=>document.fullscreenElement===document.documentElement || fallbackFull;
   function reveal() {
@@ -98,6 +98,8 @@ export function lobbyPage(enterRoom,prepareRoom) {
   }
   function destroyScene() {
     ++generation;
+    sceneEvents?.abort();
+    sceneEvents=null;
     scene?.dispose();
     scene=null;
     stage.replaceChildren();
@@ -129,7 +131,7 @@ export function lobbyPage(enterRoom,prepareRoom) {
     message.textContent=startZone==="lobby" ? "正在開啟展場大廳…" : "正在載入空間…";message.hidden=false;
     el("lobbyHint").hidden=true;
     try {
-      const {createLobby}=await import("./lobby.js?v=plaques65");
+      const {createLobby}=await import("./lobby.js?v=return66");
       if(!active || version!==generation)return;
       const signs=rooms.map(({title,room})=>({title,room}));
       scene=createLobby(stage,signs,index=>{
@@ -139,10 +141,11 @@ export function lobbyPage(enterRoom,prepareRoom) {
         onTravel:walking=>entrance.classList.toggle("portal-walking",walking)
       });
       const canvas=stage.querySelector("canvas");
+      sceneEvents=new AbortController();
       canvas.addEventListener("webglcontextlost",e=>{
         if(!active || version!==generation)return;
         e.preventDefault();failed();
-      },{once:true});
+      },{once:true,signal:sceneEvents.signal});
       home.disabled=false;
       enter.disabled=false;
       message.hidden=true;

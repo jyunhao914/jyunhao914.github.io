@@ -5,7 +5,29 @@ import * as T from "./vendor/three.module.js";
 import {mountRenderer, disposeMount} from "./mount-render.js?v=floor59";
 import { architecture } from "./architecture.js?v=garden64";
 import { createFloorReflection } from "./lobby-floor-reflection.js?v=glass60";
-export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false) {
+import { publicRenderer } from "./public-renderer.js?v=return66";
+export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false, reuseCanvas = false) {
+  const options={antialias:true};
+  const lease=reuseCanvas ? publicRenderer(T,host,options) : null;
+  const renderer=lease?.renderer ?? new T.WebGLRenderer(options);
+  const events=new AbortController();
+  function release(discard=false) {
+    events.abort();
+    if(lease)lease.release(discard);
+    else {
+      renderer.dispose();
+      if(!renderer.getContext().isContextLost())renderer.forceContextLoss();
+    }
+  }
+  try {
+    return buildGallery(host,works,{onPick,onMove,onRead,tools,portalEntry,renderer,signal:events.signal,release});
+  } catch(error) {
+    release(true);
+    throw error;
+  }
+}
+
+function buildGallery(host,works,{onPick,onMove,onRead,tools,portalEntry,renderer,signal,release}) {
   const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";
   const canvasFont=(px,weight)=>weight+" "+px+"px "+family;
   const scene = new T.Scene(),
@@ -14,8 +36,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       1,
       0.06,
       80,
-    ),
-    renderer = new T.WebGLRenderer({ antialias: true });
+    );
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
   renderer.outputColorSpace = T.SRGBColorSpace;
   host.replaceChildren(renderer.domElement);
@@ -54,14 +75,14 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   });
   const reflectedPosition=new T.Vector3(Infinity,Infinity,Infinity),reflectedRotation=new T.Quaternion();
   let lastReflection=-Infinity;
-  canvas.addEventListener("webglcontextrestored",invalidateReflection);
+  canvas.addEventListener("webglcontextrestored",invalidateReflection,{signal});
   let markDrawn,surfaceReady=false;
   const ready=new Promise(resolve=>{markDrawn=resolve;});
   // Present the architecture as soon as it draws. Artwork resolves independently.
   const surfaces=Promise.race([building.previewReady,building.ready]);
-  surfaces.then(()=>{surfaceReady=true;invalidateReflection();});
-  let reflection,
-    disposed = false;
+  let reflection, disposed=false;
+  signal.addEventListener("abort",()=>{disposed=true;},{once:true});
+  surfaces.then(()=>{if(!disposed){surfaceReady=true;invalidateReflection();}});
   building.ready
     .then(() => {
       if (disposed) return;
@@ -538,7 +559,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       wheelZoom={view,point,end,start:performance.now()};
     }
   }
-  canvas.addEventListener("wheel",handleWheel,{passive:false});
+  canvas.addEventListener("wheel",handleWheel,{passive:false,signal});
   function advanceWheel(now) {
     const {view,point,end,start}=wheelZoom;
     const t=T.MathUtils.clamp((now-start)/96,0,1);
@@ -554,7 +575,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     if(!fingers.size)multiTouch=false;
     return true;
   }
-  canvas.onpointerdown = (e) => {
+  canvas.addEventListener("pointerdown",e=>{
     wheelZoom=null;
     if(e.pointerType==="touch") {
       if(drag && !fingers.has(drag.pointer))return;
@@ -604,8 +625,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       }
       drag.origin = { x: obj.userData.a.x, y: obj.userData.a.y };
     }
-  };
-  canvas.onpointermove = (e) => {
+  },{signal});
+  canvas.addEventListener("pointermove",e=>{
     const finger=fingers.get(e.pointerId);
     if(finger) {
       finger.x=e.clientX;finger.y=e.clientY;
@@ -655,10 +676,10 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
         : .003;
       turn(-dx*sensitivity,-dy*sensitivity*.90);
     }
-  };
+  },{signal});
   canvas.tabIndex = 0;
   canvas.setAttribute("aria-label", "展廳視角，可拖曳環視、雙指縮放或點地板前往");
-  canvas.onpointerup = (e) => {
+  canvas.addEventListener("pointerup",e=>{
     if(endTouch(e))return;
     if (e.defaultPrevented) { drag=null; return; }
     if (!drag || drag.pointer !== e.pointerId) return;
@@ -693,10 +714,12 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       }
     }
     drag = null;
-  };
-  canvas.onpointercancel = canvas.onlostpointercapture = (e) => {
+  },{signal});
+  function pointerCancelled(e) {
     if(!endTouch(e) && drag?.pointer===e.pointerId)cancelDrag();
-  };
+  }
+  canvas.addEventListener("pointercancel",pointerCancelled,{signal});
+  canvas.addEventListener("lostpointercapture",pointerCancelled,{signal});
   let travel = null;
   function operate(action,dt) {
     wheelZoom=null;
@@ -858,8 +881,8 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     if(code==="KeyR"){resetView();return;}
     keys.set(code,{start:performance.now(),moved:false,applied:0,action:actionFor(code),mixed:false});
   }
-  window.addEventListener("keydown", key);
-  window.addEventListener("keyup", key);
+  window.addEventListener("keydown", key, {signal});
+  window.addEventListener("keyup", key, {signal});
   let blur = () => {
     cancelDrag();
     fingers.clear();multiTouch=false;pinch=null;wheelZoom=null;
@@ -868,8 +891,9 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     mobile?.release();
     spaceHeld=false;
   };
-  window.addEventListener("blur", blur);
+  window.addEventListener("blur", blur, {signal});
   let ro = new ResizeObserver(() => {
+    if(disposed)return;
     wheelZoom=null;
     let w = host.clientWidth,
       h = host.clientHeight;
@@ -896,6 +920,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
   let elapsed=0, frames=0, fastFrames=0, highRefresh=false;
   let last = performance.now();
   function renderFrame(now) {
+    if(disposed)return;
     let dt = Math.min(0.040, Math.max(0, (now - last) / 1000));
     const ms=now-last;
     last = now;
@@ -1141,7 +1166,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     return a;
   }
   const entryLook=e=>turn(-e.detail.dx*.003,-e.detail.dy*.003);
-  host.addEventListener("entrylook",entryLook);
+  host.addEventListener("entrylook",entryLook,{signal});
   host.dispatchEvent(new CustomEvent("viewerready",{detail: input =>
     input.type==="entrylook" ? turn(-input.dx*.003,-input.dy*.003) : key({ ...input, target:canvas, preventDefault() {} })
   }));
@@ -1248,16 +1273,15 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
     home:resetView,
     focus,
     dispose() {
+      if(disposed)return;
+      disposed=true;
       clearTimeout(artworkTimer);
       markDrawn?.();
       mounts.dispose();
       building.dispose?.();
       building.textures.forEach((t) => t.dispose());
       scene.traverse((o) => o.shadow?.dispose());
-      host.removeEventListener("entrylook",entryLook);
       mobile?.dispose();
-      canvas.removeEventListener("wheel",handleWheel);
-      disposed = true;
       for(const image of pendingStills) {
         image.onload=image.onerror=null;
         image.removeAttribute("src");
@@ -1268,9 +1292,6 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
       reflection?.dispose();
       renderer.setAnimationLoop(null);
       ro.disconnect();
-      window.removeEventListener("keydown", key);
-      window.removeEventListener("keyup", key);
-      window.removeEventListener("blur", blur);
       videos.forEach((v) => {
         v.pause();
         v.removeAttribute("src");
@@ -1281,8 +1302,7 @@ export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, p
         o.geometry?.dispose();
         o.material?.dispose();
       });
-      renderer.dispose();
-      renderer.forceContextLoss();
+      release();
       host.replaceChildren();
     },
   };

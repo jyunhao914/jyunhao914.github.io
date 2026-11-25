@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=plaques65";
+import {lobbyPage} from "./lobby-page.js?v=return66";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id),
   };
 let shows = [],
   current,
-  viewer,
+  viewer, viewerEvents,
   musicIndex = 0,
   seq = 0;
 function today() {
@@ -92,6 +92,12 @@ $("detail").onclose = () => {
   clearMedia($("content"));
   $("content").replaceChildren();
 };
+function disposeViewer(){
+  viewerEvents?.abort();
+  viewerEvents=null;
+  viewer?.dispose();
+  viewer=null;
+}
 function leave(entireFullscreen=false) {
   $("visit").inert=false;
   $("stage").dispatchEvent(new Event("discardnavigation"));
@@ -101,8 +107,7 @@ function leave(entireFullscreen=false) {
   const exit=document.fullscreenElement && (entireFullscreen || document.fullscreenElement===$("visit")) ? document.exitFullscreen().catch(()=>{}) : null;
   $("expand").textContent = "放大展廳";
   seq++;
-  viewer?.dispose();
-  viewer = null;
+  disposeViewer();
   $("stage").replaceChildren();
   $("visit").hidden = true;
   document.querySelector(".hero").hidden = false;
@@ -206,8 +211,7 @@ async function enter(workId,throughDoor=false) {
   if(target)$("room").value=target.room;
   if(!privatePreview)returningFromHall=true;
   let n = ++seq;
-  viewer?.dispose();
-  viewer = null;
+  disposeViewer();
   $("visit").hidden = false;
   $("visit").inert = throughDoor;
   document.body.classList.add("visiting");
@@ -243,25 +247,27 @@ async function enter(workId,throughDoor=false) {
           $("scrollPosition").value = Math.round(fraction*1000);
           $("scrollPosition").setAttribute("aria-valuetext", "自卷首向左 " + Math.round((1-fraction)*100) + "%");
           $("readPosition").textContent = Math.round((1-fraction)*100) + "%";
-        }, undefined, throughDoor,
+        }, undefined, throughDoor, !privatePreview,
       );
     if (n === seq && viewer) {
       if(target)viewer.select(roomWorks.indexOf(target));
       const canvas=$("stage").querySelector("canvas");
+      viewerEvents=new AbortController();
+      const {signal}=viewerEvents;
       let notice;
       canvas.addEventListener("webglcontextlost",()=>{
         if(n===seq && !notice) {
           if(throughDoor)releaseDoor();
           notice=offerCatalogue("3D 畫面暫停，正在等待圖形服務恢復。");
         }
-      });
+      },{signal});
       canvas.addEventListener("webglcontextrestored",()=>{
         if(n!==seq)return;
         const restoreFocus=notice?.contains(document.activeElement);
         notice?.remove();
         notice=null;
         if(restoreFocus)canvas.focus({preventScroll:true});
-      });
+      },{signal});
       if(throughDoor) {
         await viewer.ready;
         if(n!==seq || !visit.inert)return;
@@ -507,7 +513,7 @@ function showCatalogue(visible) {
 let lastRoute, returningFromHall=false;
 const doors=[];
 let incomingDoor;
-function loadRoomRenderer() {return import("./gallery.js?v=garden64");}
+function loadRoomRenderer() {return import("./gallery.js?v=return66");}
 const lobby=lobbyPage(door=>{
   incomingDoor=door;
   openRoom(door.show,door.room);

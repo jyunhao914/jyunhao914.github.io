@@ -1,4 +1,5 @@
 import * as T from "./vendor/three.module.js";
+import { publicRenderer } from "./public-renderer.js?v=return66";
 import { mobileControls } from "./mobile-controls.js?v=lobby35";
 import { buildMuseumGrounds } from "./museum-grounds.js?v=depth61";
 import {createFloorReflection} from "./lobby-floor-reflection.js?v=glass60";
@@ -36,11 +37,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
   const scene = new T.Scene();
   const camera = new T.PerspectiveCamera(61, 1, .06, Math.max(85, 4 * Math.hypot(plan.halfDepth, plan.halfWidth) + 35));
   camera.rotation.order = "YXZ";
-  const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.65));
-  renderer.outputColorSpace = T.SRGBColorSpace;
-  renderer.toneMapping = T.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.04;
+  const {renderer,release}=publicRenderer(T,host,{antialias:true,powerPreference:"high-performance"});
   const canvas = renderer.domElement;
   canvas.style.cssText = "display:block;width:100%;height:100%;touch-action:none;cursor:grab";
   canvas.tabIndex = 0;
@@ -457,23 +454,31 @@ export function createLobby(host, doors, onEnter, options = {}) {
     fitView();camera.updateProjectionMatrix();
     invalidate();
   }
-  function dispose() {
+  function dispose(discard=false) {
     if (disposed) return;
     disposed = true;
-    cancelApproach();
-    clearInput();
-    listeners.abort();
-    observer?.disconnect();
-    cancelAnimationFrame(frame);
-    stick?.dispose();
-    grounds?.dispose();
-    floorReflection?.dispose();
-    interior?.dispose();
-    renderer.dispose();
-    renderer.forceContextLoss();
-    canvas.remove();
+    let clean=false;
+    try {
+      cancelApproach();
+      clearInput();
+      listeners.abort();
+      observer?.disconnect();
+      cancelAnimationFrame(frame);
+      stick?.dispose();
+      grounds?.dispose();
+      floorReflection?.dispose();
+      interior?.dispose();
+      clean=true;
+    } finally {
+      canvas.remove();
+      release(discard || !clean);
+    }
   }
   try {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.65));
+    renderer.outputColorSpace = T.SRGBColorSpace;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.04;
     interior = buildLobby(T, scene, doors, {...plan, invalidate});
     floorReflection=createFloorReflection(T,renderer,scene,interior.reflectionFloor,invalidate);
     grounds = buildMuseumGrounds(T,scene,{halfWidth:plan.halfWidth,halfDepth:plan.halfDepth,panorama:interior.panorama,invalidate});
@@ -530,7 +535,7 @@ export function createLobby(host, doors, onEnter, options = {}) {
     resetView(options.startZone!=="lobby");
     host.dispatchEvent(new CustomEvent("viewerready", {detail:earlyInput}));
   } catch (error) {
-    dispose();
+    dispose(true);
     throw error;
   }
   return { dispose,setPaused,enterDoor:enter,enterMuseum,exitMuseum,home };
