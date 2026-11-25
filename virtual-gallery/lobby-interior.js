@@ -1,4 +1,3 @@
-import {mountReceptionRelief,mountCorridorReliefs} from "./lobby-wall-installation.js?v=depth61";
 import {mountPierLetters} from "./pier-lettering.js?v=wayfinding53";
 import {buildReception,furnitureObstacles} from "./lobby-reception.js?v=depth61";
 import {buildWaypoints} from "./lobby-waypoints.js?v=directory42";
@@ -747,8 +746,6 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
     root.add(pool,pool.target);
   }
 
-  mountCorridorReliefs(T,root,materials,{doorLeft,doorRight,exterior,plasterNormal,plasterMap});
-
   // The low-iron glass shows the space beyond through nearly clear normal
   // incidence. At a slant it picks up the real corridor's ceiling light axis.
   const glassMat=material(T.ShaderMaterial,{
@@ -1009,7 +1006,6 @@ export function buildLobby(T, scene, doors, {halfWidth,halfDepth,invalidate}={})
   function highlightSign(action){
     for(const row of signRows)row.face.emissive.setHex(row.action===action?0x22180c:0);
   }
-  mountReceptionRelief(T,root,materials,plasterNormal,plasterMap);
   const deskHits=buildReception(T,root,{texture,materials,stoneMap,stoneNormal});
   const updateWaypoints=buildWaypoints(T,root,doors,{materials,textures,hits,halfDepth:d});
   root.updateMatrixWorld(true);
