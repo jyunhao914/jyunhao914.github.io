@@ -3,7 +3,7 @@ import {mobileControls} from "./mobile-controls.js?v=stickspace20";
 import {roomSize} from "./room-size.js?v=desk33";
 import * as T from "./vendor/three.module.js";
 import {mountRenderer, disposeMount} from "./mount-render.js?v=floor59";
-import { architecture } from "./architecture.js?v=glazing63";
+import { architecture } from "./architecture.js?v=garden64";
 import { createFloorReflection } from "./lobby-floor-reflection.js?v=glass60";
 export function gallery(host, works, onPick, onMove, onRead = () => {}, tools, portalEntry = false) {
   const family=getComputedStyle(host).getPropertyValue("--gallery-font-family").trim() || "sans-serif";

@@ -840,7 +840,7 @@ function layout(keepScene=false) {
         showDeskRulers();
       };
       let t = token;
-      import("../gallery.js?v=glazing63")
+      import("../gallery.js?v=garden64")
         .then(({ gallery }) => {
           if (t !== token) return;
           viewer = gallery(

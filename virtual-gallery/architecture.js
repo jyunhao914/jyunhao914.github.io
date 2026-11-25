@@ -28,17 +28,27 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
   const previews=[];
   const sheet=loadScanPreview();
   const loader = new T.ImageLoader();
-  function texture(file, color = false, x = 1, y = 1) {
+  function texture(file, color = false, x = 1, y = 1, previewFile) {
     const tex=new T.Texture();
+    function upload(image){
+      // WebGL storage already allocated for a preview cannot grow in place.
+      if(tex.image && (tex.image.width!==image.width || tex.image.height!==image.height))tex.dispose();
+      tex.image=image;
+      tex.needsUpdate=true;
+    }
+    if(previewFile){
+      const preview=new Image();
+      preview.crossOrigin="anonymous";
+      preview.fetchPriority="high";
+      preview.onload=()=>{if(!tex.image)upload(preview);};
+      preview.src=new URL("./materials/"+previewFile,import.meta.url).href;
+    }
     loads.push(
       new Promise((resolve) => {
         loader.load(
           new URL("./materials/" + file, import.meta.url).href,
           image=>{
-            // WebGL2 texture storage cannot grow after a preview has been uploaded.
-            if(tex.image && (tex.image.width!==image.width || tex.image.height!==image.height))tex.dispose();
-            tex.image=image;
-            tex.needsUpdate=true;
+            upload(image);
             resolve();
           },
           undefined,
@@ -78,6 +88,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     const w = halfWidth, l = halfDepth;
     const tones = colors || (theater ? [0x3d414b, 0x3c343f, 0x34413e, 0x3d414a] :
       [0x424a50, 0x47423f, 0x394641, 0x46404a]);
+    const gardenDetail=study ? texture("study-garden-detail.webp",true,1,1,"study-garden-preview.webp") : null;
     const plaster = {...surface("plaster", 1, 1), roughness: .91, normalScale: new T.Vector2(.13,.13)};
     const wood = surface("wood", 1, 1);
     const timber = {...wood, roughness: .75};
@@ -105,7 +116,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
     ];
     walls.forEach(wall => facing(wall,1.08));
     if (study) {
-      walls.push(studyWindows(scene, texture, plaster, wood, tones[2], w, l, height, lightBays, bayPitch, openingWidth));
+      walls.push(studyWindows(scene, texture, gardenDetail, plaster, wood, tones[2], w, l, height, lightBays, bayPitch, openingWidth));
     }
     const ceiling = facing(box(scene, w*2,.12,l*2, study ? 0xa19a8d : theater ? 0x494b50 : 0x87847d, 0,height,0,plaster),1.08);
     // A recessed dark skirting gives the floor a consistent junction with the
@@ -488,7 +499,7 @@ export function architecture(scene, box, renderer, theme = "", halfWidth = 6, ha
 
 // The west wall of the calligraphy study overlooks one continuous planted court.
 // Batch the solid profiles by finish so adding a bay doesn't add draw calls.
-function studyWindows(scene, texture, plaster, wood, wallTone, halfWidth, halfDepth, height, count, pitch, width) {
+function studyWindows(scene, texture, detail, plaster, wood, wallTone, halfWidth, halfDepth, height, count, pitch, width) {
   const wallX=-halfWidth, sill=1.19, head=2.98, glassX=wallX-.206;
   const reveals=[], lining=[], bronze=[], seals=[], paleStone=[], courtStone=[], paving=[];
   const centres=Array.from({length:count},(_,i)=>-halfDepth+(i+.5)*pitch);
@@ -603,7 +614,6 @@ function studyWindows(scene, texture, plaster, wood, wallTone, halfWidth, halfDe
   const garden=new T.Mesh(new T.SphereGeometry(1,64,32),new T.MeshBasicMaterial({
     map:texture("woodland.webp",true),color:0xf8f7eb,side:T.BackSide,toneMapped:false,
   }));
-  const detail=texture("study-garden-detail.webp",true);
   detail.wrapS=detail.wrapT=T.ClampToEdgeWrapping;
   garden.material.onBeforeCompile=shader=>{
     shader.uniforms.studyGardenDetail={value:detail};

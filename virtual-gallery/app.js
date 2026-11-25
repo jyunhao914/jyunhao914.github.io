@@ -508,7 +508,7 @@ function showCatalogue(visible) {
 let lastRoute, lastDoor;
 const doors=[];
 let incomingDoor;
-function loadRoomRenderer() {return import("./gallery.js?v=glazing63");}
+function loadRoomRenderer() {return import("./gallery.js?v=garden64");}
 const lobby=lobbyPage(door=>{
   incomingDoor=door;
   openRoom(door.show,door.room);
@@ -557,6 +557,12 @@ function displayShow(show,room,work,catalogue) {
   } else {
     showCatalogue(false);
     if(expanded)visit.classList.add("expanded");
+    if($("room").value==="書法展廳" && !document.querySelector("link[data-study-garden]")){
+      const link=document.createElement("link");
+      link.rel="preload";link.as="image";link.crossOrigin="anonymous";link.fetchPriority="high";
+      link.href=new URL("./materials/study-garden-preview.webp",import.meta.url).href;
+      link.dataset.studyGarden="";document.head.append(link);
+    }
     enter(work,throughDoor);
   }
 }
