@@ -163,7 +163,11 @@ p {
 .card-caption span {font-size:.85rem;color:#36546a}
 .card-info {min-height:44px;border:0;border-top:1px solid #dbe1e2;border-radius:0;text-align:left;font-size:.88rem}
 .gallery-fallback {position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:20px;background:#e7ecea;color:#263531}
-#editLayout {display:block;padding:8px 0;overflow-wrap:anywhere}
+.museum-office {margin-top:12px;border-top:1px solid color-mix(in srgb,currentColor 18%,transparent)}
+.museum-office summary {width:fit-content;min-height:44px;padding:11px 4px;line-height:22px;cursor:pointer}
+.museum-office summary:focus-visible {outline:3px solid #d18337;outline-offset:-2px}
+.museum-office a {display:inline-flex;align-items:center;min-height:44px;margin-inline-end:12px;padding:6px 4px;color:inherit;text-underline-offset:3px;overflow-wrap:anywhere}
+footer .museum-office {border:0;margin:0}
 .muted,
 small {
   color: #526777;
@@ -550,7 +554,7 @@ body.visiting {
 
 /* Public entrance and individual room doors */
 body.in-lobby {overflow:hidden}
-body.in-lobby > :is(header,footer) {display:none}
+body:is(.in-lobby,.visiting) > :is(header,footer) {display:none}
 #hallEntrance {
   position:fixed;inset:0;z-index:12;width:100%;height:100dvh;margin:0;overflow:hidden;
   background:#343d3e;color:#f9f8f2;

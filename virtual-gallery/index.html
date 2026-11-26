@@ -5,7 +5,7 @@
     name="viewport"
     content="width=device-width,initial-scale=1,viewport-fit=cover"
   /><title>美術館園區｜虛擬策展工作室</title
-  ><link rel="stylesheet" href="style.css?v=plaques65" />
+  ><link rel="stylesheet" href="style.css?v=office67" />
   <link rel="stylesheet" href="typography.css?v=hall34">
   <header>
     <strong>虛擬策展工作室</strong>
@@ -41,7 +41,12 @@
           <p>方向鍵或 WASD 移動。按住空白鍵搭配方向鍵轉頭。在大廳將廳牌移到視野中央，按 Enter 入場。也可按 Tab 選取「展廳名錄」，再按 Enter 開啟。Esc 可關閉名錄或停下自動行走，R 可回到起點。</p>
           <div class="touch-motion"><button type="button" id="lobbyGyro" aria-pressed="false">陀螺儀轉向</button> <span id="lobbyGyroStatus" role="status"></span></div>
         </details>
-        <div class="lobby-directory-actions"><button type="button" id="lobbyHome">回到大廳起點</button><button type="button" id="lobbyReturnGrounds" hidden>回到美術館園區</button><button type="button" id="lobbyRetry" hidden>重新開啟 3D 大廳</button><a id="lobbyAdminLink" href="admin/">策展後台</a><a id="lobbyDownload" href="studio.zip" download>下載工作室</a></div>
+        <div class="lobby-directory-actions"><button type="button" id="lobbyHome">回到大廳起點</button><button type="button" id="lobbyReturnGrounds" hidden>回到美術館園區</button><button type="button" id="lobbyRetry" hidden>重新開啟 3D 大廳</button></div>
+        <details class="museum-office" id="lobbyOffice">
+          <summary>館務資訊</summary>
+          <a id="lobbyAdminLink" href="admin/" data-office-home>進入策展後臺</a>
+          <a href="studio.zip" download>下載策展工作室</a>
+        </details>
       </dialog>
     </section>
     <section id="exhibits" hidden>
@@ -94,7 +99,6 @@
           <p>用滑鼠或手指輕推圓形搖桿微調，推近外圈才加快。按住空白鍵推搖桿可原地轉向，上下推可抬頭或低頭；近看長卷時左右推動沿牆細移，放手即停。開啟陀螺儀後，轉動手機可環顧；看畫時固定朝向作品。點作品走到畫前。拖空白牆面可轉身，點地板可走到該處。</p>
           <p>將滑鼠游標對準想看的筆畫，滾輪向上拉近、向下拉遠。觸控時兩指張開拉近、合攏拉遠。在一般作品上左右滑可換件。在長卷上拖曳可沿牆慢移，放手即停；拖動位置滑桿可快速跳到別處。</p>
         </details>
-        <a id="editLayout" href="admin/">調整作品位置（策展登入）</a>
         <label>切換展覽<select id="visitShows"></select></label>
         <label>展廳<select id="room"></select></label>
         <div class="tour-tools">
@@ -116,6 +120,10 @@
             step=".01"
             value=".5"
         /></label>
+        <details class="museum-office" id="visitOffice">
+          <summary>館務資訊</summary>
+          <a id="editLayout" href="admin/">進入策展後臺</a>
+        </details>
       </div>
     </section>
     <div id="works" class="section" hidden>
@@ -125,11 +133,12 @@
     <div class="grid" id="cards" hidden></div>
   </main>
   <footer>
-    虛擬策展工作室　線上美術館　·　<a href="admin/">線上策展後台</a>　·　<a
-      href="studio.zip"
-      download
-      >下載策展工作室</a
-    >
+    虛擬策展工作室　線上美術館
+    <details class="museum-office" id="catalogueOffice">
+      <summary>館務資訊</summary>
+      <a href="admin/" data-office-home>進入策展後臺</a>
+      <a href="studio.zip" download>下載策展工作室</a>
+    </details>
   </footer>
   <dialog id="detail">
     <button id="close">關閉展籤</button>
@@ -171,7 +180,7 @@
         stage.addEventListener("lostpointercapture",()=>{touch=null});
         function capture(e) {
           if(surface.hidden || surface.inert || stage.querySelector("canvas") || document.querySelector("dialog[open]") || e.altKey || e.ctrlKey || e.metaKey ||
-             e.target.closest?.("input,textarea,select,button,a,[contenteditable=true]") ||
+             e.target.closest?.("input,textarea,select,button,a,summary,[contenteditable=true]") ||
              !["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyA","KeyS","KeyD","Space","KeyR"].includes(e.code)) return;
           e.preventDefault();
           if(!e.repeat && pending.length<64) pending.push({code:e.code,type:e.type});
@@ -190,5 +199,5 @@
       captureEarlyNavigation(document.getElementById("lobbyStage"),document.getElementById("hallEntrance"));
     })();
   </script>
-  <script type="module" src="app.js?v=return66"></script>
+  <script type="module" src="app.js?v=office67"></script>
 </html>

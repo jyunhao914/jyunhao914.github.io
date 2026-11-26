@@ -3,10 +3,6 @@ export function lobbyPage(enterRoom,prepareRoom) {
   const el=id=>document.getElementById(id), entrance=el("hallEntrance"), stage=el("lobbyStage");
   const panel=el("lobbyDirectoryPanel"), directory=el("lobbyDirectory"), message=el("lobbyMessage");
   const enter=el("lobbyEnterDoor"), expand=el("lobbyExpand"), home=el("lobbyHome"), retry=el("lobbyRetry");
-  if(location.pathname.startsWith("/public/")) {
-    el("lobbyAdminLink").href="/";
-    el("lobbyDownload").hidden=true;
-  }
   let scene, sceneEvents, generation=0, active=false, unavailable=false, fallbackFull=false, quietTimer, zone="grounds";
   let rooms=[], returningFromHall=false, pointer, crossing=false, waitTimer, blend;
   const fullscreen=()=>document.fullscreenElement===document.documentElement || fallbackFull;
@@ -40,7 +36,10 @@ export function lobbyPage(enterRoom,prepareRoom) {
     prepareRoom();
     scene?.setPaused(true);
     reveal();
-    if(!panel.open)panel.showModal();
+    if(!panel.open){
+      el("lobbyOffice").open=false;
+      panel.showModal();
+    }
   }
   directory.onclick=showDirectory;
   el("lobbyDirectoryClose").onclick=()=>panel.close();

@@ -1,4 +1,4 @@
-import {lobbyPage} from "./lobby-page.js?v=return66";
+import {lobbyPage} from "./lobby-page.js?v=office67";
 
 const $ = (id) => document.getElementById(id),
   node = (tag, txt) => {
@@ -119,11 +119,10 @@ function updateEditLink(work) {
   if(work)params.set("work",work.id);
   const link=$("editLayout");
   link.href="admin/?"+params;
-  link.textContent=work ? "調整《"+work.title+"》位置（策展登入）" : "調整作品位置（策展登入）";
+  link.textContent=work ? "進入策展後臺調整《"+work.title+"》" : "進入策展後臺";
 }
 function draw() {
   $("music").pause();
-  $("editLayout").hidden=new URLSearchParams(location.search).has("studio-preview") || location.pathname.startsWith("/public/") || location.pathname.startsWith("/preview/");
   updateEditLink(current.works[0]);
   $("title").textContent = $("visitTitle").textContent = current.title;
   $("room").replaceChildren(
@@ -420,6 +419,7 @@ function showFocus(a) {
 }
 function menu(open) {
   const changed = $("visitMenu").hidden === open;
+  if(changed)$("visitOffice").open=false;
   $("visitMenu").hidden = !open;
   if(changed) revealControls();
   if(!open && !$("visit").hidden) $("stage").querySelector("canvas")?.focus({preventScroll:true});
@@ -458,6 +458,20 @@ document.addEventListener("keydown", (e) => {
 });
 const embeddedPreview = location.search === "?studio-preview" && parent !== window;
 const privatePreview = embeddedPreview || location.pathname.startsWith("/preview/");
+if(privatePreview || new URLSearchParams(location.search).has("studio-preview")){
+  document.querySelectorAll(".museum-office").forEach(office=>office.hidden=true);
+}else if(location.pathname.startsWith("/public/")){
+  document.querySelectorAll("[data-office-home]").forEach(link=>link.href="/");
+  document.querySelectorAll(".museum-office a[download]").forEach(link=>link.hidden=true);
+  $("visitOffice").hidden=true;
+}
+window.addEventListener("pageshow",event=>{
+  if(!event.persisted)return;
+  for(const office of document.querySelectorAll(".museum-office[open]")){
+    if(office.contains(document.activeElement))office.querySelector("summary").focus({preventScroll:true});
+    office.open=false;
+  }
+});
 let previewWork;
 async function loadExhibitions() {
   if (embeddedPreview) {
@@ -498,6 +512,7 @@ function clearMedia(container) {
   }
 }
 function showCatalogue(visible) {
+  $("catalogueOffice").open=false;
   const hero=document.querySelector(".hero");
   if(visible)drawCatalogue();
   else {
