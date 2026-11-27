@@ -7,7 +7,8 @@ import {roomSize} from "../room-size.js?v=desk33";
 import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
 import { bindInventory, inventoryMarkup } from "./desk-inventory.js?v=inventory68";
 import { addToExhibition } from "./inventory-placement.js?v=inventory68";
-import { state, post, versions, exhibition } from "./storage.js?v=desk33";
+import { state, post, versions, exhibition } from "./storage.js?v=publish69";
+import { publicationController } from "./publication-controller.js?v=publish69";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
   status = $("#status");
@@ -20,7 +21,7 @@ const workspaceViews = {
 const requestedView = new URLSearchParams(location.search).get("view");
 let db = await state(),
   tab = Object.keys(workspaceViews).find(name => workspaceViews[name] === requestedView) || "展覽管理",
-  sid = db.shows[0]?.id,
+  sid = db.shows.find(s => s.id === new URLSearchParams(location.search).get("show"))?.id ?? db.shows[0]?.id,
   aid = db.arts[0]?.id,
   search = "",
   filter = "",
@@ -47,16 +48,32 @@ const show = () => db.shows.find((x) => x.id === sid),
           "'": "&#39;",
         })[c],
     );
-let saveMessage="尚無修改", saveFailed=false;
+let saveMessage="草稿已儲存", saveFailed=false, publicationBusy=false;
+const publications = publicationController({
+  database:() => db, revision:() => generation, draftStatus:() => saveMessage, commit:commitPublication,
+  updateList:label => {
+    for(const row of document.querySelectorAll("#show-list [data-publication-show]")) {
+      const item=db.shows.find(s=>s.id===row.dataset.publicationShow);
+      if(item) {
+        const text=label(item)+" · "+item.ids.length+" 件作品";
+        if(row.textContent!==text)row.textContent=text;
+      }
+    }
+  }
+});
 function showSaveStatus(message,failed=false) {
   saveMessage=message;
   saveFailed=failed;
   status.textContent=message;
   paintSaveStatus();
+  publications.changed();
 }
 function paintSaveStatus() {
   const label=$("#wall-save-status");
-  if(label)label.textContent=saveMessage;
+  if(label) {
+    label.textContent=saveMessage;
+    label.parentElement.hidden=!saveFailed;
+  }
   for(const button of document.querySelectorAll("[data-save-retry]")) {
     button.hidden=!saveFailed;
     button.onclick=retrySave;
@@ -70,7 +87,7 @@ function flush() {
   chain=chain.catch(()=>{}).then(async()=>{
     while(dirty) {
       const gen=generation;
-      showSaveStatus("儲存中…");
+      showSaveStatus("草稿儲存中…");
       try {
         db.rev=await post("save",db);
       } catch(e) {
@@ -79,14 +96,14 @@ function flush() {
       }
       if(gen===generation)dirty=false;
     }
-    if(saveMessage==="儲存中…")showSaveStatus("已儲存 · 版本 "+db.rev);
+    if(saveMessage==="草稿儲存中…")showSaveStatus("草稿已儲存 · 版本 "+db.rev);
   });
   return chain;
 }
 function changed() {
   dirty=true;
   generation++;
-  showSaveStatus("等待儲存");
+  showSaveStatus("草稿等待儲存");
   clearTimeout(timer);
   timer=setTimeout(retrySave,1200);
 }
@@ -95,7 +112,7 @@ function error(e) {
   status.textContent = "操作失敗 · " + e.message;
 }
 window.addEventListener("beforeunload", (e) => {
-  if (dirty) {
+  if (dirty || publicationBusy) {
     e.preventDefault();
     e.returnValue = "";
   }
@@ -146,6 +163,28 @@ function action(k, fn) {
     };
 }
 export {flush as saveBeforeLogout};
+async function commitPublication(op, selected, approvedSource) {
+  if(publicationBusy || show()!==selected) throw Error("展覽選取已變更，請重新核對。");
+  publicationBusy=true;
+  const main=document.querySelector("main"), logout=$("#logout");
+  const approvedGeneration=generation;
+  main.inert=true;
+  logout.disabled=true;
+  try {
+    chain=flush().then(async()=>{
+      if(approvedGeneration!==generation || dirty)throw Error("草稿內容已變更，請重新核對後發布。");
+      db.rev=await post(op,{id:selected.id,rev:db.rev},approvedSource);
+      selected.status=op==="end" ? "歷史典藏" : "已發布";
+      generation++;
+      if(!dirty)showSaveStatus("草稿已儲存 · 版本 "+db.rev);
+    });
+    await chain;
+  } finally {
+    main.inert=false;
+    logout.disabled=false;
+    publicationBusy=false;
+  }
+}
 function fileData(f, mime) {
   return new Promise((ok, no) => {
     let r = new FileReader();
@@ -210,6 +249,8 @@ function syncWorkspaceNav() {
   if (tab !== "佈展設定") {
     for (const key of ["layout", "work", "panel"]) route.searchParams.delete(key);
   }
+  if(tab==="展覽管理" && sid) route.searchParams.set("show",sid);
+  else route.searchParams.delete("show");
   if (tab === "展覽管理" || (tab === "佈展設定" && route.searchParams.has("layout"))) route.searchParams.delete("view");
   else route.searchParams.set("view", workspaceViews[tab]);
   if (route.href !== location.href) history.replaceState(null, "", route);
@@ -237,12 +278,13 @@ function render() {
       const compactLandscape=matchMedia("(orientation:landscape) and (max-height:550px)").matches;
       if(!deskWasOpen && (compactLandscape || matchMedia("(max-width:740px)").matches)) {
         requestAnimationFrame(()=>{
-          if(panel.isConnected)$(compactLandscape?"#wall-preview":".desk-heading").scrollIntoView({block:"start"});
+          if(panel.isConnected)$(".desk-heading").scrollIntoView({block:"start"});
         });
       }
     }
   }
   else backup();
+  publications.mount($("#publication-host"), show());
   paintCheckReturn();
 }
 let libraryDetailOpen=false;
@@ -416,8 +458,10 @@ function manage() {
     artworkList($("#show-list"), cards, sid, selectShow);
     $("#show-list").querySelectorAll("small").forEach((label,i) => {
       const ex = db.shows[i];
-      label.textContent = ex.status + " · " + ex.ids.length + " 件作品";
+      label.dataset.publicationShow = ex.id;
+      label.textContent = ex.ids.length + " 件作品";
     });
+    publications.changed();
   }
   listShows();
   $("#switch-show").onclick = e => {
@@ -439,12 +483,11 @@ function manage() {
     $("#form").innerHTML = '<p class="catalog-empty">尚無展覽。點「建立展覽」開始選作品。</p>';
     return;
   }
-  const published = s.status === "已發布";
-  $("#form").innerHTML = '<section class="show-overview"><span class="show-status"></span><h2 id="show-title" tabindex="-1"></h2>' +
+  $("#form").innerHTML = '<section class="show-overview"><h2 id="show-title" tabindex="-1"></h2>' +
     '<p class="catalog-meta"><span id="show-dates"></span> · <span id="show-count"></span></p>' +
-    '<div class="catalog-actions">'+btn("layout","進入佈展")+btn("preview","參觀預覽")+btn("publish",published?"更新公開展覽":"發布展覽") +
+    '<div class="catalog-actions">'+btn("layout","進入佈展")+btn("preview","參觀預覽") +
     '</div><p id="show-first-work" class="catalog-empty" hidden></p>' +
-    (published ? '<a class="live-exhibition" target="_blank" rel="noopener noreferrer" href="../#'+encodeURIComponent(s.id)+'">查看公開展覽</a>' : '') + '</section>' +
+    '<div id="publication-host"></div></section>' +
     '<details class="catalog-section" id="show-check"><summary>展前檢查 <small id="check-count"></small></summary>'+
     '<p id="check-progress"></p><ul id="check-list"></ul></details>'+
     '<details class="catalog-section" id="show-info"><summary>展覽資料與檔期</summary><div class="fields">' +
@@ -511,14 +554,13 @@ function manage() {
   }
   function updateOverview() {
     updateCheck();
-    $(".show-status").textContent = s.status;
     $("#show-title").textContent = s.title;
     $("#show-dates").textContent = s.start && s.end ? s.start+" 至 "+s.end :
       s.start ? s.start+" 起" : s.end ? "至 "+s.end : "未設定展期";
     $("#show-count").textContent = s.ids.length+" 件作品";
     $("#member-count").textContent = "已選 "+s.ids.length+" 件";
     const empty = !s.ids.length;
-    for (const k of ["preview","publish"]) $('[data-act="'+k+'"]').disabled = empty;
+    $('[data-act="preview"]').disabled = empty;
     const hint = $("#show-first-work");
     hint.hidden = !empty;
     if(empty)hint.textContent = db.arts.length ? "進入佈展即可從作品庫選件。" : "先將作品加入作品資料庫，再回來選件。";
@@ -605,28 +647,9 @@ function manage() {
     } catch(err){error(err);}
     finally {input.value="";input.disabled=false;}
   };
-  for (let k of ["publish", "end"])
-    action(k, async () => {
-      if (
-        !confirm(
-          k === "end"
-            ? "從公開清單撤展並保留私人典藏？"
-            : "將本展所選作品與影音公開至 GitHub？",
-        )
-      )
-        return;
-      document.querySelector("main").inert = true;
-      try {
-        await flush();
-        status.textContent = "正在更新 GitHub…";
-        await post(k, { id: s.id, rev: db.rev });
-        db = await state();
-      } finally {
-        document.querySelector("main").inert = false;
-      }
-      status.textContent = "GitHub 已更新，Pages 正在建置";
-      render();
-    });
+  action("end", () => {
+    if(confirm("從正式站撤下《"+s.title+"》並保留私人典藏？")) return publications.submit("end");
+  });
 }
 async function previewShow(s,work) {
     const dialog = document.querySelector("#preview"),
@@ -725,12 +748,12 @@ function layout(keepScene=false) {
   const toolButtons=Object.entries(deskTools).map(([key,label])=>
     '<button type="button" role="tab" id="'+(key==="mount"?"jump-mount":"desk-tab-"+key)+'" data-desk-tool="'+key+'" aria-controls="desk-panel-'+key+'">'+label+'</button>').join("");
   if(!keepScene) app.innerHTML =
-    '<div class="desk-heading"><h1>佈展設定</h1><label>展覽<select id="ex"></select></label></div>'+
+    '<div class="desk-heading"><h1>佈展設定</h1><label>展覽<select id="ex"></select></label></div><div id="publication-host"></div>'+
     '<div class="hanging-desk"><section id="wall-preview" aria-label="即時展牆預覽"><div class="surface-tools">'+
     '<div class="desk-view-modes" role="group" aria-label="展牆視圖">'+btn("3D","3D 實景")+btn("2D","2D 展牆")+'</div>'+
     (mode==="3D" && a ? '<button id="ruler-toggle" aria-pressed="true">隱藏尺標</button>' : '')+
     btn("preview","參觀預覽")+'</div><div id="surface"></div>'+
-    '<div class="wall-save"><span role="status" id="wall-save-status"></span><button id="wall-save-retry" data-save-retry hidden>重試儲存</button></div></section>'+
+    '<div class="wall-save" hidden><span role="status" id="wall-save-status"></span><button id="wall-save-retry" data-save-retry hidden>重試儲存</button></div></section>'+
     '<div class="desk-sidebar"><div class="desk-work-picker"><label for="sel">編輯作品</label><select id="sel"></select></div>'+
     '<div class="desk-tool-tabs" role="tablist" aria-label="佈展工具">'+toolButtons+'</div>'+
     '<div id="layout-inspector" role="region" aria-label="佈展工具內容" tabindex="-1"><section id="desk-panel-inventory" class="inventory" role="tabpanel" aria-labelledby="desk-tab-inventory" data-desk-panel="inventory">'+
@@ -809,7 +832,7 @@ function layout(keepScene=false) {
     $("#sel").value="";
   }
   const reviewed=works.filter(w=>w.reviewed).length;
-  $("#wall-progress").textContent=s.status+"　·　掛位已確認 "+reviewed+" / "+works.length;
+  $("#wall-progress").textContent="掛位已確認 "+reviewed+" / "+works.length;
   const wallNames=["北牆","西牆","南牆","東牆"];
   artworkList($("#wall-list"),works,aid,chosen=>{
     activateTool("position",true);
@@ -840,7 +863,7 @@ function layout(keepScene=false) {
     const reviewed=Boolean(obj.reviewed);
     if(work && Boolean(work.reviewed)!==reviewed) {
       work.reviewed=reviewed;
-      $("#wall-progress").textContent=s.status+"　·　掛位已確認 "+works.filter(w=>w.reviewed).length+" / "+works.length;
+      $("#wall-progress").textContent="掛位已確認 "+works.filter(w=>w.reviewed).length+" / "+works.length;
       const meta=$("#wall-list").children[index]?.querySelector("small");
       if(meta)meta.textContent=meta.textContent.replace(reviewed?"待確認":"掛位已確認",reviewed?"掛位已確認":"待確認");
       const review=app.querySelector('[data-act="review"]');

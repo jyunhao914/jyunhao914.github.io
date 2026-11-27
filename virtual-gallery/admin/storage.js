@@ -1,4 +1,5 @@
 import { mountFields, validateMount } from "../mount-fields.js?v=desk33";
+import { describePublication, listChanges, readPages, requireCatalogue, samePublication } from "./publication.js?v=publish69";
 
 const owner = "jyunhao914",
   privateRepo = "virtual-gallery-private",
@@ -9,9 +10,9 @@ let tokenProvider, credential = "",
   stateSha = "",
   loadedRevision;
 const endpoint = (repo, path = "") => "/repos/" + owner + "/" + repo + path;
-async function api(
+async function apiResponse(
   path,
-  { method = "GET", body, accept = "application/vnd.github+json" } = {},
+  { method = "GET", body, accept = "application/vnd.github+json", etag, signal } = {},
 ) {
   if(tokenProvider) credential=await tokenProvider();
   if (!credential) throw Error("請先登入 GitHub。");
@@ -20,15 +21,17 @@ async function api(
     redirect: "error",
     credentials: "omit",
     cache: "no-store",
+    signal,
     referrerPolicy: "no-referrer",
     headers: {
       Authorization: "Bearer " + credential,
       Accept: accept,
+      ...(etag ? { "If-None-Match": etag } : {}),
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!response.ok) {
+  if (!response.ok && !(etag && response.status === 304)) {
     let msg = {
       401: "憑證無效或已到期。",
       403: "權限不足或已達 GitHub 速率限制。請確認兩個儲存庫的 Contents 讀寫權限。",
@@ -36,9 +39,12 @@ async function api(
       409: "其他裝置已更新資料。請備份當前變更後重新登入。",
       422: "GitHub 拒絕此次變更，請檢查檔案大小及分支規則。",
     };
-    throw Error(msg[response.status] || "GitHub 回應 " + response.status);
+    throw Object.assign(Error(msg[response.status] || "GitHub 回應 " + response.status), { status: response.status });
   }
-  return response.json();
+  return response;
+}
+async function api(path, options) {
+  return (await apiResponse(path, options)).json();
 }
 async function guard() {
   let repo = await api(endpoint(privateRepo));
@@ -64,9 +70,10 @@ export async function login(value,provider) {
 const decoder = new TextDecoder(),
   encoder = new TextEncoder();
 function decode(value) {
-  return JSON.parse(
-    decoder.decode(Uint8Array.from(atob(value), (c) => c.charCodeAt(0))),
-  );
+  if (Uint8Array.fromBase64) return JSON.parse(decoder.decode(Uint8Array.fromBase64(value)));
+  const binary = atob(value), bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = binary.charCodeAt(i);
+  return JSON.parse(decoder.decode(bytes));
 }
 function encode(value) {
   let bytes = encoder.encode(JSON.stringify(value));
@@ -77,16 +84,16 @@ function encode(value) {
     chunks.push(btoa(String.fromCharCode(...bytes.subarray(i, i + 24576))));
   return chunks.join("");
 }
+function contents(repo, path, ref = "main") {
+  return endpoint(repo, "/contents/" + path + "?ref=" + encodeURIComponent(ref));
+}
+async function blobData(repo, meta, signal) {
+  if (meta.encoding === "base64") return decode(meta.content);
+  return api(endpoint(repo, "/git/blobs/" + meta.sha), { accept: "application/vnd.github.raw+json", signal });
+}
 async function file(repo, path, ref = "main") {
-  let meta = await api(
-    endpoint(repo, "/contents/" + path + "?ref=" + encodeURIComponent(ref)),
-    { accept: "application/vnd.github.object+json" },
-  );
-  let data =
-    meta.encoding === "base64"
-      ? decode(meta.content)
-      : decode((await api(endpoint(repo, "/git/blobs/" + meta.sha))).content);
-  return { data, sha: meta.sha };
+  const meta = await api(contents(repo, path, ref), { accept: "application/vnd.github.object+json" });
+  return { data: await blobData(repo, meta), sha: meta.sha };
 }
 async function write(repo, path, data, sha, message) {
   return (
@@ -182,6 +189,60 @@ export function exhibition(s, x) {
     ),
   };
 }
+let sourceFile, pagesFile, lastRead, reading, epoch = 0;
+function invalidatePublication() {
+  epoch++;
+  lastRead = undefined;
+  reading = undefined;
+}
+async function loadPublication() {
+  const previous = sourceFile;
+  const signal = AbortSignal.timeout?.(120000);
+  const [response, pages] = await Promise.all([
+    apiResponse(contents(publicRepo, publicPath), { accept: "application/vnd.github.object+json", etag: previous?.etag, signal }),
+    readPages(pagesFile, signal),
+  ]);
+  let source = previous;
+  if (response.status !== 304) {
+    const meta = await response.json();
+    let data;
+    if (meta.sha === pages.sha) data = pages.data;
+    else if (meta.sha === previous?.sha) data = previous.data;
+    else data = requireCatalogue(await blobData(publicRepo, meta, signal));
+    source = { data, sha: meta.sha, etag: response.headers.get("ETag") };
+  }
+  if (source.sha === pages.sha && source.data !== pages.data) source = { ...source, data: pages.data };
+  return { source, pages, checkedAt: Date.now() };
+}
+export function cachedPublication(id) {
+  if (!lastRead) return null;
+  return {
+    source: sourceFile.data.find(show => show.id === id) ?? null,
+    live: pagesFile.data.find(show => show.id === id) ?? null,
+    checkedAt: lastRead,
+  };
+}
+export async function readPublication(id) {
+  const generation = epoch;
+  const request = reading ??= loadPublication();
+  try {
+    const { source, pages, checkedAt } = await request;
+    if (generation !== epoch) return readPublication(id);
+    sourceFile = source;
+    pagesFile = pages;
+    lastRead = checkedAt;
+    return cachedPublication(id);
+  } finally {
+    if (request === reading) reading = undefined;
+  }
+}
+const taipeiDate = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" });
+export function publicationState(db, show, snapshot) {
+  return describePublication(exhibition(db, show), show, snapshot, taipeiDate.format());
+}
+export function publicationChanges(db, show, snapshot) {
+  return listChanges(exhibition(db, show), snapshot.live);
+}
 export async function versions() {
   return (
     await api(
@@ -195,7 +256,7 @@ export async function versions() {
       c.sha.slice(0, 7),
   }));
 }
-export async function post(op, input) {
+export async function post(op, input, approvedSource) {
   let body = structuredClone(input);
   if (op === "save") return save(body);
   if (op === "restore") {
@@ -210,32 +271,43 @@ export async function post(op, input) {
   let s = latest.data,
     x = s.shows.find((a) => a.id === body.id);
   if (!x || !["publish", "end"].includes(op)) throw Error("找不到展覽。");
-  let today = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Taipei",
-  }).format(new Date());
+  let today = taipeiDate.format();
   if (
     op === "publish" &&
     (!x.ids.length || (x.start && today < x.start) || (x.end && today > x.end))
   )
     throw Error("請選擇作品並於展期內發布。");
-  let previous = await file(publicRepo, publicPath),
-    items = previous.data.filter((a) => a.id !== x.id);
-  if (op === "publish") items.unshift(exhibition(s, x));
-  await write(
-    publicRepo,
-    publicPath,
-    items,
-    previous.sha,
-    op === "publish"
-      ? "Publish curated exhibition"
-      : "Archive curated exhibition",
-  );
-  x.status = op === "publish" ? "已發布" : "歷史典藏";
+  const meta = await api(contents(publicRepo, publicPath), { accept: "application/vnd.github.object+json" });
+  const previous = meta.sha === sourceFile?.sha ? sourceFile.data : requireCatalogue(await blobData(publicRepo, meta));
+  const index = previous.findIndex(show => show.id === x.id);
+  const projection = op === "publish" ? exhibition(s, x) : null;
+  if (!samePublication(previous[index] ?? null, projection)) {
+    if (approvedSource !== undefined && !samePublication(previous[index] ?? null, approvedSource)) {
+      throw Object.assign(Error("此展的公開版本已變更，請重新核對再送出。"), {reviewRequired:true});
+    }
+    const items = previous.slice();
+    if (index < 0) items.unshift(projection);
+    else if (projection) items[index] = projection;
+    else items.splice(index, 1);
+    let sha;
+    try {
+      sha = await write(publicRepo, publicPath, items, meta.sha,
+        projection ? "Publish curated exhibition" : "Archive curated exhibition");
+    } catch (error) {
+      invalidatePublication();
+      if (!error.status || error.status >= 500) error.publicUncertain = true;
+      throw error;
+    }
+    sourceFile = { data: items, sha };
+  }
+  invalidatePublication();
+  const status = projection ? "已發布" : "歷史典藏";
+  if (x.status === status) return s.rev;
+  x.status = status;
   try {
     return await save(s);
   } catch (e) {
-    throw Error(
-      "公開清單已更新，但私人狀態儲存失敗。請重新登入核對。" + e.message,
-    );
+    throw Object.assign(Error("GitHub 公開清單已就緒，私人展務狀態未能儲存。" + e.message),
+      { publicUpdated: true });
   }
 }

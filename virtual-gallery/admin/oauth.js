@@ -60,7 +60,7 @@ export async function authorize(keep=false) {
   const entry=new URLSearchParams(location.search);
   sessionStorage.setItem(
     keys.flow,
-    JSON.stringify({ state, verifier, keep, layout:entry.get("layout"),work:entry.get("work"), panel:entry.get("panel"), view:entry.get("view"), time: Date.now() }),
+    JSON.stringify({ state, verifier, keep, layout:entry.get("layout"),work:entry.get("work"), panel:entry.get("panel"), view:entry.get("view"), show:entry.get("show"), time: Date.now() }),
   );
   const params = new URLSearchParams({
     client_id: app.id,
@@ -122,6 +122,8 @@ export async function restore() {
       if(flow.work)entry.set("work",flow.work);
       if(["inventory","available","position","mount","light"].includes(flow.panel))entry.set("panel",flow.panel);
       history.replaceState(null,"",location.pathname+"?"+entry);
+    } else if (flow.show && (!flow.view || flow.view==="exhibitions")) {
+      history.replaceState(null,"",location.pathname+"?"+new URLSearchParams({show:flow.show}));
     } else if (["library","backup","desk"].includes(flow.view)) {
       history.replaceState(null,"",location.pathname+"?view="+flow.view);
     }
