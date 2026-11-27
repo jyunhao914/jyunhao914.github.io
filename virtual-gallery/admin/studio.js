@@ -5,6 +5,8 @@ import { readDimensions } from "./dimensions.js";
 import * as wallTools from "./wall-tools.js?v=hall34";
 import {roomSize} from "../room-size.js?v=desk33";
 import { artworkList, artworkDetail } from "./art-preview.js?v=wall24";
+import { bindInventory, inventoryMarkup } from "./desk-inventory.js?v=inventory68";
+import { addToExhibition } from "./inventory-placement.js?v=inventory68";
 import { state, post, versions, exhibition } from "./storage.js?v=desk33";
 const $ = (s) => document.querySelector(s),
   app = $("#app"),
@@ -193,6 +195,7 @@ function syncWorkspaceNav() {
       button.textContent = name;
       button.onclick = () => {
         if (name !== tab) {
+          if (name === "佈展設定" && tab === "作品資料庫") prepareLibrarySelection();
           tab = name;
           render();
         }
@@ -515,10 +518,10 @@ function manage() {
     $("#show-count").textContent = s.ids.length+" 件作品";
     $("#member-count").textContent = "已選 "+s.ids.length+" 件";
     const empty = !s.ids.length;
-    for (const k of ["layout","preview","publish"]) $('[data-act="'+k+'"]').disabled = empty;
+    for (const k of ["preview","publish"]) $('[data-act="'+k+'"]').disabled = empty;
     const hint = $("#show-first-work");
     hint.hidden = !empty;
-    if(empty)hint.textContent = db.arts.length ? "先在下方「展出作品」勾選要展出的作品。" : "先將作品加入作品資料庫，再回來選件。";
+    if(empty)hint.textContent = db.arts.length ? "進入佈展即可從作品庫選件。" : "先將作品加入作品資料庫，再回來選件。";
   }
   updateOverview();
   $("#show-members").open = !s.ids.length;
@@ -656,7 +659,19 @@ async function previewShow(s,work) {
   }
 const deskTools={inventory:"作品清單",position:"位置",mount:"裝裱",light:"燈光"};
 const requestedTool=new URLSearchParams(location.search).get("panel");
-let deskTool=Object.hasOwn(deskTools,requestedTool) ? requestedTool : "position";
+let deskTool=requestedTool==="available" ? "inventory" : Object.hasOwn(deskTools,requestedTool) ? requestedTool : "position";
+let openAvailableOnEntry = requestedTool === "available";
+const inventoryBrowser = { exhibition: null, available: false, preferred: null, query: "" };
+let lastDeskSelection;
+function prepareLibrarySelection() {
+  const s = show();
+  if (!s) return;
+  const unplaced = Boolean(aid && !s.ids.includes(aid));
+  Object.assign(inventoryBrowser, { exhibition: sid, available: unplaced || !s.ids.length, preferred: unplaced ? aid : null, query: "" });
+  if (unplaced) aid = lastDeskSelection?.show === sid ? lastDeskSelection.work : null;
+  unmatchedEntry = null;
+  deskTool = "inventory";
+}
 const lightFields=["lx","ly","lz","power","kelvin","angle"];
 let rulerPreference=null;
 matchMedia("(orientation:landscape) and (max-height:550px)").addEventListener("change",event=>{
@@ -677,24 +692,31 @@ function showDeskRulers() {
 function layout(keepScene=false) {
   let s = show();
   if (!s) {
-    app.textContent = "請先建立展覽";
+    app.innerHTML = "<h1>佈展設定</h1><p>請先建立展覽，再從作品庫選件。</p>" + btn("manage", "前往展覽管理");
+    action("manage", () => { tab = "展覽管理"; render(); });
     return;
   }
   let works = s.ids.map((i) => ({
     ...db.arts.find((a) => a.id === i),
     ...s.layout[i],
   }));
+  if (inventoryBrowser.exhibition !== sid) {
+    inventoryBrowser.exhibition = sid;
+    inventoryBrowser.query = "";
+    inventoryBrowser.available = openAvailableOnEntry || !works.length || Boolean(inventoryBrowser.preferred && !s.ids.includes(inventoryBrowser.preferred));
+    openAvailableOnEntry = false;
+  }
   const needsSelection=unmatchedEntry===s.id && !aid;
   if (!needsSelection && !works.some((a) => a.id === aid)) aid = works[0]?.id;
+  const route=new URL(location.href);
+  route.searchParams.set("layout",sid);
+  route.searchParams.delete("view");
   if(aid) {
-    const route=new URL(location.href);
-    if(route.searchParams.get("layout")!==sid || route.searchParams.get("work")!==aid) {
-      route.searchParams.set("layout",sid);
-      const original=Object.entries(s.publicWorkIds || {}).find(([,id])=>id===aid);
-      route.searchParams.set("work",original?.[0] || aid);
-      if(route.href!==location.href)history.replaceState(null,"",route);
-    }
-  }
+    lastDeskSelection = {show:sid, work:aid};
+    const original=Object.entries(s.publicWorkIds || {}).find(([,id])=>id===aid);
+    route.searchParams.set("work",original?.[0] || aid);
+  } else if(!needsSelection) route.searchParams.delete("work");
+  if(route.href!==location.href)history.replaceState(null,"",route);
   let a = works.find((work) => work.id === aid);
   if(!a)deskTool="inventory";
   const inspectorBefore=$("#layout-inspector"), activeBefore=document.activeElement;
@@ -712,7 +734,25 @@ function layout(keepScene=false) {
     '<div class="desk-sidebar"><div class="desk-work-picker"><label for="sel">編輯作品</label><select id="sel"></select></div>'+
     '<div class="desk-tool-tabs" role="tablist" aria-label="佈展工具">'+toolButtons+'</div>'+
     '<div id="layout-inspector" role="region" aria-label="佈展工具內容" tabindex="-1"><section id="desk-panel-inventory" class="inventory" role="tabpanel" aria-labelledby="desk-tab-inventory" data-desk-panel="inventory">'+
-    '<p id="wall-progress"></p><div id="wall-list"></div></section><div id="form"></div></div></div></div>';
+    inventoryMarkup+'</section><div id="form"></div></div></div></div>';
+  function addWork(chosen) {
+    const work = db.arts.find(item => item.id === chosen);
+    if (!work || !addToExhibition(s, work, works, a)) return;
+    aid = chosen;
+    unmatchedEntry = null;
+    Object.assign(inventoryBrowser, { available: false, preferred: null, query: "" });
+    changed();
+    render();
+    const row = $('#wall-list button[aria-current="true"]');
+    row?.focus({preventScroll:true});
+    row?.scrollIntoView({block:"nearest",inline:"nearest"});
+  }
+  let inventoryBound = false;
+  function writePanelRoute() {
+    const route = new URL(location.href);
+    route.searchParams.set("panel", deskTool === "inventory" && inventoryBrowser.available ? "available" : deskTool);
+    if (route.href !== location.href) history.replaceState(null, "", route);
+  }
   function activateTool(key,resetScroll=false) {
     deskTool=key;
     for(const el of app.querySelectorAll("[data-desk-tool]")) {
@@ -722,9 +762,11 @@ function layout(keepScene=false) {
       el.disabled=!a && el.dataset.deskTool!=="inventory";
     }
     for(const el of app.querySelectorAll("[data-desk-panel]"))el.hidden=el.dataset.deskPanel!==key;
-    const route=new URL(location.href);
-    route.searchParams.set("panel",key);
-    if(route.href!==location.href)history.replaceState(null,"",route);
+    if(key==="inventory" && !inventoryBound) {
+      bindInventory($("#desk-panel-inventory"), db.arts, s, inventoryBrowser, addWork, writePanelRoute);
+      inventoryBound = true;
+    }
+    writePanelRoute();
     showDeskRulers();
     if(resetScroll)$("#layout-inspector").scrollTop=0;
   }
@@ -775,6 +817,7 @@ function layout(keepScene=false) {
     $("#desk-tab-position")?.focus({preventScroll:true});
   },w=>[w.room,wallNames[w.wall],w.groupId?"連屏":"",w.reviewed?"掛位已確認":"待確認"].filter(Boolean).join(" · "));
   action("preview",()=>previewShow(s,a));
+  $('[data-act="preview"]').disabled = !works.length;
   for(const m of ["2D","3D"])app.querySelector('[data-act="'+m+'"]').setAttribute("aria-current",String(m===mode));
   for (let m of ["2D", "3D"])
     action(m, () => {
@@ -784,7 +827,7 @@ function layout(keepScene=false) {
     });
   $("#sel").disabled=!works.length;
   if (!a) {
-    $("#surface").textContent = works.length ? "這件公開作品無法對應目前的草稿，請從清單選擇要編輯的作品。" : "請先於展覽管理勾選展出作品";
+    $("#surface").textContent = works.length ? "這件公開作品無法對應目前的草稿，請從清單選擇要編輯的作品。" : "從作品清單的「可加入本展」選擇第一件作品。";
     return;
   }
   room = a.room;

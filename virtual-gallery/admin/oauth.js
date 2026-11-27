@@ -120,7 +120,7 @@ export async function restore() {
     if(flow.layout) {
       const entry=new URLSearchParams({layout:flow.layout});
       if(flow.work)entry.set("work",flow.work);
-      if(["inventory","position","mount","light"].includes(flow.panel))entry.set("panel",flow.panel);
+      if(["inventory","available","position","mount","light"].includes(flow.panel))entry.set("panel",flow.panel);
       history.replaceState(null,"",location.pathname+"?"+entry);
     } else if (["library","backup","desk"].includes(flow.view)) {
       history.replaceState(null,"",location.pathname+"?view="+flow.view);
